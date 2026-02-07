@@ -103,7 +103,27 @@ function buildQuickPromptDataUrl(): string {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Quick Prompt</title>
     <style>
-      :root { color-scheme: light dark; }
+      :root {
+        color-scheme: light dark;
+        --qp-bg: rgba(255, 255, 255, 0.94);
+        --qp-bg-soft: rgba(255, 255, 255, 0.86);
+        --qp-border: #e5e7eb;
+        --qp-text: #1f2937;
+        --qp-muted: #6b7280;
+        --qp-accent: #4f46e5;
+        --qp-shadow: 0 8px 22px rgba(17, 24, 39, 0.11);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --qp-bg: rgba(31, 31, 31, 0.94);
+          --qp-bg-soft: rgba(31, 31, 31, 0.86);
+          --qp-border: #3a3a3a;
+          --qp-text: #f6f6f6;
+          --qp-muted: #a0a0a0;
+          --qp-accent: #6c63ff;
+          --qp-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
+        }
+      }
       html, body {
         width: 100%;
         height: 100%;
@@ -123,46 +143,29 @@ function buildQuickPromptDataUrl(): string {
         box-sizing: border-box;
         padding: 8px 14px;
         overflow: hidden;
-        border-radius: 0;
-        border: 1px solid rgba(124, 58, 237, 0.52);
+        border-radius: 14px;
+        border: 1.5px solid var(--qp-border);
         background:
-          linear-gradient(165deg, rgba(248, 244, 255, 0.84), rgba(235, 225, 255, 0.68));
+          linear-gradient(180deg, var(--qp-bg), var(--qp-bg-soft));
         box-shadow:
-          0 10px 26px rgba(88, 28, 135, 0.2),
-          inset 0 1px 0 rgba(255, 255, 255, 0.72);
-        backdrop-filter: blur(24px) saturate(165%);
-        -webkit-backdrop-filter: blur(24px) saturate(165%);
+          var(--qp-shadow),
+          inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        backdrop-filter: blur(16px) saturate(130%);
+        -webkit-backdrop-filter: blur(16px) saturate(130%);
+        transition: border-color 0.18s ease-out, box-shadow 0.18s ease-out;
       }
       .panel::before {
         content: "";
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.08));
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent);
       }
-      .panel::after {
-        content: "";
-        position: absolute;
-        inset: 3px;
-        border: 1px solid rgba(167, 139, 250, 0.62);
-        pointer-events: none;
-      }
-      @media (prefers-color-scheme: dark) {
-        .panel {
-          border-color: rgba(196, 181, 253, 0.56);
-          background:
-            linear-gradient(165deg, rgba(49, 34, 79, 0.84), rgba(28, 19, 47, 0.74));
-          box-shadow:
-            0 12px 28px rgba(0, 0, 0, 0.38),
-            0 0 0 1px rgba(139, 92, 246, 0.24),
-            inset 0 1px 0 rgba(255, 255, 255, 0.14);
-        }
-        .panel::before {
-          background: linear-gradient(180deg, rgba(224, 206, 255, 0.16), rgba(224, 206, 255, 0.03));
-        }
-        .panel::after {
-          border-color: rgba(196, 181, 253, 0.44);
-        }
+      .panel:focus-within {
+        border-color: var(--qp-accent);
+        box-shadow:
+          0 0 0 3px rgba(79, 70, 229, 0.2),
+          var(--qp-shadow);
       }
       .input {
         position: relative;
@@ -170,7 +173,7 @@ function buildQuickPromptDataUrl(): string {
         width: 100%;
         border: none;
         background: transparent;
-        color: rgba(17, 24, 39, 0.86);
+        color: var(--qp-text);
         font-size: 23px;
         font-weight: 560;
         line-height: 1.3;
@@ -181,19 +184,12 @@ function buildQuickPromptDataUrl(): string {
         resize: none;
         overflow-y: hidden;
       }
-      @media (prefers-color-scheme: dark) {
-        .input {
-          color: rgba(248, 250, 252, 0.94);
-        }
-      }
-      .input::placeholder { color: rgba(71, 85, 105, 0.58); }
-      @media (prefers-color-scheme: dark) {
-        .input::placeholder { color: rgba(148, 163, 184, 0.68); }
-      }
+      .input::placeholder { color: var(--qp-muted); opacity: 0.78; }
       .input:focus { outline: none; }
       @media (max-width: 640px) {
         .panel {
           padding: 7px 12px;
+          border-radius: 12px;
         }
         .input {
           font-size: 19px;
