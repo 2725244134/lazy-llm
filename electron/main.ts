@@ -10,7 +10,7 @@ import type {
   PaneCount,
   PaneResponseReadyPayload,
 } from './ipc/contracts.js';
-import { getConfig } from './ipc-handlers/store.js';
+import { getConfig, setDefaultPaneCount, setDefaultProvider } from './ipc-handlers/store.js';
 import { ViewManager } from './views/manager.js';
 
 // Prevent multiple instances
@@ -112,6 +112,7 @@ function registerIPCHandlers() {
     }
     const count = validatePaneCount(request?.count);
     viewManager.setPaneCount(count);
+    setDefaultPaneCount(count);
     console.log('[IPC] pane:setCount', { count });
     return { success: true };
   });
@@ -128,6 +129,9 @@ function registerIPCHandlers() {
     }
     const providerKey = typeof request?.providerKey === 'string' ? request.providerKey : '';
     const success = viewManager.updatePaneProvider(paneIndex, providerKey);
+    if (success) {
+      setDefaultProvider(paneIndex, providerKey);
+    }
     console.log('[IPC] pane:updateProvider', { paneIndex, providerKey, success });
     return { success, paneIndex };
   });

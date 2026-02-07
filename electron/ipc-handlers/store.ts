@@ -48,3 +48,47 @@ export function setSession(session: Partial<StoreSchema['session']>) {
   const current = store.get('session');
   store.set('session', { ...current, ...session });
 }
+
+export function setDefaultPaneCount(paneCount: number): AppConfig {
+  const current = getConfig();
+  const fallbackProvider = current.defaults.providers[0] ?? 'chatgpt';
+  const nextProviders = Array.from({ length: paneCount }, (_, paneIndex) => {
+    return current.defaults.providers[paneIndex] ?? fallbackProvider;
+  });
+
+  const nextConfig = normalizeConfig({
+    ...current,
+    defaults: {
+      ...current.defaults,
+      pane_count: paneCount,
+      providers: nextProviders,
+    },
+  });
+
+  store.set('config', nextConfig);
+  return nextConfig;
+}
+
+export function setDefaultProvider(paneIndex: number, providerKey: string): AppConfig {
+  const current = getConfig();
+  const fallbackProvider = current.defaults.providers[0] ?? 'chatgpt';
+  const nextProviders = Array.from(
+    { length: current.defaults.pane_count },
+    (_, index) => current.defaults.providers[index] ?? fallbackProvider
+  );
+
+  if (paneIndex >= 0 && paneIndex < nextProviders.length) {
+    nextProviders[paneIndex] = providerKey;
+  }
+
+  const nextConfig = normalizeConfig({
+    ...current,
+    defaults: {
+      ...current.defaults,
+      providers: nextProviders,
+    },
+  });
+
+  store.set('config', nextConfig);
+  return nextConfig;
+}
