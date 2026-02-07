@@ -151,25 +151,44 @@ test.describe('Electron Smoke Tests', () => {
       return window.evaluate(async () => {
         const council = (window as unknown as {
           council: {
-            getLayoutSnapshot: () => Promise<{ quickPromptVisible: boolean }>;
+            getLayoutSnapshot: () => Promise<{
+              quickPromptVisible: boolean;
+              quickPromptBounds: { height: number } | null;
+            }>;
           };
         }).council;
         const snapshot = await council.getLayoutSnapshot();
-        return snapshot.quickPromptVisible;
+        return {
+          visible: snapshot.quickPromptVisible,
+          height: snapshot.quickPromptBounds?.height ?? 0,
+        };
       });
     };
 
-    await expect.poll(isQuickPromptVisible).toBe(false);
+    await expect.poll(async () => (await isQuickPromptVisible()).visible).toBe(false);
 
     const paneBtn3 = window.locator('[data-testid="pane-chip-3"]');
 
     await window.keyboard.press('Control+J');
-    await expect.poll(isQuickPromptVisible).toBe(true);
+    await expect.poll(async () => (await isQuickPromptVisible()).visible).toBe(true);
+    const initialHeight = (await isQuickPromptVisible()).height;
+
+    const resizeResult = await window.evaluate(async () => {
+      const council = (window as unknown as {
+        council: {
+          resizeQuickPrompt: (request: { height: number }) => Promise<{ success: boolean; visible: boolean; height: number }>;
+        };
+      }).council;
+      return council.resizeQuickPrompt({ height: 260 });
+    });
+    expect(resizeResult.success).toBe(true);
+    await expect.poll(async () => (await isQuickPromptVisible()).height).toBeGreaterThan(initialHeight);
+
     await paneBtn3.click();
     await expect(paneBtn3).toHaveClass(/active/);
 
     await window.keyboard.press('Control+J');
-    await expect.poll(isQuickPromptVisible).toBe(false);
+    await expect.poll(async () => (await isQuickPromptVisible()).visible).toBe(false);
 
     await electronApp.close();
   });

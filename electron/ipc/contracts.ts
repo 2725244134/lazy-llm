@@ -17,6 +17,7 @@ export const IPC_CHANNELS = {
   SIDEBAR_UPDATE_WIDTH: 'sidebar:updateWidth',
   QUICK_PROMPT_TOGGLE: 'quickPrompt:toggle',
   QUICK_PROMPT_HIDE: 'quickPrompt:hide',
+  QUICK_PROMPT_RESIZE: 'quickPrompt:resize',
   // Pane channels (main <-> pane)
   PANE_INJECT_PROMPT: 'pane:injectPrompt',
   PANE_RESPONSE_READY: 'pane:responseReady',
@@ -116,6 +117,7 @@ export interface LayoutSnapshot {
   sidebar: ViewRect;
   paneCount: PaneCount;
   quickPromptVisible: boolean;
+  quickPromptBounds: ViewRect | null;
   panes: PaneState[];
 }
 
@@ -135,6 +137,16 @@ export interface QuickPromptHideResponse {
 export interface QuickPromptToggleResponse {
   success: boolean;
   visible: boolean;
+}
+
+export interface QuickPromptResizeRequest {
+  height: number;
+}
+
+export interface QuickPromptResizeResponse {
+  success: boolean;
+  visible: boolean;
+  height: number;
 }
 
 // Pane injection types
@@ -199,5 +211,9 @@ export interface IPCContract {
   [IPC_CHANNELS.QUICK_PROMPT_TOGGLE]: {
     request: void;
     response: QuickPromptToggleResponse;
+  };
+  [IPC_CHANNELS.QUICK_PROMPT_RESIZE]: {
+    request: QuickPromptResizeRequest;
+    response: QuickPromptResizeResponse;
   };
 }

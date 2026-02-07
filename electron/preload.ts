@@ -17,6 +17,8 @@ import type {
   SidebarWidthResponse,
   QuickPromptToggleResponse,
   QuickPromptHideResponse,
+  QuickPromptResizeRequest,
+  QuickPromptResizeResponse,
   LayoutSnapshot,
 } from './ipc/contracts.js';
 
@@ -75,6 +77,11 @@ const councilAPI = {
   // Hide quick prompt overlay
   hideQuickPrompt: (): Promise<QuickPromptHideResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.QUICK_PROMPT_HIDE);
+  },
+
+  // Resize quick prompt overlay height
+  resizeQuickPrompt: (request: QuickPromptResizeRequest): Promise<QuickPromptResizeResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.QUICK_PROMPT_RESIZE, request);
   },
 };
 

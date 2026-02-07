@@ -9,6 +9,7 @@ import type {
   SidebarWidthRequest,
   PaneCount,
   PaneResponseReadyPayload,
+  QuickPromptResizeRequest,
 } from './ipc/contracts.js';
 import { getConfig, setDefaultPaneCount, setDefaultProvider } from './ipc-handlers/store.js';
 import { ViewManager } from './views/manager.js';
@@ -180,6 +181,7 @@ function registerIPCHandlers() {
         sidebar: { x: 0, y: 0, width: 0, height: 0 },
         paneCount: 1,
         quickPromptVisible: false,
+        quickPromptBounds: null,
         panes: [],
       };
     }
@@ -213,6 +215,16 @@ function registerIPCHandlers() {
     }
     const visible = viewManager.hideQuickPrompt();
     return { success: true, visible };
+  });
+
+  // Quick prompt resize
+  ipcMain.handle(IPC_CHANNELS.QUICK_PROMPT_RESIZE, (_event, request: QuickPromptResizeRequest) => {
+    if (!viewManager) {
+      return { success: false, visible: false, height: 0 };
+    }
+    const height = typeof request?.height === 'number' ? request.height : 0;
+    const result = viewManager.resizeQuickPrompt(height);
+    return { success: true, ...result };
   });
 
   // Listen for pane response ready (from pane webContents)

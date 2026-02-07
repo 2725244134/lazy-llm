@@ -76,7 +76,9 @@ const injectRuntimePath = resolveFirstExistingPath([
 const QUICK_PROMPT_PASSTHROUGH_MODE = true;
 const QUICK_PROMPT_MAX_WIDTH = 960;
 const QUICK_PROMPT_MIN_WIDTH = 360;
-const QUICK_PROMPT_HEIGHT = 162;
+const QUICK_PROMPT_DEFAULT_HEIGHT = 112;
+const QUICK_PROMPT_MIN_HEIGHT = 92;
+const QUICK_PROMPT_MAX_HEIGHT = 360;
 const QUICK_PROMPT_MIN_TOP = 96;
 const QUICK_PROMPT_TOP_RATIO = 0.22;
 const QUICK_PROMPT_VIEWPORT_PADDING = 16;
@@ -106,7 +108,6 @@ function buildQuickPromptDataUrl(): string {
       :root { color-scheme: light dark; }
       html, body {
         width: 100%;
-        height: 100%;
         margin: 0;
         padding: 0;
         background: transparent;
@@ -115,53 +116,30 @@ function buildQuickPromptDataUrl(): string {
       }
       body {
         display: flex;
-        align-items: stretch;
+        align-items: flex-start;
         justify-content: center;
       }
       .panel {
         width: 100%;
-        height: 100%;
         box-sizing: border-box;
-        padding: 12px 14px 10px;
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.35);
-        background: rgba(255, 255, 255, 0.9);
-        box-shadow: 0 12px 36px rgba(15, 23, 42, 0.26);
-        backdrop-filter: blur(10px) saturate(130%);
+        padding: 14px 16px;
+        border-radius: 22px;
+        border: 1px solid rgba(148, 163, 184, 0.34);
+        background:
+          linear-gradient(160deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.78));
+        box-shadow:
+          0 16px 40px rgba(15, 23, 42, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.62);
+        backdrop-filter: blur(16px) saturate(145%);
       }
       @media (prefers-color-scheme: dark) {
         .panel {
-          border-color: rgba(100, 116, 139, 0.52);
-          background: rgba(22, 27, 34, 0.9);
-        }
-      }
-      .header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        margin-bottom: 6px;
-      }
-      .title {
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.7px;
-        text-transform: uppercase;
-        color: #475569;
-      }
-      .shortcut {
-        font-size: 11px;
-        line-height: 1;
-        color: #64748b;
-        border: 1px solid rgba(148, 163, 184, 0.4);
-        border-radius: 999px;
-        padding: 4px 8px;
-      }
-      @media (prefers-color-scheme: dark) {
-        .title { color: #cbd5e1; }
-        .shortcut {
-          color: #94a3b8;
-          border-color: rgba(148, 163, 184, 0.35);
+          border-color: rgba(100, 116, 139, 0.5);
+          background:
+            linear-gradient(160deg, rgba(20, 26, 35, 0.88), rgba(19, 23, 30, 0.8));
+          box-shadow:
+            0 18px 44px rgba(0, 0, 0, 0.48),
+            inset 0 1px 0 rgba(255, 255, 255, 0.08);
         }
       }
       .input {
@@ -169,64 +147,98 @@ function buildQuickPromptDataUrl(): string {
         border: none;
         background: transparent;
         color: #111827;
-        font-size: 31px;
+        font-size: 30px;
         font-weight: 580;
-        line-height: 1.2;
+        line-height: 1.3;
         letter-spacing: 0.2px;
+        min-height: 56px;
+        max-height: 260px;
+        padding: 2px 0 0;
+        resize: none;
+        overflow-y: hidden;
       }
       @media (prefers-color-scheme: dark) {
         .input {
-          color: #f6f6f6;
+          color: #f8fafc;
         }
       }
-      .input::placeholder { color: #6b7280; }
-      .input:focus { outline: none; }
-      .hint {
-        margin-top: 7px;
-        font-size: 12px;
-        color: #6b7280;
-        letter-spacing: 0.12px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+      .input::placeholder { color: rgba(100, 116, 139, 0.92); }
+      @media (prefers-color-scheme: dark) {
+        .input::placeholder { color: rgba(148, 163, 184, 0.86); }
       }
+      .input:focus { outline: none; }
       @media (max-width: 640px) {
         .panel {
-          padding: 10px 12px 9px;
-          border-radius: 14px;
+          padding: 12px 14px;
+          border-radius: 16px;
         }
-        .input { font-size: 22px; }
-        .hint { font-size: 11px; }
+        .input {
+          font-size: 22px;
+          min-height: 46px;
+        }
       }
     </style>
   </head>
   <body>
     <div class="panel" data-testid="quick-prompt-overlay">
-      <div class="header">
-        <div class="title">Quick Prompt</div>
-        <div class="shortcut">Ctrl+J</div>
-      </div>
-      <div class="dialog" data-testid="quick-prompt-dialog">
-        <input
-          id="quickPromptInput"
-          class="input"
-          data-testid="quick-prompt-input"
-          type="text"
-          placeholder="Just prompt."
-          autocomplete="off"
-        />
-        <div class="hint">Enter to send · Esc to close · Ctrl+J to toggle</div>
-      </div>
+      <textarea
+        id="quickPromptInput"
+        class="input"
+        data-testid="quick-prompt-input"
+        placeholder="Just prompt."
+        autocomplete="off"
+      ></textarea>
     </div>
     <script>
       const input = document.getElementById('quickPromptInput');
       let isSending = false;
+      let resizeRaf = 0;
+      let lastResizeHeight = 0;
+      const MIN_INPUT_HEIGHT = 56;
+      const MAX_INPUT_HEIGHT = 260;
+      const PANEL_VERTICAL_CHROME = 30;
+      let pendingViewHeight = MIN_INPUT_HEIGHT + PANEL_VERTICAL_CHROME;
 
       const focusInput = () => {
         if (!input) return;
         input.focus();
         const cursorPos = input.value.length;
         input.setSelectionRange(cursorPos, cursorPos);
+      };
+
+      const pushResize = async () => {
+        if (!window.quickPrompt || typeof window.quickPrompt.resize !== 'function') return;
+        const measuredHeight = Math.ceil(pendingViewHeight);
+        if (measuredHeight === lastResizeHeight) return;
+        lastResizeHeight = measuredHeight;
+        try {
+          await window.quickPrompt.resize(measuredHeight);
+        } catch (_error) {
+          // Best effort; no-op
+        }
+      };
+
+      const scheduleResize = () => {
+        if (resizeRaf !== 0) {
+          cancelAnimationFrame(resizeRaf);
+        }
+        resizeRaf = requestAnimationFrame(() => {
+          resizeRaf = 0;
+          void pushResize();
+        });
+      };
+
+      const syncInputHeight = () => {
+        if (!input) return;
+        input.style.height = '0px';
+        const nextHeight = Math.min(
+          MAX_INPUT_HEIGHT,
+          Math.max(MIN_INPUT_HEIGHT, input.scrollHeight)
+        );
+        input.style.height = nextHeight + 'px';
+        input.style.overflowY = input.scrollHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden';
+        pendingViewHeight = nextHeight + PANEL_VERTICAL_CHROME;
+        scheduleResize();
       };
 
       const hide = async () => {
@@ -244,6 +256,7 @@ function buildQuickPromptDataUrl(): string {
         try {
           await window.quickPrompt.sendPrompt(prompt);
           input.value = '';
+          syncInputHeight();
           await hide();
         } finally {
           isSending = false;
@@ -251,13 +264,15 @@ function buildQuickPromptDataUrl(): string {
         }
       };
 
+      input?.addEventListener('input', syncInputHeight);
+
       window.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
           void hide();
           return;
         }
-        if (event.key === 'Enter') {
+        if (event.key === 'Enter' && !event.shiftKey) {
           event.preventDefault();
           void submit();
         }
@@ -268,10 +283,16 @@ function buildQuickPromptDataUrl(): string {
         input.value = '';
         input.disabled = false;
         isSending = false;
+        syncInputHeight();
         focusInput();
       });
 
-      window.addEventListener('quick-prompt:focus', focusInput);
+      window.addEventListener('quick-prompt:focus', () => {
+        focusInput();
+        syncInputHeight();
+      });
+
+      syncInputHeight();
     </script>
   </body>
 </html>`;
@@ -288,6 +309,7 @@ export class ViewManager {
   private currentSidebarWidth: number;
   private quickPromptVisible = false;
   private quickPromptReady = false;
+  private quickPromptHeight = QUICK_PROMPT_DEFAULT_HEIGHT;
   private providers: Map<string, ProviderMeta>;
   private injectRuntimeScript: string | null = null;
 
@@ -328,10 +350,15 @@ export class ViewManager {
     );
     const minWidth = Math.min(QUICK_PROMPT_MIN_WIDTH, maxAvailableWidth);
     const width = Math.max(minWidth, Math.min(QUICK_PROMPT_MAX_WIDTH, maxAvailableWidth));
-    const height = Math.min(
-      QUICK_PROMPT_HEIGHT,
-      Math.max(108, contentSize.height - QUICK_PROMPT_VIEWPORT_PADDING * 2)
+    const maxHeightByViewport = Math.max(
+      QUICK_PROMPT_MIN_HEIGHT,
+      contentSize.height - QUICK_PROMPT_VIEWPORT_PADDING * 2
     );
+    const desiredHeight = Math.max(
+      QUICK_PROMPT_MIN_HEIGHT,
+      Math.min(QUICK_PROMPT_MAX_HEIGHT, this.quickPromptHeight)
+    );
+    const height = Math.min(desiredHeight, maxHeightByViewport);
     const x = Math.max(0, Math.floor((contentSize.width - width) / 2));
     const preferredTop = Math.max(
       QUICK_PROMPT_MIN_TOP,
@@ -464,8 +491,10 @@ export class ViewManager {
       return this.quickPromptVisible;
     }
 
+    this.quickPromptHeight = QUICK_PROMPT_DEFAULT_HEIGHT;
     this.window.contentView.addChildView(this.quickPromptView);
     this.quickPromptView.setBounds(this.getQuickPromptBounds());
+    this.quickPromptView.webContents.focus();
     this.quickPromptVisible = true;
 
     if (this.quickPromptReady) {
@@ -481,8 +510,27 @@ export class ViewManager {
     }
     this.window.contentView.removeChildView(this.quickPromptView);
     this.quickPromptVisible = false;
+    this.quickPromptHeight = QUICK_PROMPT_DEFAULT_HEIGHT;
     this.focusSidebarIfAvailable();
     return this.quickPromptVisible;
+  }
+
+  resizeQuickPrompt(nextHeight: number): { visible: boolean; height: number } {
+    if (!Number.isFinite(nextHeight)) {
+      return { visible: this.quickPromptVisible, height: this.quickPromptHeight };
+    }
+
+    const clampedHeight = Math.max(
+      QUICK_PROMPT_MIN_HEIGHT,
+      Math.min(QUICK_PROMPT_MAX_HEIGHT, Math.floor(nextHeight))
+    );
+    this.quickPromptHeight = clampedHeight;
+
+    if (this.quickPromptVisible && this.quickPromptView) {
+      this.quickPromptView.setBounds(this.getQuickPromptBounds());
+    }
+
+    return { visible: this.quickPromptVisible, height: this.quickPromptHeight };
   }
 
   private focusSidebarIfAvailable(): void {
@@ -632,6 +680,9 @@ export class ViewManager {
   getSnapshot(): LayoutSnapshot {
     const contentSize = this.getContentSize();
     const sidebarBounds = this.sidebarView?.getBounds() || { x: 0, y: 0, width: 0, height: 0 };
+    const quickPromptBounds = this.quickPromptVisible && this.quickPromptView
+      ? this.quickPromptView.getBounds()
+      : null;
 
     return {
       windowWidth: contentSize.width,
@@ -639,6 +690,7 @@ export class ViewManager {
       sidebar: sidebarBounds,
       paneCount: this.currentPaneCount,
       quickPromptVisible: this.quickPromptVisible,
+      quickPromptBounds,
       panes: this.paneViews.map(pane => ({
         paneIndex: pane.paneIndex,
         bounds: pane.view.getBounds(),
