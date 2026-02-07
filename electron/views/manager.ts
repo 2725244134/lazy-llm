@@ -101,6 +101,7 @@ function buildQuickPromptDataUrl(): string {
         height: 100%;
         margin: 0;
         padding: 0;
+        background: transparent;
         font-family: "SF Pro Text", "SF Pro SC", "PingFang SC", "Segoe UI", sans-serif;
       }
       .overlay {
@@ -110,8 +111,8 @@ function buildQuickPromptDataUrl(): string {
         align-items: flex-start;
         justify-content: center;
         padding: 22vh 16px 16px;
-        background: rgba(17, 24, 39, 0.2);
-        backdrop-filter: blur(3px);
+        background: transparent;
+        backdrop-filter: none;
       }
       .dialog {
         width: min(960px, 100%);
@@ -366,6 +367,7 @@ export class ViewManager {
       },
     });
 
+    this.quickPromptView.setBackgroundColor('#00000000');
     this.attachGlobalShortcutHooks(this.quickPromptView.webContents);
     this.quickPromptView.webContents.on('did-finish-load', () => {
       this.quickPromptReady = true;
