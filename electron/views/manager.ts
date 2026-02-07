@@ -169,7 +169,6 @@ export class ViewManager {
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: true,
-          partition: `persist:pane-${paneIndex}`,
           additionalArguments: [`--pane-index=${paneIndex}`],
         },
       });

@@ -60,14 +60,14 @@ BaseWindow (无自身 webContents)
 | sidebar | `electron/preload.ts` | 暴露 `window.council` API，用于 IPC 通信 |
 | pane-N | `electron/pane-preload.ts` | 暴露 `window.paneAPI`，用于 prompt 注入和响应提取 |
 
-### Session 隔离
+### Session strategy
 
-每个 pane 使用独立 session 以保持登录状态隔离：
+All pane views use Electron's default session so authentication state can be shared across panes.
 
 ```ts
 new WebContentsView({
   webPreferences: {
-    partition: `persist:pane-${paneIndex}`,  // 独立持久化 session
+    // No `partition` override: use defaultSession.
     // ...
   }
 })
@@ -259,7 +259,7 @@ export interface ViewManager {
    - 当 pane 数量减少：多余 WebContentsView 从 contentView 移除并销毁。
    - 当 pane 数量增加：按 `paneIndex` 顺序创建新 WebContentsView。
    - provider 切换只调用 `webContents.loadURL()`，不销毁 view。
-3. **Session 持久化**：使用 `persist:pane-N` partition，登录状态跨会话保留。
+3. **Shared default session**: pane views do not set a custom partition, so login state is reused across panes.
 
 ### Boundaries and dependencies
 
@@ -296,9 +296,9 @@ electron/
    - 优点：单一事实来源，避免渲染层与壳层漂移。
    - 代价：每次布局变化需要 IPC 调用。
 
-4. **Session 隔离（partition）**
-   - 优点：每个 pane 独立登录状态，互不干扰。
-   - 代价：首次使用每个 pane 都需要登录。
+4. **Shared default session**
+   - Benefit: users sign in once and can reuse the same authenticated state in every pane.
+   - Cost: less isolation; logout/account-switch actions can impact all panes.
 
 5. **只支持水平分栏**
    - 优点：先把契约做稳定，降低复杂度。
