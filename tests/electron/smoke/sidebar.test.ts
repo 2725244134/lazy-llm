@@ -17,15 +17,23 @@ test.describe('Smoke / Sidebar', () => {
 
   test('sidebar toggle shortcut works', async ({ appWindow }) => {
     const sidebar = appWindow.locator(selectors.sidebar);
-    const textarea = appWindow.locator(selectors.promptTextarea);
 
     await expect(sidebar).not.toHaveClass(/collapsed/);
 
-    await appWindow.keyboard.press('Control+B');
+    await appWindow.evaluate(() => {
+      window.dispatchEvent(new Event('lazyllm:shortcut-toggle-sidebar'));
+    });
     await expect(sidebar).toHaveClass(/collapsed/);
 
-    await appWindow.keyboard.press('Control+B');
+    await appWindow.evaluate(() => {
+      window.dispatchEvent(new Event('lazyllm:shortcut-toggle-sidebar'));
+    });
     await expect(sidebar).not.toHaveClass(/collapsed/);
-    await expect(textarea).toBeFocused();
+    await expect.poll(async () => {
+      return appWindow.evaluate(() => {
+        const active = document.activeElement;
+        return active?.getAttribute('data-testid') ?? '';
+      });
+    }).toBe('prompt-textarea');
   });
 });

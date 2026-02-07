@@ -42,15 +42,18 @@ check: ## Run type checking.
 	@echo "==> Type-checking (vue-tsc)"
 	@bun run typecheck
 
-.PHONY: test test-unit test-electron-smoke test-electron-smoke-headless release-verify-tag
+.PHONY: test test-unit test-electron-smoke test-electron-smoke-headless test-electron-smoke-prepare release-verify-tag
 test: test-unit test-electron-smoke ## Run all test suites.
 test-unit: ## Run unit tests with vitest.
 	@echo "==> Running unit tests"
 	@bun run test:unit
-test-electron-smoke: ## Run Electron smoke tests with Playwright.
+test-electron-smoke-prepare: ## Build production artifacts required by Electron smoke tests.
+	@echo "==> Building artifacts for Electron smoke tests"
+	@bun run build
+test-electron-smoke: test-electron-smoke-prepare ## Run Electron smoke tests with Playwright.
 	@echo "==> Running Electron smoke tests"
 	@bun run test:electron:smoke
-test-electron-smoke-headless: ## Run Electron smoke tests in headless Linux (xvfb).
+test-electron-smoke-headless: test-electron-smoke-prepare ## Run Electron smoke tests in headless Linux (xvfb).
 	@echo "==> Running Electron smoke tests (headless)"
 	@xvfb-run -a bun run test:electron:smoke
 

@@ -3,7 +3,7 @@ Author: cctop
 Created: 2026-02-08
 Updated: 2026-02-08
 Status: Implemented
-Commits: ci(release): migrate llm-council GitHub maintenance workflows and prepare v0.1.1
+Commits: ci(release): migrate llm-council GitHub maintenance workflows and prepare v0.1.1; fix(ci): build artifacts before electron smoke tests; test(electron): stabilize smoke checks under headless CI
 ---
 
 # CLIP-7: Migrate GitHub Workflow and Release Maintenance Logic from llm-council
@@ -61,6 +61,11 @@ Commits: ci(release): migrate llm-council GitHub maintenance workflows and prepa
    - `make release-verify-tag EXPECTED_VERSION=v0.1.1`
 3. release 演练：
    - bump 版本、提交、打 tag（本地）
+4. CI 验证：
+   - GitHub Actions `CI` workflow 通过（包含 smoke headless）
+5. Headless 稳定性验证：
+   - 快捷键相关 smoke case 在 xvfb 下可稳定通过
+   - 使用稳定的 shortcut effect 路径验证（避免 CI 键盘注入抖动）
 
 ## Implementation notes
 
