@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { providerMetas, providerIcons } from '@/providers'
 
 const props = defineProps<{
@@ -12,6 +12,7 @@ const emit = defineEmits<{
 }>()
 
 const isOpen = ref(false)
+const selectRef = ref<HTMLDivElement | null>(null)
 
 const selectedProvider = computed(() =>
   providerMetas.find((p) => p.key === props.modelValue) ?? providerMetas[0]
@@ -28,36 +29,38 @@ const select = (key: string) => {
   isOpen.value = false
 }
 
-// Close dropdown when clicking outside
 const handleClickOutside = (e: MouseEvent) => {
-  const target = e.target as HTMLElement
-  if (!target.closest('.select-wrapper')) {
+  if (selectRef.value && !selectRef.value.contains(e.target as Node)) {
     isOpen.value = false
   }
 }
 
-watch(isOpen, (open) => {
-  if (open) {
-    document.addEventListener('click', handleClickOutside)
-  } else {
-    document.removeEventListener('click', handleClickOutside)
-  }
+onMounted(() => {
+  document.addEventListener('click', handleClickOutside)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
 <template>
-  <div class="select-wrapper" :data-testid="testid">
+  <div ref="selectRef" class="select-container" :data-testid="testid">
     <button
+      type="button"
       class="select-trigger"
-      :class="{ open: isOpen }"
+      :class="{ 'is-open': isOpen }"
       @click="toggle"
     >
-      <span class="select-value">
-        <component :is="selectedIcon" v-if="selectedIcon" class="provider-icon" />
-        {{ selectedProvider.name }}
+      <span class="trigger-content">
+        <span v-if="selectedIcon" class="trigger-icon">
+          <component :is="selectedIcon" class="icon" />
+        </span>
+        <span class="trigger-label">{{ selectedProvider.name }}</span>
       </span>
       <svg
-        class="select-arrow"
+        class="chevron"
+        :class="{ 'is-open': isOpen }"
         xmlns="http://www.w3.org/2000/svg"
         viewBox="0 0 24 24"
         fill="none"
@@ -67,111 +70,224 @@ watch(isOpen, (open) => {
         <polyline points="6 9 12 15 18 9"></polyline>
       </svg>
     </button>
-    <div v-if="isOpen" class="select-dropdown">
-      <button
-        v-for="provider in providerMetas"
-        :key="provider.key"
-        class="select-option"
-        :class="{ selected: provider.key === modelValue }"
-        @click="select(provider.key)"
-      >
-        <component :is="providerIcons[provider.key]" v-if="providerIcons[provider.key]" class="provider-icon" />
-        {{ provider.name }}
-      </button>
-    </div>
+
+    <transition name="dropdown">
+      <div v-show="isOpen" class="dropdown-menu">
+        <div class="dropdown-scroll">
+          <div
+            v-for="provider in providerMetas"
+            :key="provider.key"
+            class="dropdown-item"
+            :class="{ 'is-selected': provider.key === modelValue }"
+            @click="select(provider.key)"
+          >
+            <span v-if="providerIcons[provider.key]" class="item-icon">
+              <component :is="providerIcons[provider.key]" class="icon" />
+            </span>
+            <span class="item-label">{{ provider.name }}</span>
+            <svg
+              v-if="provider.key === modelValue"
+              class="checkmark"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+            >
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <style scoped>
-.select-wrapper {
+.select-container {
   position: relative;
   width: 100%;
 }
 
 .select-trigger {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1.5px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  transition: all 0.2s ease-out;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .select-trigger:hover {
   border-color: var(--accent);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.select-trigger.open {
+.select-trigger.is-open {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
-.select-value {
+.trigger-content {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
 }
 
-.provider-icon {
-  width: 18px;
-  height: 18px;
+.trigger-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   flex-shrink: 0;
 }
 
-.select-arrow {
+.trigger-icon :deep(svg) {
+  width: 24px;
+  height: 24px;
+}
+
+.trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
   width: 16px;
   height: 16px;
-  transition: transform 0.2s;
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: all 0.25s ease;
 }
 
-.select-trigger.open .select-arrow {
+.chevron.is-open {
   transform: rotate(180deg);
+  opacity: 1;
 }
 
-.select-dropdown {
+.dropdown-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   left: 0;
   right: 0;
+  z-index: 50;
   background: var(--bg);
   border: 1.5px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 100;
+  border-radius: 12px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 10px 20px -5px rgba(0, 0, 0, 0.15);
   overflow: hidden;
 }
 
-.select-option {
-  width: 100%;
-  padding: 10px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-  transition: background 0.15s;
+.dropdown-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.dropdown-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 2px;
 }
 
-.select-option:hover {
-  background: var(--bg-hover);
+.dropdown-item:last-child {
+  margin-bottom: 0;
 }
 
-.select-option.selected {
-  background: var(--accent);
-  color: var(--bg);
+.dropdown-item:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.dropdown-item.is-selected {
+  background: #f3f4f6;
   font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+  .dropdown-item.is-selected {
+    background: rgba(255, 255, 255, 0.1);
+  }
+}
+
+.item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.item-icon :deep(svg) {
+  width: 24px;
+  height: 24px;
+  opacity: 0.85;
+}
+
+.item-label {
+  flex: 1;
+}
+
+.checkmark {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke: var(--broadcast);
+}
+
+/* Dropdown Animation */
+.dropdown-enter-active {
+  transition: all 0.2s ease-out;
+}
+
+.dropdown-leave-active {
+  transition: all 0.15s ease-in;
+}
+
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.96);
+}
+
+.dropdown-enter-to,
+.dropdown-leave-from {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Scrollbar styling */
+.dropdown-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.dropdown-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
 }
 </style>
