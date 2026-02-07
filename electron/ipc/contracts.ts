@@ -10,6 +10,13 @@ export const IPC_CHANNELS = {
   PANE_SET_COUNT: 'pane:setCount',
   PANE_UPDATE_PROVIDER: 'pane:updateProvider',
   PROMPT_SEND: 'prompt:send',
+  // Layout channels
+  LAYOUT_UPDATE: 'layout:update',
+  LAYOUT_GET_SNAPSHOT: 'layout:getSnapshot',
+  SIDEBAR_UPDATE_WIDTH: 'sidebar:updateWidth',
+  // Pane channels (main <-> pane)
+  PANE_INJECT_PROMPT: 'pane:injectPrompt',
+  PANE_RESPONSE_READY: 'pane:responseReady',
 } as const;
 
 // Type definitions for IPC payloads
@@ -65,6 +72,58 @@ export interface PromptResponse {
   failures?: string[];
 }
 
+// Layout types
+export type PaneCount = 1 | 2 | 3 | 4;
+
+export interface ViewRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PaneState {
+  paneIndex: number;
+  bounds: ViewRect;
+  providerKey: string;
+  url: string;
+}
+
+export interface LayoutUpdateRequest {
+  sidebarWidth: number;
+  paneCount: PaneCount;
+}
+
+export interface LayoutUpdateResponse {
+  success: boolean;
+}
+
+export interface LayoutSnapshot {
+  windowWidth: number;
+  windowHeight: number;
+  sidebar: ViewRect;
+  paneCount: PaneCount;
+  panes: PaneState[];
+}
+
+export interface SidebarWidthRequest {
+  width: number;
+}
+
+export interface SidebarWidthResponse {
+  success: boolean;
+}
+
+// Pane injection types
+export interface PaneInjectPromptPayload {
+  text: string;
+}
+
+export interface PaneResponseReadyPayload {
+  paneIndex: number;
+  response: string;
+}
+
 // Structured error response
 export interface IPCError {
   code: string;
@@ -93,5 +152,17 @@ export interface IPCContract {
   [IPC_CHANNELS.PROMPT_SEND]: {
     request: PromptRequest;
     response: PromptResponse;
+  };
+  [IPC_CHANNELS.LAYOUT_UPDATE]: {
+    request: LayoutUpdateRequest;
+    response: LayoutUpdateResponse;
+  };
+  [IPC_CHANNELS.LAYOUT_GET_SNAPSHOT]: {
+    request: void;
+    response: LayoutSnapshot;
+  };
+  [IPC_CHANNELS.SIDEBAR_UPDATE_WIDTH]: {
+    request: SidebarWidthRequest;
+    response: SidebarWidthResponse;
   };
 }

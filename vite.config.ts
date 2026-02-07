@@ -38,6 +38,20 @@ export default defineConfig({
           },
         },
       },
+      {
+        entry: 'electron/pane-preload.ts',
+        onstart(args) {
+          args.reload();
+        },
+        vite: {
+          build: {
+            outDir: 'dist-electron',
+            rollupOptions: {
+              external: ['electron'],
+            },
+          },
+        },
+      },
     ]),
     renderer(),
   ],

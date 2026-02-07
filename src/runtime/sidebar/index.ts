@@ -8,7 +8,7 @@ function createFallbackRuntime(): SidebarRuntime {
   const defaultConfig: AppConfig = {
     sidebar: {
       expanded_width: 280,
-      collapsed_width: 64,
+      collapsed_width: 48,
     },
     defaults: {
       pane_count: 2,
@@ -23,19 +23,27 @@ function createFallbackRuntime(): SidebarRuntime {
   };
 
   return {
-    async getConfig() {
+    async getConfig(): Promise<AppConfig> {
       return defaultConfig;
     },
-    async setPaneCount(_count) {
+    async setPaneCount(_count: PaneCount): Promise<void> {
       // No-op in fallback mode
     },
-    async updateProvider(_paneIndex, _providerKey, _totalPanes) {
+    async updateProvider(_paneIndex: number, _providerKey: string): Promise<void> {
       // No-op in fallback mode
     },
-    async updateLayout(_args) {
+    async updateSidebarWidth(_width: number): Promise<void> {
       // No-op in fallback mode
     },
-    async sendPrompt(_text) {
+    async updateLayout(_args: {
+      viewportWidth: number;
+      viewportHeight: number;
+      paneCount: PaneCount;
+      sidebarWidth: number;
+    }): Promise<void> {
+      // No-op in fallback mode
+    },
+    async sendPrompt(_text: string): Promise<void> {
       console.log('[Fallback] sendPrompt called, but no runtime available');
     },
   };

@@ -7,6 +7,11 @@ import type {
   PaneUpdateResponse,
   PromptRequest,
   PromptResponse,
+  LayoutUpdateRequest,
+  LayoutUpdateResponse,
+  SidebarWidthRequest,
+  SidebarWidthResponse,
+  LayoutSnapshot,
 } from '../../electron/ipc/contracts';
 
 export interface CouncilAPI {
@@ -15,6 +20,9 @@ export interface CouncilAPI {
   setPaneCount: (request: PaneCountRequest) => Promise<PaneCountResponse>;
   updateProvider: (request: PaneUpdateRequest) => Promise<PaneUpdateResponse>;
   sendPrompt: (request: PromptRequest) => Promise<PromptResponse>;
+  updateLayout: (request: LayoutUpdateRequest) => Promise<LayoutUpdateResponse>;
+  getLayoutSnapshot: () => Promise<LayoutSnapshot>;
+  updateSidebarWidth: (request: SidebarWidthRequest) => Promise<SidebarWidthResponse>;
 }
 
 declare global {

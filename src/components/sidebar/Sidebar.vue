@@ -13,8 +13,12 @@ const collapsed = ref(false)
 const paneCount = ref<PaneCount>(2)
 const activeProviders = ref<string[]>([...DEFAULT_ACTIVE_PROVIDERS])
 
+// Sidebar width from config (loaded on mount)
+const expandedWidth = ref(280)
+const collapsedWidth = ref(48)
+
 const configuredSidebarWidth = computed(() =>
-  collapsed.value ? 64 : 280
+  collapsed.value ? collapsedWidth.value : expandedWidth.value
 )
 const sidebarWidth = computed(() => `${configuredSidebarWidth.value}px`)
 
@@ -76,6 +80,9 @@ onMounted(async () => {
 
   try {
     const config = await runtime.getConfig()
+    // Load sidebar width from config
+    expandedWidth.value = config.sidebar.expanded_width
+    collapsedWidth.value = config.sidebar.collapsed_width
     if (config.defaults.providers.length > 0) {
       activeProviders.value = [...config.defaults.providers]
     }
@@ -119,7 +126,7 @@ const setProvider = async (paneIndex: number, providerKey: string) => {
   if (activeProviders.value[paneIndex] === providerKey) return
 
   try {
-    await runtime.updateProvider(paneIndex, providerKey, paneCount.value)
+    await runtime.updateProvider(paneIndex, providerKey)
     activeProviders.value[paneIndex] = providerKey
   } catch (e) {
     console.error('[Sidebar] setProvider error:', e)

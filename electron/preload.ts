@@ -9,6 +9,11 @@ import type {
   PaneUpdateResponse,
   PromptRequest,
   PromptResponse,
+  LayoutUpdateRequest,
+  LayoutUpdateResponse,
+  SidebarWidthRequest,
+  SidebarWidthResponse,
+  LayoutSnapshot,
 } from './ipc/contracts.js';
 
 // Type-safe API exposed to renderer
@@ -36,6 +41,21 @@ const councilAPI = {
   // Send prompt to all panes
   sendPrompt: (request: PromptRequest): Promise<PromptResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SEND, request);
+  },
+
+  // Update layout
+  updateLayout: (request: LayoutUpdateRequest): Promise<LayoutUpdateResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.LAYOUT_UPDATE, request);
+  },
+
+  // Get layout snapshot (for testing/debugging)
+  getLayoutSnapshot: (): Promise<LayoutSnapshot> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.LAYOUT_GET_SNAPSHOT);
+  },
+
+  // Update sidebar width
+  updateSidebarWidth: (request: SidebarWidthRequest): Promise<SidebarWidthResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.SIDEBAR_UPDATE_WIDTH, request);
   },
 };
 

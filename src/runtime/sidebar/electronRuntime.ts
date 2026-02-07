@@ -19,21 +19,33 @@ export function createElectronRuntime(): SidebarRuntime {
       }
     },
 
-    async updateProvider(paneIndex: number, providerKey: string, _totalPanes: PaneCount): Promise<void> {
+    async updateProvider(paneIndex: number, providerKey: string): Promise<void> {
       const result = await council.updateProvider({ paneIndex, providerKey });
       if (!result.success) {
         throw new Error(`Failed to update provider for pane ${paneIndex}`);
       }
     },
 
-    async updateLayout(_args: {
+    async updateSidebarWidth(width: number): Promise<void> {
+      const result = await council.updateSidebarWidth({ width });
+      if (!result.success) {
+        throw new Error('Failed to update sidebar width');
+      }
+    },
+
+    async updateLayout(args: {
       viewportWidth: number;
       viewportHeight: number;
       paneCount: PaneCount;
       sidebarWidth: number;
     }): Promise<void> {
-      // Layout updates are handled by the main process
-      // This is a no-op in the current implementation
+      const result = await council.updateLayout({
+        sidebarWidth: args.sidebarWidth,
+        paneCount: args.paneCount,
+      });
+      if (!result.success) {
+        throw new Error('Failed to update layout');
+      }
     },
 
     async sendPrompt(text: string): Promise<void> {

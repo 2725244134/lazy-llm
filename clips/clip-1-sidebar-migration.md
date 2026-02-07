@@ -16,7 +16,7 @@ Commits: TBD
 2. 保持原项目 Sidebar 的 feature 一致性（pane/provider/prompt 行为不回退）。
 3. 允许实现层重构，以降低 renderer 与桌面壳 IPC 的耦合。
 
-如果只做“调用替换”而不定义契约，后续维护会持续出现跨层修改、错误难定位和 smoke 用例脆弱的问题。
+如果只做"调用替换"而不定义契约，后续维护会持续出现跨层修改、错误难定位和 smoke 用例脆弱的问题。
 
 ## Non-goals
 
@@ -24,8 +24,30 @@ Commits: TBD
 2. 不新增产品 feature（例如更多布局模式、更多 provider 类型）。
 3. 不在本 CLIP 内重写 Inject 全链路，只覆盖 Sidebar 可见路径。
 4. 不要求一次性删除所有历史兼容代码，允许阶段性并存后清理。
+5. 不在本 CLIP 内定义窗口架构和 Pane 布局（见 CLIP-2）。
 
 ## Design
+
+### Architecture context
+
+**重要**：Sidebar 作为独立的 `WebContentsView` 运行，而非 BrowserWindow 的主 renderer。
+
+原因：
+1. Pane 需要 `WebContentsView` 以便注入脚本到 provider 页面
+2. 如果 Sidebar 在 BrowserWindow renderer，Pane WebContentsView 会遮挡它（z-order 问题）
+3. 统一使用 WebContentsView 管理所有视图，架构更清晰
+
+窗口结构（详见 CLIP-2）：
+
+```
+BaseWindow
+└── contentView
+    ├── WebContentsView [sidebar]  ← 本 CLIP 关注
+    ├── WebContentsView [pane-0]
+    └── ...
+```
+
+Sidebar WebContentsView 加载 Vue 应用（`dist/index.html`），通过 `preload.ts` 暴露 IPC bridge。
 
 ### Parity contract
 
@@ -53,21 +75,21 @@ Commits: TBD
 export interface SidebarRuntime {
   getConfig(): Promise<AppConfig>
   setPaneCount(count: 1 | 2 | 3 | 4): Promise<void>
-  updateProvider(paneIndex: number, providerKey: string, totalPanes: 1 | 2 | 3 | 4): Promise<void>
-  updateLayout(args: {
-    viewportWidth: number
-    viewportHeight: number
-    paneCount: 1 | 2 | 3 | 4
-    sidebarWidth: number
-  }): Promise<void>
+  updateProvider(paneIndex: number, providerKey: string): Promise<void>
+  updateSidebarWidth(width: number): Promise<void>
   sendPrompt(text: string): Promise<void>
 }
 ```
 
+说明：
+1. `updateLayout` 拆分为 `setPaneCount` 和 `updateSidebarWidth`，职责更清晰
+2. Main 进程知道窗口尺寸，Sidebar 不需要传递 viewport 信息
+3. `updateProvider` 不再需要 `totalPanes` 参数，Main 进程已有状态
+
 建议文件落点：
 
 1. `src/runtime/sidebar/types.ts`：定义 `SidebarRuntime`。
-2. `src/runtime/sidebar/electronRuntime.ts`：基于 `window.electron`/`window.council` 的实现。
+2. `src/runtime/sidebar/electronRuntime.ts`：基于 `window.council` 的实现。
 3. `src/runtime/sidebar/index.ts`：runtime factory。
 
 ### Boundaries and dependencies
