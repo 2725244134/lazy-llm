@@ -2,12 +2,14 @@ import * as chatgpt from './chatgpt'
 import * as claude from './claude'
 import * as gemini from './gemini'
 import * as grok from './grok'
+import * as perplexity from './perplexity'
+import * as aistudio from './aistudio'
 
 import type { ProviderMeta, ProviderInject, Provider } from './types'
 export type { ProviderMeta, ProviderInject, Provider }
 
 // List of all providers
-export const providers = [chatgpt, claude, gemini, grok]
+export const providers = [chatgpt, claude, gemini, grok, perplexity, aistudio]
 
 // Index by key
 export const providersByKey = Object.fromEntries(
@@ -31,4 +33,4 @@ export const providerIcons = Object.fromEntries(
 export const DEFAULT_ACTIVE_PROVIDERS = ['chatgpt', 'claude', 'gemini', 'grok']
 
 // Re-export each provider
-export { chatgpt, claude, gemini, grok }
+export { chatgpt, claude, gemini, grok, perplexity, aistudio }
