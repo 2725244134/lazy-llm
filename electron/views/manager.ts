@@ -3,10 +3,11 @@
  */
 
 import { BaseWindow, WebContentsView } from 'electron';
-import { existsSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { calculateLayout } from './geometry.js';
+import { buildPromptInjectionEvalScript, type PromptInjectionResult } from './promptInjection.js';
 import { getConfig } from '../ipc-handlers/store.js';
 import type {
   PaneCount,
@@ -48,11 +49,24 @@ const rendererIndexPath = resolveFirstExistingPath([
   join(runtimeDir, '..', '..', 'dist', 'index.html'),
 ]);
 
+const injectRuntimePath = resolveFirstExistingPath([
+  join(runtimeDir, 'inject.js'),
+  join(runtimeDir, '..', 'inject.js'),
+  join(runtimeDir, '..', '..', 'dist-electron', 'inject.js'),
+]);
+
 interface PaneView {
   view: WebContentsView;
   paneIndex: number;
   providerKey: string;
   url: string;
+}
+
+function toFailureReason(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
 }
 
 export class ViewManager {
@@ -62,6 +76,7 @@ export class ViewManager {
   private currentPaneCount: PaneCount = 1;
   private currentSidebarWidth: number;
   private providers: Map<string, ProviderMeta>;
+  private injectRuntimeScript: string | null = null;
 
   constructor(window: BaseWindow) {
     this.window = window;
@@ -241,13 +256,40 @@ export class ViewManager {
    */
   async sendPromptToAll(text: string): Promise<{ success: boolean; failures: string[] }> {
     const failures: string[] = [];
+    let promptEvalScript: string;
+
+    try {
+      promptEvalScript = buildPromptInjectionEvalScript(text);
+    } catch (error) {
+      return {
+        success: false,
+        failures: [`invalid-prompt: ${toFailureReason(error)}`],
+      };
+    }
+
+    const injectRuntimeScript = this.getInjectRuntimeScript();
+    if (!injectRuntimeScript) {
+      return {
+        success: false,
+        failures: this.paneViews.map((pane) => `pane-${pane.paneIndex}: inject runtime not available`),
+      };
+    }
 
     for (const pane of this.paneViews) {
       try {
-        pane.view.webContents.send('pane:injectPrompt', { text });
+        await pane.view.webContents.executeJavaScript(injectRuntimeScript, true);
+        const result = await pane.view.webContents.executeJavaScript(
+          promptEvalScript,
+          true
+        ) as PromptInjectionResult | undefined;
+
+        if (!result?.success) {
+          const reason = result?.reason ?? 'prompt injection failed';
+          failures.push(`pane-${pane.paneIndex}: ${reason}`);
+        }
       } catch (error) {
         console.error(`[ViewManager] Failed to send prompt to pane ${pane.paneIndex}:`, error);
-        failures.push(`pane-${pane.paneIndex}`);
+        failures.push(`pane-${pane.paneIndex}: ${toFailureReason(error)}`);
       }
     }
 
@@ -255,6 +297,25 @@ export class ViewManager {
       success: failures.length === 0,
       failures,
     };
+  }
+
+  private getInjectRuntimeScript(): string | null {
+    if (this.injectRuntimeScript) {
+      return this.injectRuntimeScript;
+    }
+
+    if (!existsSync(injectRuntimePath)) {
+      console.error(`[ViewManager] Inject runtime not found at ${injectRuntimePath}`);
+      return null;
+    }
+
+    try {
+      this.injectRuntimeScript = readFileSync(injectRuntimePath, 'utf8');
+      return this.injectRuntimeScript;
+    } catch (error) {
+      console.error('[ViewManager] Failed to read inject runtime:', error);
+      return null;
+    }
   }
 
   /**
