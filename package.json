@@ -9,7 +9,7 @@
     "build:preloads": "bunx esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/preload.cjs && bunx esbuild electron/pane-preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/pane-preload.cjs && bunx esbuild electron/quick-prompt-preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/quick-prompt-preload.cjs",
     "build:inject": "bunx esbuild src/inject/inject.ts --bundle --platform=browser --format=iife --target=es2020 --minify --outfile=dist-electron/inject.js",
     "build:electron-artifacts": "bun run build:preloads && bun run build:inject",
-    "dev:electron": "bun run build:electron-artifacts && concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "dev:electron": "bun run build:electron-artifacts && cross-env NODE_ENV=development vite",
     "build": "vue-tsc --noEmit && vite build && bun run build:electron-artifacts",
     "preview": "vite preview",
     "package": "bun run build && electron-builder",
