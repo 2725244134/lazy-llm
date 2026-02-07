@@ -75,8 +75,17 @@ const handleWindowResize = () => {
   })
 }
 
+const handleGlobalKeydown = (e: KeyboardEvent) => {
+  const isToggleShortcut = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b'
+  if (!isToggleShortcut || e.repeat) return
+
+  e.preventDefault()
+  void toggleCollapse()
+}
+
 onMounted(async () => {
   window.addEventListener('resize', handleWindowResize)
+  window.addEventListener('keydown', handleGlobalKeydown)
 
   try {
     const config = await runtime.getConfig()
@@ -96,6 +105,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleWindowResize)
+  window.removeEventListener('keydown', handleGlobalKeydown)
   if (resizeRaf !== 0) {
     window.cancelAnimationFrame(resizeRaf)
     resizeRaf = 0
@@ -174,7 +184,7 @@ provide(SIDEBAR_KEY, sidebarContext)
       <span class="sidebar-title" data-testid="sidebar-title">LAZY LLM</span>
       <button
         class="collapse-btn"
-        title="Toggle sidebar"
+        title="Toggle sidebar (Ctrl+B)"
         data-testid="sidebar-collapse"
         @click="void toggleCollapse()"
       >

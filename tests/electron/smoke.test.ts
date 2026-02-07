@@ -114,6 +114,28 @@ test.describe('Electron Smoke Tests', () => {
     await electronApp.close();
   });
 
+  test('sidebar toggle shortcut works', async () => {
+    const electronApp = await electron.launch({
+      args: ['.'],
+      env: { ...process.env, NODE_ENV: 'production' },
+    });
+
+    const window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+
+    const sidebar = window.locator('[data-testid="sidebar"]');
+
+    await expect(sidebar).not.toHaveClass(/collapsed/);
+
+    await window.keyboard.press('Control+B');
+    await expect(sidebar).toHaveClass(/collapsed/);
+
+    await window.keyboard.press('Control+B');
+    await expect(sidebar).not.toHaveClass(/collapsed/);
+
+    await electronApp.close();
+  });
+
   test('pane selector works', async () => {
     const electronApp = await electron.launch({
       args: ['.'],
