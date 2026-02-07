@@ -4,15 +4,17 @@
 
 export const QUICK_PROMPT_SCRIPT = `
 const input = document.getElementById('quickPromptInput');
+const panel = document.querySelector('[data-testid="quick-prompt-overlay"]');
 let isSending = false;
 let resizeRaf = 0;
 let lastResizeHeight = 0;
 const MIN_INPUT_HEIGHT = 44;
 const MAX_INPUT_HEIGHT = 240;
-const PANEL_VERTICAL_CHROME = 26;
+const DEFAULT_VIEW_HEIGHT = 74;
+const PANEL_HEIGHT_SAFETY_GAP = 2;
 const DRAFT_SYNC_DEBOUNCE_MS = 90;
 const SEND_CLEAR_SYNC_GUARD_MS = 650;
-let pendingViewHeight = MIN_INPUT_HEIGHT + PANEL_VERTICAL_CHROME;
+let pendingViewHeight = DEFAULT_VIEW_HEIGHT;
 let draftSyncTimer = 0;
 let draftSyncInFlight = false;
 let queuedDraftText = null;
@@ -48,6 +50,15 @@ const scheduleResize = () => {
   });
 };
 
+const syncPanelHeight = () => {
+  if (!panel) {
+    pendingViewHeight = Math.max(DEFAULT_VIEW_HEIGHT, pendingViewHeight);
+    return;
+  }
+  const measured = panel.getBoundingClientRect().height + PANEL_HEIGHT_SAFETY_GAP;
+  pendingViewHeight = Math.max(DEFAULT_VIEW_HEIGHT, Math.ceil(measured));
+};
+
 const syncInputHeight = () => {
   if (!input) return;
   input.style.height = '0px';
@@ -57,8 +68,19 @@ const syncInputHeight = () => {
   );
   input.style.height = nextHeight + 'px';
   input.style.overflowY = input.scrollHeight > MAX_INPUT_HEIGHT ? 'auto' : 'hidden';
-  pendingViewHeight = nextHeight + PANEL_VERTICAL_CHROME;
+  syncPanelHeight();
   scheduleResize();
+};
+
+const observePanelResize = () => {
+  if (!panel || typeof ResizeObserver !== 'function') {
+    return;
+  }
+  const observer = new ResizeObserver(() => {
+    syncPanelHeight();
+    scheduleResize();
+  });
+  observer.observe(panel);
 };
 
 const supportsDraftSync = () => {
@@ -192,5 +214,6 @@ window.addEventListener('quick-prompt:focus', () => {
   syncInputHeight();
 });
 
+observePanelResize();
 syncInputHeight();
 `;

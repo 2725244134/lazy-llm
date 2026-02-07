@@ -77,8 +77,8 @@ const injectRuntimePath = resolveFirstExistingPath([
 const QUICK_PROMPT_PASSTHROUGH_MODE = true;
 const QUICK_PROMPT_MAX_WIDTH = 560;
 const QUICK_PROMPT_MIN_WIDTH = 280;
-const QUICK_PROMPT_DEFAULT_HEIGHT = 66;
-const QUICK_PROMPT_MIN_HEIGHT = 62;
+const QUICK_PROMPT_DEFAULT_HEIGHT = 74;
+const QUICK_PROMPT_MIN_HEIGHT = 66;
 const QUICK_PROMPT_MAX_HEIGHT = 320;
 const QUICK_PROMPT_VIEWPORT_PADDING = 16;
 
@@ -315,7 +315,7 @@ export class ViewManager {
 
     const clampedHeight = Math.max(
       QUICK_PROMPT_MIN_HEIGHT,
-      Math.min(QUICK_PROMPT_MAX_HEIGHT, Math.floor(nextHeight))
+      Math.min(QUICK_PROMPT_MAX_HEIGHT, Math.ceil(nextHeight))
     );
     this.quickPromptHeight = clampedHeight;
 
