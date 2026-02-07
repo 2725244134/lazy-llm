@@ -25,6 +25,48 @@ test.describe('Electron Smoke Tests', () => {
     await electronApp.close();
   });
 
+  test('layout snapshot uses content-area dimensions', async () => {
+    const electronApp = await electron.launch({
+      args: ['.'],
+      env: { ...process.env, NODE_ENV: 'production' },
+    });
+
+    const window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+
+    const metrics = await window.evaluate(async () => {
+      const browserWindow = globalThis as unknown as Window & {
+        council: {
+          getLayoutSnapshot: () => Promise<{
+            windowWidth: number;
+            windowHeight: number;
+            sidebar: { width: number; height: number };
+            panes: Array<{ bounds: { height: number } }>;
+          }>;
+        };
+      };
+      const council = browserWindow.council;
+
+      const snapshot = await council.getLayoutSnapshot();
+      return {
+        innerWidth: browserWindow.innerWidth,
+        innerHeight: browserWindow.innerHeight,
+        snapshot,
+      };
+    });
+
+    expect(metrics.snapshot.windowWidth).toBeGreaterThanOrEqual(metrics.innerWidth);
+    expect(metrics.snapshot.windowHeight).toBe(metrics.innerHeight);
+    expect(metrics.snapshot.sidebar.width).toBe(metrics.innerWidth);
+    expect(metrics.snapshot.sidebar.height).toBe(metrics.innerHeight);
+
+    for (const pane of metrics.snapshot.panes) {
+      expect(pane.bounds.height).toBe(metrics.innerHeight);
+    }
+
+    await electronApp.close();
+  });
+
   test('IPC health check works', async () => {
     const electronApp = await electron.launch({
       args: ['.'],

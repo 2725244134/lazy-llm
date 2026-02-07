@@ -73,6 +73,17 @@ export class ViewManager {
   }
 
   /**
+   * Get drawable content size (exclude native window frame/title/menu areas)
+   */
+  private getContentSize(): { width: number; height: number } {
+    const contentBounds = this.window.getContentBounds();
+    return {
+      width: Math.max(1, contentBounds.width),
+      height: Math.max(1, contentBounds.height),
+    };
+  }
+
+  /**
    * Initialize sidebar WebContentsView
    */
   initSidebar(): WebContentsView {
@@ -183,10 +194,10 @@ export class ViewManager {
       this.currentSidebarWidth = sidebarWidth;
     }
 
-    const bounds = this.window.getBounds();
+    const contentSize = this.getContentSize();
     const layout = calculateLayout({
-      windowWidth: bounds.width,
-      windowHeight: bounds.height,
+      windowWidth: contentSize.width,
+      windowHeight: contentSize.height,
       sidebarWidth: this.currentSidebarWidth,
       paneCount: this.currentPaneCount,
     });
@@ -208,12 +219,12 @@ export class ViewManager {
    * Get current layout snapshot for testing/debugging
    */
   getSnapshot(): LayoutSnapshot {
-    const bounds = this.window.getBounds();
+    const contentSize = this.getContentSize();
     const sidebarBounds = this.sidebarView?.getBounds() || { x: 0, y: 0, width: 0, height: 0 };
 
     return {
-      windowWidth: bounds.width,
-      windowHeight: bounds.height,
+      windowWidth: contentSize.width,
+      windowHeight: contentSize.height,
       sidebar: sidebarBounds,
       paneCount: this.currentPaneCount,
       panes: this.paneViews.map(pane => ({

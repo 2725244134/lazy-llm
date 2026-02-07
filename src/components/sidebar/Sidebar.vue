@@ -220,6 +220,7 @@ provide(SIDEBAR_KEY, sidebarContext)
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
+  -webkit-app-region: drag;
 }
 
 .sidebar.collapsed .sidebar-header {
@@ -252,6 +253,7 @@ provide(SIDEBAR_KEY, sidebarContext)
   justify-content: center;
   border-radius: 4px;
   transition: background 0.15s, color 0.15s;
+  -webkit-app-region: no-drag;
 }
 
 .collapse-btn:hover {

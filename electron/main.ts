@@ -28,7 +28,12 @@ function createWindow() {
     height: 900,
     minWidth: 800,
     minHeight: 600,
+    frame: false,
+    autoHideMenuBar: true,
   });
+
+  // Keep menu hidden by default for frameless mode.
+  mainWindow.setMenuBarVisibility(false);
 
   // Initialize ViewManager
   viewManager = new ViewManager(mainWindow);
