@@ -46,7 +46,10 @@ onMounted(async () => {
   --text-muted: #6b7280;
   --accent: #000000;
   --broadcast: #4f46e5;
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'SF Pro Text', 'SF Pro SC', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC',
+    'Source Han Sans SC', 'WenQuanYi Micro Hei', -apple-system,
+    BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -77,9 +80,20 @@ body,
 body {
   font-family: var(--font-sans);
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 1.5;
   color: var(--text);
   background: var(--bg);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
 }
 </style>
 
