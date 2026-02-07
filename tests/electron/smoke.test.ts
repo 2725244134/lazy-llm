@@ -124,6 +124,7 @@ test.describe('Electron Smoke Tests', () => {
     await window.waitForLoadState('domcontentloaded');
 
     const sidebar = window.locator('[data-testid="sidebar"]');
+    const textarea = window.locator('[data-testid="prompt-textarea"]');
 
     await expect(sidebar).not.toHaveClass(/collapsed/);
 
@@ -132,6 +133,7 @@ test.describe('Electron Smoke Tests', () => {
 
     await window.keyboard.press('Control+B');
     await expect(sidebar).not.toHaveClass(/collapsed/);
+    await expect(textarea).toBeFocused();
 
     await electronApp.close();
   });
@@ -213,6 +215,7 @@ test.describe('Electron Smoke Tests', () => {
     // Verify prompt textarea is visible
     const textarea = window.locator('[data-testid="prompt-textarea"]');
     await expect(textarea).toBeVisible();
+    await expect(textarea).toBeFocused();
 
     // Verify send button is visible
     const sendBtn = window.locator('[data-testid="prompt-send-btn"]');

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, provide, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, provide, ref } from 'vue'
 import PaneSelector from './PaneSelector.vue'
 import ProviderList from './ProviderList.vue'
 import PromptComposer from './PromptComposer.vue'
@@ -67,6 +67,25 @@ const syncLayoutWithErrorHandling = async () => {
 }
 
 let resizeRaf = 0
+let focusRaf = 0
+
+const focusPromptComposer = async () => {
+  if (collapsed.value) return
+
+  await nextTick()
+  if (focusRaf !== 0) {
+    window.cancelAnimationFrame(focusRaf)
+  }
+  focusRaf = window.requestAnimationFrame(() => {
+    focusRaf = 0
+    const textarea = document.querySelector<HTMLTextAreaElement>('[data-testid="prompt-textarea"]')
+    if (!textarea || textarea.disabled) return
+    textarea.focus()
+    const cursorPos = textarea.value.length
+    textarea.setSelectionRange(cursorPos, cursorPos)
+  })
+}
+
 const handleWindowResize = () => {
   if (resizeRaf !== 0) return
   resizeRaf = window.requestAnimationFrame(() => {
@@ -101,6 +120,7 @@ onMounted(async () => {
   }
 
   await syncLayoutWithErrorHandling()
+  await focusPromptComposer()
 })
 
 onBeforeUnmount(() => {
@@ -110,11 +130,18 @@ onBeforeUnmount(() => {
     window.cancelAnimationFrame(resizeRaf)
     resizeRaf = 0
   }
+  if (focusRaf !== 0) {
+    window.cancelAnimationFrame(focusRaf)
+    focusRaf = 0
+  }
 })
 
 const toggleCollapse = async () => {
   collapsed.value = !collapsed.value
   await syncLayoutWithErrorHandling()
+  if (!collapsed.value) {
+    await focusPromptComposer()
+  }
 }
 
 const setPaneCount = async (count: number) => {
