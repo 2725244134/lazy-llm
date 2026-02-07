@@ -6,33 +6,31 @@
 export const QUICK_PROMPT_STYLES = `
 :root {
   color-scheme: light;
-  --qp-surface: rgba(255, 255, 255, 0.98);
-  --qp-surface-soft: rgba(248, 250, 252, 0.95);
-  --qp-border: rgba(15, 23, 42, 0.14);
-  --qp-border-focus: #2563eb;
-  --qp-ring: rgba(37, 99, 235, 0.2);
-  --qp-bottom-line: rgba(37, 99, 235, 0.6);
-  --qp-bottom-line-idle: rgba(15, 23, 42, 0.26);
-  --qp-bottom-glow: rgba(37, 99, 235, 0.38);
+  --qp-surface: rgba(255, 251, 243, 0.97);
+  --qp-surface-soft: rgba(255, 247, 233, 0.92);
+  --qp-border: rgba(217, 161, 90, 0.7);
+  --qp-border-focus: rgba(245, 158, 11, 0.96);
+  --qp-ring: rgba(245, 158, 11, 0.24);
+  --qp-inner-stroke: rgba(255, 255, 255, 0.82);
   --qp-text: #0f172a;
   --qp-placeholder: #475569;
-  --qp-shadow: 0 12px 28px rgba(15, 23, 42, 0.17);
+  --qp-shadow: 0 14px 30px rgba(66, 38, 10, 0.2);
+  --qp-shadow-focus: 0 18px 34px rgba(66, 38, 10, 0.26);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --qp-surface: rgba(17, 24, 39, 0.96);
-    --qp-surface-soft: rgba(15, 23, 42, 0.93);
-    --qp-border: rgba(148, 163, 184, 0.36);
-    --qp-border-focus: #60a5fa;
-    --qp-ring: rgba(96, 165, 250, 0.26);
-    --qp-bottom-line: rgba(96, 165, 250, 0.85);
-    --qp-bottom-line-idle: rgba(148, 163, 184, 0.44);
-    --qp-bottom-glow: rgba(96, 165, 250, 0.45);
+    --qp-surface: rgba(43, 31, 18, 0.92);
+    --qp-surface-soft: rgba(36, 25, 14, 0.9);
+    --qp-border: rgba(251, 191, 36, 0.62);
+    --qp-border-focus: rgba(252, 211, 77, 0.95);
+    --qp-ring: rgba(252, 211, 77, 0.22);
+    --qp-inner-stroke: rgba(255, 241, 214, 0.25);
     --qp-text: #f8fafc;
-    --qp-placeholder: #cbd5e1;
-    --qp-shadow: 0 14px 34px rgba(2, 6, 23, 0.52);
+    --qp-placeholder: #d1d5db;
+    --qp-shadow: 0 16px 34px rgba(12, 8, 4, 0.46);
+    --qp-shadow-focus: 0 20px 42px rgba(12, 8, 4, 0.56);
   }
 }
 
@@ -57,58 +55,39 @@ body {
   box-sizing: border-box;
   padding: 10px 14px;
   overflow: hidden;
-  border-radius: 16px;
-  border: 2px solid var(--qp-border);
-  border-bottom-width: 3px;
+  border-radius: 18px;
+  border: 2.5px solid var(--qp-border);
   background: linear-gradient(180deg, var(--qp-surface), var(--qp-surface-soft));
-  box-shadow: var(--qp-shadow);
+  box-shadow:
+    var(--qp-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -1px 0 rgba(245, 158, 11, 0.28);
   backdrop-filter: blur(14px) saturate(118%);
   -webkit-backdrop-filter: blur(14px) saturate(118%);
-  transition: border-color 0.16s ease-out, box-shadow 0.16s ease-out, border-bottom-color 0.16s ease-out;
+  transition: border-color 0.16s ease-out, box-shadow 0.16s ease-out;
 }
 
 .panel::after {
   content: "";
   position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 0;
-  height: 3px;
-  border-radius: 999px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--qp-bottom-line-idle) 22%,
-    var(--qp-bottom-line) 50%,
-    var(--qp-bottom-line-idle) 78%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  opacity: 0.9;
-  transition: opacity 0.16s ease-out, filter 0.16s ease-out;
+  inset: 3px;
+  border-radius: 14px;
+  border: 1px solid var(--qp-inner-stroke);
+  pointer-events: none;
+  opacity: 0.78;
 }
 
 .panel:focus-within {
   border-color: var(--qp-border-focus);
-  border-bottom-color: var(--qp-bottom-line);
   box-shadow:
-    0 0 0 3px var(--qp-ring),
-    var(--qp-shadow);
+    var(--qp-shadow-focus),
+    inset 0 0 0 1px var(--qp-ring),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(245, 158, 11, 0.36);
 }
 
 .panel:focus-within::after {
-  opacity: 1;
-  filter: drop-shadow(0 0 8px var(--qp-bottom-glow));
-  animation: qpBottomSweep 2.2s linear infinite;
-}
-
-@keyframes qpBottomSweep {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
+  opacity: 0.94;
 }
 
 .input {
@@ -158,7 +137,7 @@ body {
 @media (max-width: 640px) {
   .panel {
     padding: 9px 12px;
-    border-radius: 14px;
+    border-radius: 16px;
   }
   .input {
     font-size: 18px;
