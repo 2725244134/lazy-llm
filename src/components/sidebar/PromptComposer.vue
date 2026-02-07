@@ -109,6 +109,36 @@ onMounted(() => {
   caret-color: var(--broadcast);
   transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background 0.2s ease-out;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 2px rgba(0, 0, 0, 0.04);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(79, 70, 229, 0.45) transparent;
+}
+
+.composer-textarea::-webkit-scrollbar {
+  width: 8px;
+}
+
+.composer-textarea::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.composer-textarea::-webkit-scrollbar-thumb {
+  background: rgba(79, 70, 229, 0.4);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.composer-textarea:hover::-webkit-scrollbar-thumb {
+  background: rgba(79, 70, 229, 0.55);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.composer-textarea:focus::-webkit-scrollbar-thumb {
+  background: rgba(79, 70, 229, 0.7);
+  border: 2px solid transparent;
+  background-clip: padding-box;
 }
 
 .composer-textarea::placeholder {
