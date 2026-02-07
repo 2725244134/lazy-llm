@@ -1,0 +1,69 @@
+{
+  "name": "lazy-llm",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist-electron/main.mjs",
+  "scripts": {
+    "dev": "vite",
+    "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "package": "bun run build && electron-builder",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "bun run test:unit",
+    "test:unit": "vitest run",
+    "test:electron:smoke": "playwright test tests/electron/",
+    "prepare": "echo 'Hooks ready'"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "electron-store": "^10.0.0",
+    "node-machine-id": "^1.1.12",
+    "tailwind-merge": "^3.4.0",
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^22.10.0",
+    "@vitejs/plugin-vue": "^5.2.1",
+    "autoprefixer": "^10.4.23",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8",
+    "electron-rebuild": "^3.2.9",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.18",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3",
+    "vite-plugin-electron": "^0.28.8",
+    "vite-plugin-electron-renderer": "^0.14.6",
+    "vite-svg-loader": "^5.1.0",
+    "vitest": "^4.0.18",
+    "vue-tsc": "^2.1.10",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "com.lazyllm.app",
+    "productName": "LazyLLM",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development"
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    }
+  }
+}
