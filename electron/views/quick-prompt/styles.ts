@@ -8,9 +8,9 @@ export const QUICK_PROMPT_STYLES = `
   color-scheme: light;
   --qp-surface: rgba(255, 255, 255, 0.97);
   --qp-surface-soft: rgba(248, 250, 252, 0.93);
-  --qp-border: rgba(235, 219, 178, 0.95);
-  --qp-border-focus: rgba(215, 153, 33, 0.95);
-  --qp-ring: rgba(215, 153, 33, 0.24);
+  --qp-border: #d5c4a1;
+  --qp-border-focus: #b57614;
+  --qp-ring: rgba(181, 118, 20, 0.26);
   --qp-inner-stroke: rgba(255, 255, 255, 0.88);
   --qp-text: #3c3836;
   --qp-placeholder: #7c6f64;
@@ -23,9 +23,9 @@ export const QUICK_PROMPT_STYLES = `
     color-scheme: dark;
     --qp-surface: rgba(43, 43, 43, 0.94);
     --qp-surface-soft: rgba(34, 34, 34, 0.9);
-    --qp-border: rgba(168, 153, 132, 0.64);
-    --qp-border-focus: rgba(250, 189, 47, 0.95);
-    --qp-ring: rgba(250, 189, 47, 0.2);
+    --qp-border: rgba(189, 174, 147, 0.7);
+    --qp-border-focus: #d79921;
+    --qp-ring: rgba(215, 153, 33, 0.24);
     --qp-inner-stroke: rgba(235, 219, 178, 0.22);
     --qp-text: #fbf1c7;
     --qp-placeholder: #d5c4a1;
@@ -61,7 +61,7 @@ body {
   box-shadow:
     var(--qp-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 0 rgba(215, 153, 33, 0.24);
+    inset 0 -1px 0 rgba(181, 118, 20, 0.28);
   backdrop-filter: blur(14px) saturate(118%);
   -webkit-backdrop-filter: blur(14px) saturate(118%);
   transition: border-color 0.16s ease-out, box-shadow 0.16s ease-out;
@@ -83,7 +83,7 @@ body {
     var(--qp-shadow-focus),
     inset 0 0 0 1px var(--qp-ring),
     inset 0 1px 0 rgba(255, 255, 255, 0.64),
-    inset 0 -1px 0 rgba(215, 153, 33, 0.34);
+    inset 0 -1px 0 rgba(181, 118, 20, 0.38);
 }
 
 .panel:focus-within::after {
