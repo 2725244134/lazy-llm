@@ -6,8 +6,9 @@
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "vite",
-    "dev:electron": "concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
-    "build": "vue-tsc --noEmit && vite build",
+    "build:preloads": "bunx esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/preload.cjs && bunx esbuild electron/pane-preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/pane-preload.cjs",
+    "dev:electron": "bun run build:preloads && concurrently \"vite\" \"wait-on http://localhost:5173 && cross-env NODE_ENV=development electron .\"",
+    "build": "vue-tsc --noEmit && vite build && bun run build:preloads",
     "preview": "vite preview",
     "package": "bun run build && electron-builder",
     "typecheck": "vue-tsc --noEmit",

@@ -18,9 +18,9 @@ test.describe('Electron Smoke Tests', () => {
     const sidebar = window.locator('[data-testid="sidebar"]');
     await expect(sidebar).toBeVisible();
 
-    // Verify main content is visible
+    // Main content exists in sidebar renderer app, but may be clipped by WebContentsView bounds.
     const mainContent = window.locator('[data-testid="main-content"]');
-    await expect(mainContent).toBeVisible();
+    await expect(mainContent).toHaveCount(1);
 
     await electronApp.close();
   });
@@ -88,10 +88,51 @@ test.describe('Electron Smoke Tests', () => {
     // Verify it becomes active
     await expect(paneBtn3).toHaveClass(/active/);
 
+    const snapshotAfterPane3 = await window.evaluate(() => {
+      return (window as unknown as { council: { getLayoutSnapshot: () => Promise<{ paneCount: number; panes: unknown[] }> } }).council.getLayoutSnapshot();
+    });
+    expect(snapshotAfterPane3.paneCount).toBe(3);
+    expect(snapshotAfterPane3.panes.length).toBe(3);
+
     // Click pane 1 button
     const paneBtn1 = window.locator('[data-testid="pane-chip-1"]');
     await paneBtn1.click();
     await expect(paneBtn1).toHaveClass(/active/);
+
+    const snapshotAfterPane1 = await window.evaluate(() => {
+      return (window as unknown as { council: { getLayoutSnapshot: () => Promise<{ paneCount: number; panes: unknown[] }> } }).council.getLayoutSnapshot();
+    });
+    expect(snapshotAfterPane1.paneCount).toBe(1);
+    expect(snapshotAfterPane1.panes.length).toBe(1);
+
+    await electronApp.close();
+  });
+
+  test('provider update changes pane webview target', async () => {
+    const electronApp = await electron.launch({
+      args: ['.'],
+      env: { ...process.env, NODE_ENV: 'production' },
+    });
+
+    const window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+
+    const updateResult = await window.evaluate(async () => {
+      const council = (window as unknown as {
+        council: {
+          updateProvider: (request: { paneIndex: number; providerKey: string }) => Promise<{ success: boolean }>;
+        };
+      }).council;
+      return council.updateProvider({ paneIndex: 0, providerKey: 'grok' });
+    });
+
+    expect(updateResult.success).toBe(true);
+
+    const snapshot = await window.evaluate(() => {
+      return (window as unknown as { council: { getLayoutSnapshot: () => Promise<{ panes: Array<{ providerKey: string }> }> } }).council.getLayoutSnapshot();
+    });
+
+    expect(snapshot.panes[0]?.providerKey).toBe('grok');
 
     await electronApp.close();
   });

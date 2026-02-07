@@ -3,6 +3,7 @@
  */
 
 import { BaseWindow, WebContentsView } from 'electron';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { calculateLayout } from './geometry.js';
@@ -13,7 +14,39 @@ import type {
   ProviderMeta,
 } from '../ipc/contracts.js';
 
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const runtimeDir = fileURLToPath(new URL('.', import.meta.url));
+
+function resolveFirstExistingPath(candidates: string[]): string {
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return candidates[0];
+}
+
+const sidebarPreloadPath = resolveFirstExistingPath([
+  join(runtimeDir, 'preload.cjs'),
+  join(runtimeDir, 'preload.js'),
+  join(runtimeDir, 'preload.mjs'),
+  join(runtimeDir, '..', 'preload.cjs'),
+  join(runtimeDir, '..', 'preload.js'),
+  join(runtimeDir, '..', 'preload.mjs'),
+]);
+
+const panePreloadPath = resolveFirstExistingPath([
+  join(runtimeDir, 'pane-preload.cjs'),
+  join(runtimeDir, 'pane-preload.js'),
+  join(runtimeDir, 'pane-preload.mjs'),
+  join(runtimeDir, '..', 'pane-preload.cjs'),
+  join(runtimeDir, '..', 'pane-preload.js'),
+  join(runtimeDir, '..', 'pane-preload.mjs'),
+]);
+
+const rendererIndexPath = resolveFirstExistingPath([
+  join(runtimeDir, '..', 'dist', 'index.html'),
+  join(runtimeDir, '..', '..', 'dist', 'index.html'),
+]);
 
 interface PaneView {
   view: WebContentsView;
@@ -45,7 +78,7 @@ export class ViewManager {
   initSidebar(): WebContentsView {
     this.sidebarView = new WebContentsView({
       webPreferences: {
-        preload: join(__dirname, '..', 'preload.mjs'),
+        preload: sidebarPreloadPath,
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
@@ -58,9 +91,7 @@ export class ViewManager {
     if (process.env.NODE_ENV === 'development') {
       this.sidebarView.webContents.loadURL('http://localhost:5173');
     } else {
-      this.sidebarView.webContents.loadFile(
-        join(__dirname, '..', '..', 'dist', 'index.html')
-      );
+      this.sidebarView.webContents.loadFile(rendererIndexPath);
     }
 
     return this.sidebarView;
@@ -89,7 +120,7 @@ export class ViewManager {
 
       const view = new WebContentsView({
         webPreferences: {
-          preload: join(__dirname, '..', 'pane-preload.mjs'),
+          preload: panePreloadPath,
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: true,

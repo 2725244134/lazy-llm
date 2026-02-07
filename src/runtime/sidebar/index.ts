@@ -15,10 +15,12 @@ function createFallbackRuntime(): SidebarRuntime {
       providers: ['chatgpt', 'claude'],
     },
     providers: [
-      { key: 'chatgpt', name: 'ChatGPT', url: 'https://chat.openai.com' },
-      { key: 'claude', name: 'Claude', url: 'https://claude.ai' },
-      { key: 'gemini', name: 'Gemini', url: 'https://gemini.google.com' },
-      { key: 'grok', name: 'Grok', url: 'https://grok.x.ai' },
+      { key: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/' },
+      { key: 'claude', name: 'Claude', url: 'https://claude.ai/' },
+      { key: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/' },
+      { key: 'grok', name: 'Grok', url: 'https://grok.com/' },
+      { key: 'perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai/' },
+      { key: 'aistudio', name: 'AI Studio', url: 'https://aistudio.google.com/prompts/new_chat' },
     ],
   };
 
