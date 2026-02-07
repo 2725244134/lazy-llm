@@ -43,7 +43,7 @@ check: ## Run type checking.
 	@bun run typecheck
 
 .PHONY: test test-unit test-electron-smoke
-test: test-unit ## Run all test suites.
+test: test-unit test-electron-smoke ## Run all test suites.
 test-unit: ## Run unit tests with vitest.
 	@echo "==> Running unit tests"
 	@bun run test:unit
@@ -54,4 +54,4 @@ test-electron-smoke: ## Run Electron smoke tests with Playwright.
 .PHONY: clean
 clean: ## Remove build artifacts.
 	@echo "==> Cleaning build artifacts"
-	@rm -rf dist dist-electron release node_modules
+	@rm -rf dist dist-electron release
