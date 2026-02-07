@@ -74,11 +74,11 @@ const injectRuntimePath = resolveFirstExistingPath([
 ]);
 
 const QUICK_PROMPT_PASSTHROUGH_MODE = true;
-const QUICK_PROMPT_MAX_WIDTH = 620;
-const QUICK_PROMPT_MIN_WIDTH = 300;
-const QUICK_PROMPT_DEFAULT_HEIGHT = 92;
-const QUICK_PROMPT_MIN_HEIGHT = 80;
-const QUICK_PROMPT_MAX_HEIGHT = 360;
+const QUICK_PROMPT_MAX_WIDTH = 560;
+const QUICK_PROMPT_MIN_WIDTH = 280;
+const QUICK_PROMPT_DEFAULT_HEIGHT = 66;
+const QUICK_PROMPT_MIN_HEIGHT = 62;
+const QUICK_PROMPT_MAX_HEIGHT = 320;
 const QUICK_PROMPT_VIEWPORT_PADDING = 16;
 
 interface PaneView {
@@ -106,73 +106,87 @@ function buildQuickPromptDataUrl(): string {
       :root { color-scheme: light dark; }
       html, body {
         width: 100%;
+        height: 100%;
         margin: 0;
         padding: 0;
-        background: transparent;
+        background: transparent !important;
         overflow: hidden;
         font-family: "SF Pro Text", "SF Pro SC", "PingFang SC", "Segoe UI", sans-serif;
       }
       body {
-        display: flex;
-        align-items: flex-start;
-        justify-content: center;
+        display: grid;
+        place-items: start center;
       }
       .panel {
+        position: relative;
         width: 100%;
         box-sizing: border-box;
-        padding: 10px 14px;
-        border-radius: 34px;
-        border: 1px solid rgba(255, 255, 255, 0.44);
+        padding: 8px 14px;
+        overflow: hidden;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.64);
         background:
-          linear-gradient(165deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.24));
+          linear-gradient(165deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.56));
         box-shadow:
-          0 14px 36px rgba(15, 23, 42, 0.2),
-          inset 0 1px 0 rgba(255, 255, 255, 0.52);
-        backdrop-filter: blur(24px) saturate(155%);
+          0 10px 30px rgba(15, 23, 42, 0.14),
+          inset 0 1px 0 rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(28px) saturate(180%);
+        -webkit-backdrop-filter: blur(28px) saturate(180%);
+      }
+      .panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
       }
       @media (prefers-color-scheme: dark) {
         .panel {
-          border-color: rgba(255, 255, 255, 0.2);
+          border-color: rgba(255, 255, 255, 0.24);
           background:
-            linear-gradient(165deg, rgba(34, 36, 41, 0.5), rgba(18, 20, 25, 0.34));
+            linear-gradient(165deg, rgba(39, 42, 48, 0.76), rgba(24, 27, 32, 0.6));
           box-shadow:
-            0 16px 40px rgba(0, 0, 0, 0.4),
-            inset 0 1px 0 rgba(255, 255, 255, 0.14);
+            0 12px 34px rgba(0, 0, 0, 0.36),
+            inset 0 1px 0 rgba(255, 255, 255, 0.16);
+        }
+        .panel::before {
+          background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.04));
         }
       }
       .input {
+        position: relative;
+        z-index: 1;
         width: 100%;
         border: none;
         background: transparent;
-        color: rgba(17, 24, 39, 0.9);
-        font-size: 26px;
-        font-weight: 580;
-        line-height: 1.28;
-        letter-spacing: 0.2px;
-        min-height: 50px;
+        color: rgba(17, 24, 39, 0.86);
+        font-size: 23px;
+        font-weight: 560;
+        line-height: 1.3;
+        letter-spacing: 0.14px;
+        min-height: 44px;
         max-height: 260px;
-        padding: 0;
+        padding: 1px 0;
         resize: none;
         overflow-y: hidden;
       }
       @media (prefers-color-scheme: dark) {
         .input {
-          color: rgba(248, 250, 252, 0.93);
+          color: rgba(248, 250, 252, 0.94);
         }
       }
-      .input::placeholder { color: rgba(71, 85, 105, 0.66); }
+      .input::placeholder { color: rgba(71, 85, 105, 0.58); }
       @media (prefers-color-scheme: dark) {
-        .input::placeholder { color: rgba(148, 163, 184, 0.72); }
+        .input::placeholder { color: rgba(148, 163, 184, 0.68); }
       }
       .input:focus { outline: none; }
       @media (max-width: 640px) {
         .panel {
-          padding: 9px 12px;
-          border-radius: 26px;
+          padding: 7px 12px;
         }
         .input {
-          font-size: 20px;
-          min-height: 38px;
+          font-size: 19px;
+          min-height: 36px;
         }
       }
     </style>
@@ -192,9 +206,9 @@ function buildQuickPromptDataUrl(): string {
       let isSending = false;
       let resizeRaf = 0;
       let lastResizeHeight = 0;
-      const MIN_INPUT_HEIGHT = 50;
+      const MIN_INPUT_HEIGHT = 44;
       const MAX_INPUT_HEIGHT = 260;
-      const PANEL_VERTICAL_CHROME = 20;
+      const PANEL_VERTICAL_CHROME = 18;
       let pendingViewHeight = MIN_INPUT_HEIGHT + PANEL_VERTICAL_CHROME;
 
       const focusInput = () => {
