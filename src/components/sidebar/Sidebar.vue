@@ -12,6 +12,10 @@ const runtime = getSidebarRuntime()
 const collapsed = ref(false)
 const paneCount = ref<PaneCount>(2)
 const activeProviders = ref<string[]>([...DEFAULT_ACTIVE_PROVIDERS])
+const quickPromptVisible = ref(false)
+const quickPromptText = ref('')
+const quickPromptLoading = ref(false)
+const quickPromptInputEl = ref<HTMLInputElement | null>(null)
 
 // Sidebar width from config (loaded on mount)
 const expandedWidth = ref(280)
@@ -68,6 +72,7 @@ const syncLayoutWithErrorHandling = async () => {
 
 let resizeRaf = 0
 let focusRaf = 0
+let quickPromptFocusRaf = 0
 
 const focusPromptComposer = async () => {
   if (collapsed.value) return
@@ -94,9 +99,78 @@ const handleWindowResize = () => {
   })
 }
 
+const focusQuickPromptInput = async () => {
+  await nextTick()
+  if (quickPromptFocusRaf !== 0) {
+    window.cancelAnimationFrame(quickPromptFocusRaf)
+  }
+  quickPromptFocusRaf = window.requestAnimationFrame(() => {
+    quickPromptFocusRaf = 0
+    const input = quickPromptInputEl.value
+    if (!input || input.disabled) return
+    input.focus()
+    const cursorPos = input.value.length
+    input.setSelectionRange(cursorPos, cursorPos)
+  })
+}
+
+const openQuickPrompt = async () => {
+  if (quickPromptVisible.value) return
+  quickPromptVisible.value = true
+  await focusQuickPromptInput()
+}
+
+const closeQuickPrompt = () => {
+  if (quickPromptLoading.value) return
+  quickPromptVisible.value = false
+  quickPromptText.value = ''
+  void focusPromptComposer()
+}
+
+const submitQuickPrompt = async () => {
+  const prompt = quickPromptText.value.trim()
+  if (prompt.length === 0 || quickPromptLoading.value) return
+
+  quickPromptLoading.value = true
+  try {
+    await sendPrompt(prompt)
+    quickPromptVisible.value = false
+    quickPromptText.value = ''
+    await focusPromptComposer()
+  } finally {
+    quickPromptLoading.value = false
+  }
+}
+
+const handleQuickPromptKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    closeQuickPrompt()
+    return
+  }
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    void submitQuickPrompt()
+  }
+}
+
 const handleGlobalKeydown = (e: KeyboardEvent) => {
-  const isToggleShortcut = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b'
-  if (!isToggleShortcut || e.repeat) return
+  if (e.repeat) return
+  const isShortcutModifier = e.ctrlKey || e.metaKey
+  const isBaseShortcut = isShortcutModifier && !e.altKey && !e.shiftKey
+  const key = e.key.toLowerCase()
+
+  if (isBaseShortcut && key === 'j') {
+    e.preventDefault()
+    if (quickPromptVisible.value) {
+      closeQuickPrompt()
+    } else {
+      void openQuickPrompt()
+    }
+    return
+  }
+
+  if (!(isBaseShortcut && key === 'b')) return
 
   e.preventDefault()
   void toggleCollapse()
@@ -133,6 +207,10 @@ onBeforeUnmount(() => {
   if (focusRaf !== 0) {
     window.cancelAnimationFrame(focusRaf)
     focusRaf = 0
+  }
+  if (quickPromptFocusRaf !== 0) {
+    window.cancelAnimationFrame(quickPromptFocusRaf)
+    quickPromptFocusRaf = 0
   }
 })
 
@@ -238,6 +316,27 @@ provide(SIDEBAR_KEY, sidebarContext)
       </div>
     </div>
   </aside>
+
+  <div
+    v-if="quickPromptVisible"
+    class="quick-prompt-overlay"
+    data-testid="quick-prompt-overlay"
+    @click.self="closeQuickPrompt()"
+  >
+    <div class="quick-prompt-dialog" data-testid="quick-prompt-dialog">
+      <input
+        ref="quickPromptInputEl"
+        v-model="quickPromptText"
+        class="quick-prompt-input"
+        data-testid="quick-prompt-input"
+        type="text"
+        placeholder="Just prompt."
+        :disabled="quickPromptLoading"
+        @keydown="handleQuickPromptKeydown"
+      />
+      <div class="quick-prompt-hint">Enter to send · Esc to close · Ctrl+J to toggle</div>
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -355,5 +454,66 @@ provide(SIDEBAR_KEY, sidebarContext)
 
 .sidebar.collapsed .sidebar-content {
   display: none;
+}
+
+.quick-prompt-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 22vh 16px 16px;
+  background: rgba(17, 24, 39, 0.2);
+  backdrop-filter: blur(3px);
+  z-index: 50;
+}
+
+.quick-prompt-dialog {
+  width: min(960px, 100%);
+  padding: 14px 16px 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: color-mix(in srgb, var(--bg) 92%, #ffffff 8%);
+  box-shadow: 0 18px 45px rgba(15, 23, 42, 0.28);
+}
+
+.quick-prompt-input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 30px;
+  line-height: 1.2;
+  letter-spacing: 0.2px;
+}
+
+.quick-prompt-input::placeholder {
+  color: color-mix(in srgb, var(--text-muted) 92%, transparent 8%);
+}
+
+.quick-prompt-input:focus {
+  outline: none;
+}
+
+.quick-prompt-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  opacity: 0.9;
+}
+
+@media (max-width: 640px) {
+  .quick-prompt-overlay {
+    padding-top: 18vh;
+  }
+
+  .quick-prompt-dialog {
+    border-radius: 14px;
+    padding: 12px;
+  }
+
+  .quick-prompt-input {
+    font-size: 22px;
+  }
 }
 </style>

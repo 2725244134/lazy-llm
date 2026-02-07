@@ -138,6 +138,30 @@ test.describe('Electron Smoke Tests', () => {
     await electronApp.close();
   });
 
+  test('quick prompt shortcut opens centered input', async () => {
+    const electronApp = await electron.launch({
+      args: ['.'],
+      env: { ...process.env, NODE_ENV: 'production' },
+    });
+
+    const window = await electronApp.firstWindow();
+    await window.waitForLoadState('domcontentloaded');
+
+    const overlay = window.locator('[data-testid="quick-prompt-overlay"]');
+    const quickInput = window.locator('[data-testid="quick-prompt-input"]');
+
+    await expect(overlay).toHaveCount(0);
+
+    await window.keyboard.press('Control+J');
+    await expect(overlay).toBeVisible();
+    await expect(quickInput).toBeFocused();
+
+    await window.keyboard.press('Control+J');
+    await expect(overlay).toHaveCount(0);
+
+    await electronApp.close();
+  });
+
   test('pane selector works', async () => {
     const electronApp = await electron.launch({
       args: ['.'],
