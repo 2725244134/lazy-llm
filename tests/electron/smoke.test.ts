@@ -147,17 +147,25 @@ test.describe('Electron Smoke Tests', () => {
     const window = await electronApp.firstWindow();
     await window.waitForLoadState('domcontentloaded');
 
-    const overlay = window.locator('[data-testid="quick-prompt-overlay"]');
-    const quickInput = window.locator('[data-testid="quick-prompt-input"]');
+    const isQuickPromptVisible = async () => {
+      return window.evaluate(async () => {
+        const council = (window as unknown as {
+          council: {
+            getLayoutSnapshot: () => Promise<{ quickPromptVisible: boolean }>;
+          };
+        }).council;
+        const snapshot = await council.getLayoutSnapshot();
+        return snapshot.quickPromptVisible;
+      });
+    };
 
-    await expect(overlay).toHaveCount(0);
+    await expect.poll(isQuickPromptVisible).toBe(false);
 
     await window.keyboard.press('Control+J');
-    await expect(overlay).toBeVisible();
-    await expect(quickInput).toBeFocused();
+    await expect.poll(isQuickPromptVisible).toBe(true);
 
     await window.keyboard.press('Control+J');
-    await expect(overlay).toHaveCount(0);
+    await expect.poll(isQuickPromptVisible).toBe(false);
 
     await electronApp.close();
   });

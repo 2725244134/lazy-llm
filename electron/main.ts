@@ -179,6 +179,7 @@ function registerIPCHandlers() {
         windowHeight: 0,
         sidebar: { x: 0, y: 0, width: 0, height: 0 },
         paneCount: 1,
+        quickPromptVisible: false,
         panes: [],
       };
     }
@@ -194,6 +195,24 @@ function registerIPCHandlers() {
     viewManager.setSidebarWidth(width);
     console.log('[IPC] sidebar:updateWidth', { width });
     return { success: true };
+  });
+
+  // Quick prompt toggle
+  ipcMain.handle(IPC_CHANNELS.QUICK_PROMPT_TOGGLE, () => {
+    if (!viewManager) {
+      return { success: false, visible: false };
+    }
+    const visible = viewManager.toggleQuickPrompt();
+    return { success: true, visible };
+  });
+
+  // Quick prompt hide
+  ipcMain.handle(IPC_CHANNELS.QUICK_PROMPT_HIDE, () => {
+    if (!viewManager) {
+      return { success: false, visible: false };
+    }
+    const visible = viewManager.hideQuickPrompt();
+    return { success: true, visible };
   });
 
   // Listen for pane response ready (from pane webContents)

@@ -2,7 +2,7 @@
  * ViewManager - manages sidebar and pane WebContentsViews
  */
 
-import { BaseWindow, WebContents, WebContentsView } from 'electron';
+import { BaseWindow, type Event, type Input, WebContents, WebContentsView } from 'electron';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -53,6 +53,15 @@ const panePreloadPath = resolveFirstExistingPath([
   join(runtimeDir, '..', 'pane-preload.mjs'),
 ]);
 
+const quickPromptPreloadPath = resolveFirstExistingPath([
+  join(runtimeDir, 'quick-prompt-preload.cjs'),
+  join(runtimeDir, 'quick-prompt-preload.js'),
+  join(runtimeDir, 'quick-prompt-preload.mjs'),
+  join(runtimeDir, '..', 'quick-prompt-preload.cjs'),
+  join(runtimeDir, '..', 'quick-prompt-preload.js'),
+  join(runtimeDir, '..', 'quick-prompt-preload.mjs'),
+]);
+
 const rendererIndexPath = resolveFirstExistingPath([
   join(runtimeDir, '..', 'dist', 'index.html'),
   join(runtimeDir, '..', '..', 'dist', 'index.html'),
@@ -78,12 +87,164 @@ function toFailureReason(error: unknown): string {
   return String(error);
 }
 
+function buildQuickPromptDataUrl(): string {
+  const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Quick Prompt</title>
+    <style>
+      :root { color-scheme: light dark; }
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        font-family: "SF Pro Text", "SF Pro SC", "PingFang SC", "Segoe UI", sans-serif;
+      }
+      .overlay {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 22vh 16px 16px;
+        background: rgba(17, 24, 39, 0.2);
+        backdrop-filter: blur(3px);
+      }
+      .dialog {
+        width: min(960px, 100%);
+        padding: 14px 16px 12px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.35);
+        background: rgba(255, 255, 255, 0.93);
+        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.28);
+      }
+      @media (prefers-color-scheme: dark) {
+        .dialog {
+          background: rgba(31, 31, 31, 0.94);
+        }
+      }
+      .input {
+        width: 100%;
+        border: none;
+        background: transparent;
+        color: #111827;
+        font-size: 30px;
+        line-height: 1.2;
+        letter-spacing: 0.2px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .input {
+          color: #f6f6f6;
+        }
+      }
+      .input::placeholder { color: #6b7280; }
+      .input:focus { outline: none; }
+      .hint {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #6b7280;
+      }
+      @media (max-width: 640px) {
+        .overlay { padding-top: 18vh; }
+        .dialog { border-radius: 14px; padding: 12px; }
+        .input { font-size: 22px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="overlay" id="overlay" data-testid="quick-prompt-overlay">
+      <div class="dialog" data-testid="quick-prompt-dialog">
+        <input
+          id="quickPromptInput"
+          class="input"
+          data-testid="quick-prompt-input"
+          type="text"
+          placeholder="Just prompt."
+          autocomplete="off"
+        />
+        <div class="hint">Enter to send · Esc to close · Ctrl+J to toggle</div>
+      </div>
+    </div>
+    <script>
+      const overlay = document.getElementById('overlay');
+      const input = document.getElementById('quickPromptInput');
+      let isSending = false;
+
+      const focusInput = () => {
+        if (!input) return;
+        input.focus();
+        const cursorPos = input.value.length;
+        input.setSelectionRange(cursorPos, cursorPos);
+      };
+
+      const hide = async () => {
+        if (!window.quickPrompt || typeof window.quickPrompt.hide !== 'function') return;
+        await window.quickPrompt.hide();
+      };
+
+      const submit = async () => {
+        if (!input || !window.quickPrompt || typeof window.quickPrompt.sendPrompt !== 'function') return;
+        const prompt = input.value.trim();
+        if (!prompt || isSending) return;
+
+        isSending = true;
+        input.disabled = true;
+        try {
+          await window.quickPrompt.sendPrompt(prompt);
+          input.value = '';
+          await hide();
+        } finally {
+          isSending = false;
+          input.disabled = false;
+        }
+      };
+
+      overlay?.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+          void hide();
+        }
+      });
+
+      window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          void hide();
+          return;
+        }
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          void submit();
+        }
+      });
+
+      window.addEventListener('quick-prompt:open', () => {
+        if (!input) return;
+        input.value = '';
+        input.disabled = false;
+        isSending = false;
+        focusInput();
+      });
+
+      window.addEventListener('quick-prompt:focus', focusInput);
+    </script>
+  </body>
+</html>`;
+
+  return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+}
+
 export class ViewManager {
   private window: BaseWindow;
   private sidebarView: WebContentsView | null = null;
+  private quickPromptView: WebContentsView | null = null;
   private paneViews: PaneView[] = [];
   private currentPaneCount: PaneCount = 1;
   private currentSidebarWidth: number;
+  private quickPromptVisible = false;
+  private quickPromptReady = false;
   private providers: Map<string, ProviderMeta>;
   private injectRuntimeScript: string | null = null;
 
@@ -105,6 +266,38 @@ export class ViewManager {
       width: Math.max(1, contentBounds.width),
       height: Math.max(1, contentBounds.height),
     };
+  }
+
+  private getOverlayBounds(): { x: number; y: number; width: number; height: number } {
+    const contentSize = this.getContentSize();
+    return {
+      x: 0,
+      y: 0,
+      width: contentSize.width,
+      height: contentSize.height,
+    };
+  }
+
+  private attachGlobalShortcutHooks(webContents: WebContents): void {
+    webContents.on('before-input-event', (event: Event, input: Input) => {
+      this.handleGlobalShortcut(event, input);
+    });
+  }
+
+  private handleGlobalShortcut(event: Event, input: Input): void {
+    const isKeyDownLike = input.type === 'keyDown' || input.type === 'rawKeyDown';
+    if (!isKeyDownLike || input.isAutoRepeat) {
+      return;
+    }
+
+    const key = typeof input.key === 'string' ? input.key.toLowerCase() : '';
+    const isShortcutModifier = Boolean(input.control || input.meta);
+    const isBaseShortcut = isShortcutModifier && !input.alt && !input.shift;
+
+    if (isBaseShortcut && key === 'j') {
+      event.preventDefault();
+      this.toggleQuickPrompt();
+    }
   }
 
   private applyPaneRuntimePreferences(webContents: WebContents): void {
@@ -157,6 +350,93 @@ export class ViewManager {
   }
 
   /**
+   * Initialize global quick prompt overlay view
+   */
+  initQuickPrompt(): WebContentsView {
+    if (this.quickPromptView) {
+      return this.quickPromptView;
+    }
+
+    this.quickPromptView = new WebContentsView({
+      webPreferences: {
+        preload: quickPromptPreloadPath,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+
+    this.attachGlobalShortcutHooks(this.quickPromptView.webContents);
+    this.quickPromptView.webContents.on('did-finish-load', () => {
+      this.quickPromptReady = true;
+      if (this.quickPromptVisible) {
+        this.notifyQuickPromptOpened();
+      }
+    });
+    this.quickPromptView.webContents.loadURL(buildQuickPromptDataUrl());
+
+    return this.quickPromptView;
+  }
+
+  toggleQuickPrompt(): boolean {
+    if (this.quickPromptVisible) {
+      return this.hideQuickPrompt();
+    }
+    return this.showQuickPrompt();
+  }
+
+  showQuickPrompt(): boolean {
+    if (!this.quickPromptView) {
+      this.initQuickPrompt();
+    }
+    if (!this.quickPromptView || this.quickPromptVisible) {
+      return this.quickPromptVisible;
+    }
+
+    this.window.contentView.addChildView(this.quickPromptView);
+    this.quickPromptView.setBounds(this.getOverlayBounds());
+    this.quickPromptVisible = true;
+
+    if (this.quickPromptReady) {
+      this.notifyQuickPromptOpened();
+    }
+
+    return this.quickPromptVisible;
+  }
+
+  hideQuickPrompt(): boolean {
+    if (!this.quickPromptView || !this.quickPromptVisible) {
+      return false;
+    }
+    this.window.contentView.removeChildView(this.quickPromptView);
+    this.quickPromptVisible = false;
+    this.focusSidebarIfAvailable();
+    return this.quickPromptVisible;
+  }
+
+  private focusSidebarIfAvailable(): void {
+    if (!this.sidebarView) {
+      return;
+    }
+    const sidebarContents = this.sidebarView.webContents;
+    if (!sidebarContents.isDestroyed()) {
+      sidebarContents.focus();
+    }
+  }
+
+  private notifyQuickPromptOpened(): void {
+    if (!this.quickPromptView) {
+      return;
+    }
+    this.quickPromptView.webContents.executeJavaScript(
+      `window.dispatchEvent(new Event('quick-prompt:open'));`,
+      true
+    ).catch((error) => {
+      console.error('[ViewManager] Failed to focus quick prompt overlay:', error);
+    });
+  }
+
+  /**
    * Set pane count, creating or destroying WebContentsViews as needed
    */
   setPaneCount(count: PaneCount): void {
@@ -188,6 +468,7 @@ export class ViewManager {
       });
 
       this.window.contentView.addChildView(view);
+      this.attachGlobalShortcutHooks(view.webContents);
       this.attachPaneRuntimePreferenceHooks(view.webContents);
       this.applyPaneRuntimePreferences(view.webContents);
       view.webContents.loadURL(url);
@@ -201,6 +482,10 @@ export class ViewManager {
     }
 
     this.currentPaneCount = count;
+    if (this.quickPromptVisible && this.quickPromptView) {
+      this.window.contentView.removeChildView(this.quickPromptView);
+      this.window.contentView.addChildView(this.quickPromptView);
+    }
     this.updateLayout();
   }
 
@@ -263,6 +548,11 @@ export class ViewManager {
         this.paneViews[i].view.setBounds(layout.panes[i]);
       }
     }
+
+    // Keep quick prompt overlay pinned to full content bounds.
+    if (this.quickPromptVisible && this.quickPromptView) {
+      this.quickPromptView.setBounds(this.getOverlayBounds());
+    }
   }
 
   /**
@@ -277,6 +567,7 @@ export class ViewManager {
       windowHeight: contentSize.height,
       sidebar: sidebarBounds,
       paneCount: this.currentPaneCount,
+      quickPromptVisible: this.quickPromptVisible,
       panes: this.paneViews.map(pane => ({
         paneIndex: pane.paneIndex,
         bounds: pane.view.getBounds(),
@@ -406,6 +697,21 @@ export class ViewManager {
       }
     }
     this.paneViews = [];
+
+    // Close quick prompt webContents
+    if (this.quickPromptView) {
+      try {
+        if (this.quickPromptVisible) {
+          this.window.contentView.removeChildView(this.quickPromptView);
+        }
+        this.quickPromptView.webContents.close();
+      } catch (e) {
+        console.error('[ViewManager] Error closing quick prompt:', e);
+      }
+      this.quickPromptView = null;
+      this.quickPromptVisible = false;
+      this.quickPromptReady = false;
+    }
 
     // Close sidebar webContents
     if (this.sidebarView) {

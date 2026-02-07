@@ -13,6 +13,8 @@ import type {
   LayoutUpdateResponse,
   SidebarWidthRequest,
   SidebarWidthResponse,
+  QuickPromptToggleResponse,
+  QuickPromptHideResponse,
   LayoutSnapshot,
 } from '../../electron/ipc/contracts';
 
@@ -26,6 +28,8 @@ export interface CouncilAPI {
   updateLayout: (request: LayoutUpdateRequest) => Promise<LayoutUpdateResponse>;
   getLayoutSnapshot: () => Promise<LayoutSnapshot>;
   updateSidebarWidth: (request: SidebarWidthRequest) => Promise<SidebarWidthResponse>;
+  toggleQuickPrompt: () => Promise<QuickPromptToggleResponse>;
+  hideQuickPrompt: () => Promise<QuickPromptHideResponse>;
 }
 
 declare global {
