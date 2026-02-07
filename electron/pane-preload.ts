@@ -6,10 +6,16 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from './ipc/contracts.js';
 
-// Get pane index from command line args (injected by main process)
+// Get pane index from additionalArguments (injected by main process via webPreferences)
 function getPaneIndex(): number {
-  const arg = process.argv.find(a => a.startsWith('--pane-index='));
-  return arg ? parseInt(arg.split('=')[1], 10) : 0;
+  // additionalArguments are passed as --pane-index=N
+  const args = (process as NodeJS.Process & { argv: string[] }).argv;
+  for (const arg of args) {
+    if (arg.startsWith('--pane-index=')) {
+      return parseInt(arg.split('=')[1], 10);
+    }
+  }
+  return 0;
 }
 
 const paneIndex = getPaneIndex();

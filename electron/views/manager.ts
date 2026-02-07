@@ -94,6 +94,7 @@ export class ViewManager {
           nodeIntegration: false,
           sandbox: true,
           partition: `persist:pane-${paneIndex}`,
+          additionalArguments: [`--pane-index=${paneIndex}`],
         },
       });
 
@@ -226,5 +227,33 @@ export class ViewManager {
    */
   getSidebarWidth(): number {
     return this.currentSidebarWidth;
+  }
+
+  /**
+   * Clean up all views and resources
+   * Call this before window closes
+   */
+  destroy(): void {
+    // Close all pane webContents
+    for (const pane of this.paneViews) {
+      try {
+        this.window.contentView.removeChildView(pane.view);
+        pane.view.webContents.close();
+      } catch (e) {
+        console.error(`[ViewManager] Error closing pane ${pane.paneIndex}:`, e);
+      }
+    }
+    this.paneViews = [];
+
+    // Close sidebar webContents
+    if (this.sidebarView) {
+      try {
+        this.window.contentView.removeChildView(this.sidebarView);
+        this.sidebarView.webContents.close();
+      } catch (e) {
+        console.error('[ViewManager] Error closing sidebar:', e);
+      }
+      this.sidebarView = null;
+    }
   }
 }

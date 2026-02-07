@@ -6,6 +6,8 @@ import type {
   PromptRequest,
   LayoutUpdateRequest,
   SidebarWidthRequest,
+  PaneCount,
+  PaneResponseReadyPayload,
 } from './ipc/contracts.js';
 import { getConfig } from './ipc-handlers/store.js';
 import { ViewManager } from './views/manager.js';
@@ -34,7 +36,7 @@ function createWindow() {
 
   // Set initial pane count from config
   const config = getConfig();
-  const initialPaneCount = (config.defaults.pane_count || 2) as 1 | 2 | 3 | 4;
+  const initialPaneCount = validatePaneCount(config.defaults.pane_count);
   viewManager.setPaneCount(initialPaneCount);
 
   // Update layout on window resize
@@ -42,19 +44,43 @@ function createWindow() {
     viewManager?.updateLayout();
   });
 
+  // Clean up resources before window closes
+  mainWindow.on('close', () => {
+    viewManager?.destroy();
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
     viewManager = null;
   });
+}
 
-  // Open DevTools in development
-  if (process.env.NODE_ENV === 'development') {
-    // DevTools for sidebar
-    const snapshot = viewManager.getSnapshot();
-    if (snapshot.panes.length > 0) {
-      // Will be handled by sidebar's webContents
-    }
+// Input validation helpers
+function validatePaneCount(count: unknown): PaneCount {
+  if (typeof count !== 'number' || !Number.isInteger(count)) {
+    return 2;
   }
+  if (count < 1) return 1;
+  if (count > 4) return 4;
+  return count as PaneCount;
+}
+
+function validateSidebarWidth(width: unknown): number {
+  if (typeof width !== 'number' || !Number.isFinite(width)) {
+    return 280;
+  }
+  // Clamp to reasonable range
+  return Math.max(48, Math.min(500, Math.floor(width)));
+}
+
+function validatePaneIndex(index: unknown, maxIndex: number): number | null {
+  if (typeof index !== 'number' || !Number.isInteger(index)) {
+    return null;
+  }
+  if (index < 0 || index > maxIndex) {
+    return null;
+  }
+  return index;
 }
 
 // Register IPC handlers
@@ -78,19 +104,26 @@ function registerIPCHandlers() {
     if (!viewManager) {
       return { success: false };
     }
-    viewManager.setPaneCount(request.count);
-    console.log('[IPC] pane:setCount', request);
+    const count = validatePaneCount(request?.count);
+    viewManager.setPaneCount(count);
+    console.log('[IPC] pane:setCount', { count });
     return { success: true };
   });
 
   // Update provider for pane
   ipcMain.handle(IPC_CHANNELS.PANE_UPDATE_PROVIDER, (_event, request: PaneUpdateRequest) => {
     if (!viewManager) {
-      return { success: false, paneIndex: request.paneIndex };
+      return { success: false, paneIndex: request?.paneIndex ?? -1 };
     }
-    const success = viewManager.updatePaneProvider(request.paneIndex, request.providerKey);
-    console.log('[IPC] pane:updateProvider', request, { success });
-    return { success, paneIndex: request.paneIndex };
+    const paneIndex = validatePaneIndex(request?.paneIndex, viewManager.getPaneCount() - 1);
+    if (paneIndex === null) {
+      console.error('[IPC] pane:updateProvider invalid paneIndex:', request?.paneIndex);
+      return { success: false, paneIndex: request?.paneIndex ?? -1 };
+    }
+    const providerKey = typeof request?.providerKey === 'string' ? request.providerKey : '';
+    const success = viewManager.updatePaneProvider(paneIndex, providerKey);
+    console.log('[IPC] pane:updateProvider', { paneIndex, providerKey, success });
+    return { success, paneIndex };
   });
 
   // Send prompt to all panes
@@ -98,8 +131,9 @@ function registerIPCHandlers() {
     if (!viewManager) {
       return { success: false, failures: ['no-view-manager'] };
     }
-    const result = await viewManager.sendPromptToAll(request.text);
-    console.log('[IPC] prompt:send', request, result);
+    const text = typeof request?.text === 'string' ? request.text : '';
+    const result = await viewManager.sendPromptToAll(text);
+    console.log('[IPC] prompt:send', { textLength: text.length }, result);
     return result;
   });
 
@@ -108,9 +142,11 @@ function registerIPCHandlers() {
     if (!viewManager) {
       return { success: false };
     }
-    viewManager.setPaneCount(request.paneCount);
-    viewManager.updateLayout(request.sidebarWidth);
-    console.log('[IPC] layout:update', request);
+    const paneCount = validatePaneCount(request?.paneCount);
+    const sidebarWidth = validateSidebarWidth(request?.sidebarWidth);
+    viewManager.setPaneCount(paneCount);
+    viewManager.updateLayout(sidebarWidth);
+    console.log('[IPC] layout:update', { paneCount, sidebarWidth });
     return { success: true };
   });
 
@@ -133,9 +169,18 @@ function registerIPCHandlers() {
     if (!viewManager) {
       return { success: false };
     }
-    viewManager.setSidebarWidth(request.width);
-    console.log('[IPC] sidebar:updateWidth', request);
+    const width = validateSidebarWidth(request?.width);
+    viewManager.setSidebarWidth(width);
+    console.log('[IPC] sidebar:updateWidth', { width });
     return { success: true };
+  });
+
+  // Listen for pane response ready (from pane webContents)
+  ipcMain.on(IPC_CHANNELS.PANE_RESPONSE_READY, (_event, payload: PaneResponseReadyPayload) => {
+    const paneIndex = typeof payload?.paneIndex === 'number' ? payload.paneIndex : -1;
+    const response = typeof payload?.response === 'string' ? payload.response : '';
+    console.log('[IPC] pane:responseReady', { paneIndex, responseLength: response.length });
+    // TODO: Forward response to sidebar or store for later retrieval
   });
 }
 

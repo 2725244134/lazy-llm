@@ -1,5 +1,6 @@
 import Store from 'electron-store';
-import { machineIdSync } from 'node-machine-id';
+import pkg from 'node-machine-id';
+const { machineIdSync } = pkg;
 import type { AppConfig } from '../ipc/contracts.js';
 
 // Machine-derived encryption key (not hardcoded)
