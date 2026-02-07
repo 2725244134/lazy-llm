@@ -54,17 +54,29 @@ const handleSend = async () => {
   }
 }
 
+const handleClear = async () => {
+  if (text.value.length === 0) return
+  text.value = ''
+  await nextTick()
+  syncTextareaHeight()
+}
+
 const handleKeydown = (e: KeyboardEvent) => {
   if (e.key !== 'Enter') return
 
   // Shift+Enter is always a newline.
   if (e.shiftKey) return
 
-  // Ctrl+Enter sends the prompt.
+  // Ctrl+Enter clears current draft.
   if (e.ctrlKey) {
     e.preventDefault()
-    void handleSend()
+    void handleClear()
+    return
   }
+
+  // Enter sends the prompt.
+  e.preventDefault()
+  void handleSend()
 }
 
 const isDraftSyncSuppressed = () => isLoading.value || Date.now() < suppressDraftSyncUntil
@@ -149,7 +161,7 @@ onBeforeUnmount(() => {
       @input="syncTextareaHeight"
       @keydown="handleKeydown"
     ></textarea>
-    <p class="composer-shortcut-hint">Ctrl+Enter to send · Shift+Enter for newline</p>
+    <p class="composer-shortcut-hint">Enter to send · Ctrl+Enter to clear · Shift+Enter for newline</p>
     <button
       class="composer-send-btn"
       :class="{ loading: isLoading }"
