@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "electron/**"
+      - "public/**"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+      - "clips/**"
+      - "index.html"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig*.json"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "playwright.config.ts"
+      - "Makefile"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "electron/**"
+      - "public/**"
+      - "scripts/**"
+      - "src/**"
+      - "tests/**"
+      - "clips/**"
+      - "index.html"
+      - "package.json"
+      - "bun.lock"
+      - "tsconfig*.json"
+      - "vite.config.ts"
+      - "vitest.config.ts"
+      - "playwright.config.ts"
+      - "Makefile"
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.5"
+
+      - name: Install system dependencies (Linux)
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            xvfb \
+            libgtk-3-0 \
+            libnss3 \
+            libxss1 \
+            libasound2 \
+            libgbm1
+
+      - name: Install JS dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run checks
+        run: make check
+
+      - name: Run unit tests
+        run: make test-unit
+
+      - name: Run Electron smoke tests (headless)
+        run: make test-electron-smoke-headless

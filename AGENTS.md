@@ -109,3 +109,58 @@ Before merging:
 1. `make check` passes
 2. `make test` passes
 3. `make test-electron-smoke` passes (for UI changes)
+
+## Version Contract
+
+- Keep release tag and app version aligned (validated on tag push):
+  - `package.json#version`
+- Validate locally before tagging:
+  - `make release-verify-tag EXPECTED_VERSION=vX.Y.Z`
+
+## Git Workflow
+
+### Commit Messages
+
+Recommended Conventional Commits format:
+
+```text
+<type>(<scope>): <subject>
+```
+
+Suggested types:
+`feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, `ci`, `perf`, `style`, `revert`.
+
+### History Hygiene
+
+- Keep `main` linear and readable; avoid "WIP" commits on `main`.
+- Prefer short-lived branches (feature/proto/release) and squash-merge into `main`.
+
+### Release Tags
+
+- Tag format: `vX.Y.Z` (or `X.Y.Z`).
+- Pushing a tag triggers `Validate Release Tag` (`.github/workflows/validate-tag.yml`) which
+  enforces tag/version alignment.
+
+## Release Workflow
+
+1. Ensure `main` is up to date:
+   - `git switch main`
+   - `git pull --rebase`
+2. Create a release branch, e.g. `bump-0.2.0`.
+3. Bump `package.json#version`.
+4. Run local validation:
+   - `make check`
+   - `make test`
+   - (Optional) `make package`
+   - `make release-verify-tag EXPECTED_VERSION=vX.Y.Z`
+5. Commit and merge (via PR if you prefer).
+6. Switch back to `main` and pull latest.
+7. Tag and push:
+   - `git tag vX.Y.Z`
+   - `git push origin vX.Y.Z`
+8. GitHub Actions validates the tag/version contract (`.github/workflows/validate-tag.yml`).
+
+## CI
+
+- `.github/workflows/ci.yml`: runs `make check` + tests on PR/push.
+- `.github/workflows/validate-tag.yml`: validates tag/version alignment on tag pushes.

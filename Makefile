@@ -42,7 +42,7 @@ check: ## Run type checking.
 	@echo "==> Type-checking (vue-tsc)"
 	@bun run typecheck
 
-.PHONY: test test-unit test-electron-smoke
+.PHONY: test test-unit test-electron-smoke test-electron-smoke-headless release-verify-tag
 test: test-unit test-electron-smoke ## Run all test suites.
 test-unit: ## Run unit tests with vitest.
 	@echo "==> Running unit tests"
@@ -50,6 +50,17 @@ test-unit: ## Run unit tests with vitest.
 test-electron-smoke: ## Run Electron smoke tests with Playwright.
 	@echo "==> Running Electron smoke tests"
 	@bun run test:electron:smoke
+test-electron-smoke-headless: ## Run Electron smoke tests in headless Linux (xvfb).
+	@echo "==> Running Electron smoke tests (headless)"
+	@xvfb-run -a bun run test:electron:smoke
+
+release-verify-tag: ## Validate package version against EXPECTED_VERSION (supports vX.Y.Z or X.Y.Z).
+	@if [ -z "$${EXPECTED_VERSION:-}" ]; then \
+		echo "EXPECTED_VERSION is required, e.g. make release-verify-tag EXPECTED_VERSION=v0.1.1"; \
+		exit 1; \
+	fi
+	@echo "==> Validating release tag $${EXPECTED_VERSION}"
+	@bun scripts/check_version_tag.ts --expected-version "$${EXPECTED_VERSION}"
 
 .PHONY: clean
 clean: ## Remove build artifacts.
