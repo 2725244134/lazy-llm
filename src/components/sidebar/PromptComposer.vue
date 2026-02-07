@@ -145,10 +145,11 @@ onBeforeUnmount(() => {
       v-model="text"
       class="composer-textarea"
       data-testid="prompt-textarea"
-      placeholder="Type message... (Ctrl+Enter send, Shift+Enter newline)"
+      placeholder="Just prompt."
       @input="syncTextareaHeight"
       @keydown="handleKeydown"
     ></textarea>
+    <p class="composer-shortcut-hint">Ctrl+Enter to send · Shift+Enter for newline</p>
     <button
       class="composer-send-btn"
       :class="{ loading: isLoading }"
@@ -237,6 +238,14 @@ onBeforeUnmount(() => {
   background: var(--bg);
   box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2),
     0 10px 24px rgba(79, 70, 229, 0.12);
+}
+
+.composer-shortcut-hint {
+  margin: -2px 2px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  opacity: 0.82;
 }
 
 .composer-send-btn {
