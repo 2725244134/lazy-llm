@@ -8,8 +8,8 @@ const text = ref('')
 const isLoading = ref(false)
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const trimmedText = computed(() => text.value.trim())
-const MIN_TEXTAREA_HEIGHT = 92
-const MAX_TEXTAREA_HEIGHT = 220
+const MIN_TEXTAREA_HEIGHT = 124
+const MAX_TEXTAREA_HEIGHT = 280
 
 const canSend = computed(() => trimmedText.value.length > 0 && !isLoading.value)
 
@@ -91,38 +91,42 @@ onMounted(() => {
 
 .composer-textarea {
   width: 100%;
-  min-height: 92px;
-  max-height: 220px;
-  padding: 12px 14px;
+  min-height: 124px;
+  max-height: 280px;
+  padding: 14px 16px;
   border: 1.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 14px;
   font-family: inherit;
   font-weight: 500;
-  line-height: 1.55;
+  line-height: 1.6;
+  letter-spacing: 0.1px;
   resize: none;
   overflow-y: hidden;
   margin-bottom: 10px;
-  background: var(--bg);
+  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-hover) 120%);
   color: var(--text);
-  transition: all 0.2s ease-out;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  caret-color: var(--broadcast);
+  transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background 0.2s ease-out;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 .composer-textarea::placeholder {
   color: var(--text-muted);
-  opacity: 0.7;
+  opacity: 0.78;
 }
 
 .composer-textarea:hover {
-  border-color: var(--border);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+  border-color: #8f88f7;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 3px 10px rgba(0, 0, 0, 0.06);
 }
 
 .composer-textarea:focus {
   outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05), 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--broadcast);
+  background: var(--bg);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2),
+    0 10px 24px rgba(79, 70, 229, 0.12);
 }
 
 .composer-send-btn {
