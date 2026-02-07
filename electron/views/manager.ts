@@ -2,12 +2,17 @@
  * ViewManager - manages sidebar and pane WebContentsViews
  */
 
-import { BaseWindow, WebContentsView } from 'electron';
+import { BaseWindow, WebContents, WebContentsView } from 'electron';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { calculateLayout } from './geometry.js';
 import { buildPromptInjectionEvalScript, type PromptInjectionResult } from './promptInjection.js';
+import {
+  normalizePaneUserAgent,
+  PANE_ACCEPT_LANGUAGES,
+  PANE_DEFAULT_ZOOM_FACTOR,
+} from './paneRuntimePreferences.js';
 import { getConfig } from '../ipc-handlers/store.js';
 import type {
   PaneCount,
@@ -98,6 +103,20 @@ export class ViewManager {
     };
   }
 
+  private applyPaneRuntimePreferences(webContents: WebContents): void {
+    const rawUserAgent = webContents.getUserAgent();
+    const normalizedUserAgent = normalizePaneUserAgent(rawUserAgent);
+    webContents.session.setUserAgent(normalizedUserAgent, PANE_ACCEPT_LANGUAGES);
+    webContents.setUserAgent(normalizedUserAgent);
+    webContents.setZoomFactor(PANE_DEFAULT_ZOOM_FACTOR);
+  }
+
+  private attachPaneRuntimePreferenceHooks(webContents: WebContents): void {
+    webContents.on('did-finish-load', () => {
+      this.applyPaneRuntimePreferences(webContents);
+    });
+  }
+
   /**
    * Initialize sidebar WebContentsView
    */
@@ -156,6 +175,8 @@ export class ViewManager {
       });
 
       this.window.contentView.addChildView(view);
+      this.attachPaneRuntimePreferenceHooks(view.webContents);
+      this.applyPaneRuntimePreferences(view.webContents);
       view.webContents.loadURL(url);
 
       this.paneViews.push({
@@ -188,6 +209,7 @@ export class ViewManager {
     const pane = this.paneViews[paneIndex];
     pane.providerKey = providerKey;
     pane.url = provider.url;
+    this.applyPaneRuntimePreferences(pane.view.webContents);
     pane.view.webContents.loadURL(provider.url);
 
     return true;
