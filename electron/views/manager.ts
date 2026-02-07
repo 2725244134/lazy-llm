@@ -9,7 +9,6 @@ import { fileURLToPath } from 'url';
 import { calculateLayout } from './geometry.js';
 import { buildPromptInjectionEvalScript, type PromptInjectionResult } from './promptInjection.js';
 import {
-  normalizePaneUserAgent,
   PANE_ACCEPT_LANGUAGES,
   PANE_DEFAULT_ZOOM_FACTOR,
 } from './paneRuntimePreferences.js';
@@ -105,9 +104,7 @@ export class ViewManager {
 
   private applyPaneRuntimePreferences(webContents: WebContents): void {
     const rawUserAgent = webContents.getUserAgent();
-    const normalizedUserAgent = normalizePaneUserAgent(rawUserAgent);
-    webContents.session.setUserAgent(normalizedUserAgent, PANE_ACCEPT_LANGUAGES);
-    webContents.setUserAgent(normalizedUserAgent);
+    webContents.session.setUserAgent(rawUserAgent, PANE_ACCEPT_LANGUAGES);
     webContents.setZoomFactor(PANE_DEFAULT_ZOOM_FACTOR);
   }
 
