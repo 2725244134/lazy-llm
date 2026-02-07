@@ -3,7 +3,7 @@ Author: cctop
 Created: 2026-02-08
 Updated: 2026-02-08
 Status: Implemented
-Commits: ci(release): migrate llm-council GitHub maintenance workflows and prepare v0.1.1; fix(ci): build artifacts before electron smoke tests; test(electron): stabilize smoke checks under headless CI
+Commits: ci(release): migrate llm-council GitHub maintenance workflows and prepare v0.1.1; fix(ci): build artifacts before electron smoke tests; test(electron): stabilize smoke checks under headless CI; test(electron): wait for preload bridge readiness in fixture
 ---
 
 # CLIP-7: Migrate GitHub Workflow and Release Maintenance Logic from llm-council
@@ -66,6 +66,8 @@ Commits: ci(release): migrate llm-council GitHub maintenance workflows and prepa
 5. Headless 稳定性验证：
    - 快捷键相关 smoke case 在 xvfb 下可稳定通过
    - 使用稳定的 shortcut effect 路径验证（避免 CI 键盘注入抖动）
+6. Fixture 时序保障：
+   - smoke 启动后先等待 `window.council` bridge ready，再执行 IPC 断言
 
 ## Implementation notes
 

@@ -33,9 +33,17 @@ export const test = base.extend<ElectronFixtures>({
   },
 
   appWindow: async ({ electronApp }, use) => {
-    const window = await electronApp.firstWindow();
-    await window.waitForLoadState('domcontentloaded');
-    await use(window);
+    const appPage = await electronApp.firstWindow();
+    await appPage.waitForLoadState('domcontentloaded');
+    await expect.poll(async () => {
+      return appPage.evaluate(() => {
+        const bridge = globalThis as unknown as {
+          council?: { getLayoutSnapshot?: unknown };
+        };
+        return typeof bridge.council?.getLayoutSnapshot === 'function';
+      });
+    }).toBe(true);
+    await use(appPage);
   },
 });
 
