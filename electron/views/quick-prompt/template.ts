@@ -21,7 +21,7 @@ export function buildQuickPromptHtml(): string {
         id="quickPromptInput"
         class="input"
         data-testid="quick-prompt-input"
-        placeholder="Just prompt."
+        placeholder="Type your prompt and press Enter"
         autocomplete="off"
       ></textarea>
     </div>
