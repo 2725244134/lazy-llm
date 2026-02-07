@@ -3,7 +3,7 @@ Author: cctop
 Created: 2026-02-08
 Updated: 2026-02-08
 Status: Implemented
-Commits: TBD
+Commits: 58044e2
 ---
 
 # CLIP-4: Live Prompt Draft Sync from Sidebar to Pane Inputs
