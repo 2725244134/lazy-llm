@@ -187,8 +187,8 @@ provide(SIDEBAR_KEY, sidebarContext)
       <div class="sidebar-scroll" data-testid="sidebar-scroll">
         <PaneSelector />
         <ProviderList />
+        <PromptComposer />
       </div>
-      <PromptComposer />
     </div>
   </aside>
 </template>
@@ -284,11 +284,12 @@ provide(SIDEBAR_KEY, sidebarContext)
 }
 
 .sidebar-scroll {
-  flex: 1;
-  min-height: 0;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 2px;
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-scroll::-webkit-scrollbar {
