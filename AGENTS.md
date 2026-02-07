@@ -1,5 +1,21 @@
 # LazyLLM Agent Guidelines
 
+## Superpowers System
+
+## Language
+
+- Use Chinese for conversation with users.
+- Use English for all other content, such as code comments and documentation.
+
+## Self-Service Information
+
+- If required information can be retrieved via available tools (e.g., system info, project status, file listings), run the appropriate read-only commands instead of asking the user.
+- Do not ask the user for information that can be obtained by running such commands.
+
+## Code Principle
+
+- 每次在一个 project 进行代码修改之后，先遵循 Conventional Commits 进行代码提交，然后向用户解释为什么要进行每一部分的代码修改，以及为什么这些修改生效。
+
 ## Project Overview
 
 LazyLLM is a multi-LLM interface built with Electron + Vue + TypeScript. It allows users to interact with multiple LLM providers (ChatGPT, Claude, Gemini, etc.) simultaneously.
