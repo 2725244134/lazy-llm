@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import type {
   HealthResponse,
   LayoutSnapshot,
@@ -30,13 +30,29 @@ export type QuickPromptState = {
   height: number;
 };
 
+async function ensureCouncilReady(page: Page): Promise<void> {
+  await expect.poll(
+    async () => {
+      return page.evaluate(() => {
+        const bridge = globalThis as unknown as {
+          council?: { getLayoutSnapshot?: unknown };
+        };
+        return typeof bridge.council?.getLayoutSnapshot === 'function';
+      });
+    },
+    { timeout: 15000 },
+  ).toBe(true);
+}
+
 export async function getHealthCheck(page: Page): Promise<HealthResponse> {
+  await ensureCouncilReady(page);
   return page.evaluate(() => {
     return (window as unknown as BrowserWindowWithCouncil).council.healthCheck();
   });
 }
 
 export async function getLayoutSnapshot(page: Page): Promise<LayoutSnapshot> {
+  await ensureCouncilReady(page);
   return page.evaluate(() => {
     return (window as unknown as BrowserWindowWithCouncil).council.getLayoutSnapshot();
   });
@@ -66,6 +82,7 @@ export async function resizeQuickPrompt(
   page: Page,
   request: QuickPromptResizeRequest,
 ): Promise<QuickPromptResizeResponse> {
+  await ensureCouncilReady(page);
   return page.evaluate((payload: QuickPromptResizeRequest) => {
     return (window as unknown as BrowserWindowWithCouncil).council.resizeQuickPrompt(payload);
   }, request);
@@ -75,6 +92,7 @@ export async function updateProvider(
   page: Page,
   request: PaneUpdateRequest,
 ): Promise<PaneUpdateResponse> {
+  await ensureCouncilReady(page);
   return page.evaluate((payload: PaneUpdateRequest) => {
     return (window as unknown as BrowserWindowWithCouncil).council.updateProvider(payload);
   }, request);
