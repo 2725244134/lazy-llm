@@ -1,14 +1,31 @@
 <script setup lang="ts">
-import { computed, inject, ref } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
 import { SIDEBAR_KEY } from './context'
 
 const sidebar = inject(SIDEBAR_KEY)!
 
 const text = ref('')
 const isLoading = ref(false)
+const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const trimmedText = computed(() => text.value.trim())
+const MIN_TEXTAREA_HEIGHT = 92
+const MAX_TEXTAREA_HEIGHT = 220
 
 const canSend = computed(() => trimmedText.value.length > 0 && !isLoading.value)
+
+const syncTextareaHeight = () => {
+  const textarea = textareaEl.value
+  if (!textarea) return
+
+  textarea.style.height = 'auto'
+  const nextHeight = Math.min(
+    MAX_TEXTAREA_HEIGHT,
+    Math.max(MIN_TEXTAREA_HEIGHT, textarea.scrollHeight)
+  )
+
+  textarea.style.height = `${nextHeight}px`
+  textarea.style.overflowY = textarea.scrollHeight > MAX_TEXTAREA_HEIGHT ? 'auto' : 'hidden'
+}
 
 const handleSend = async () => {
   if (!canSend.value) return
@@ -18,6 +35,8 @@ const handleSend = async () => {
   try {
     await sidebar.sendPrompt(prompt)
     text.value = ''
+    await nextTick()
+    syncTextareaHeight()
   } finally {
     isLoading.value = false
   }
@@ -29,15 +48,25 @@ const handleKeydown = (e: KeyboardEvent) => {
     void handleSend()
   }
 }
+
+watch(text, () => {
+  nextTick(syncTextareaHeight)
+})
+
+onMounted(() => {
+  syncTextareaHeight()
+})
 </script>
 
 <template>
   <div class="composer-section">
     <textarea
+      ref="textareaEl"
       v-model="text"
       class="composer-textarea"
       data-testid="prompt-textarea"
       placeholder="Type message... (Ctrl+Enter to send)"
+      @input="syncTextareaHeight"
       @keydown="handleKeydown"
     ></textarea>
     <button
@@ -62,15 +91,17 @@ const handleKeydown = (e: KeyboardEvent) => {
 
 .composer-textarea {
   width: 100%;
-  min-height: 68px;
-  padding: 10px 12px;
+  min-height: 92px;
+  max-height: 220px;
+  padding: 12px 14px;
   border: 1.5px solid var(--border);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px;
   font-family: inherit;
   font-weight: 500;
-  line-height: 1.5;
+  line-height: 1.55;
   resize: none;
+  overflow-y: hidden;
   margin-bottom: 10px;
   background: var(--bg);
   color: var(--text);

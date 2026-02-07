@@ -11,6 +11,7 @@ import { buildPromptInjectionEvalScript, type PromptInjectionResult } from './pr
 import {
   PANE_ACCEPT_LANGUAGES,
   PANE_DEFAULT_ZOOM_FACTOR,
+  SIDEBAR_DEFAULT_ZOOM_FACTOR,
 } from './paneRuntimePreferences.js';
 import { getConfig } from '../ipc-handlers/store.js';
 import type {
@@ -108,9 +109,19 @@ export class ViewManager {
     webContents.setZoomFactor(PANE_DEFAULT_ZOOM_FACTOR);
   }
 
+  private applySidebarRuntimePreferences(webContents: WebContents): void {
+    webContents.setZoomFactor(SIDEBAR_DEFAULT_ZOOM_FACTOR);
+  }
+
   private attachPaneRuntimePreferenceHooks(webContents: WebContents): void {
     webContents.on('did-finish-load', () => {
       this.applyPaneRuntimePreferences(webContents);
+    });
+  }
+
+  private attachSidebarRuntimePreferenceHooks(webContents: WebContents): void {
+    webContents.on('did-finish-load', () => {
+      this.applySidebarRuntimePreferences(webContents);
     });
   }
 
@@ -128,6 +139,8 @@ export class ViewManager {
     });
 
     this.window.contentView.addChildView(this.sidebarView);
+    this.attachSidebarRuntimePreferenceHooks(this.sidebarView.webContents);
+    this.applySidebarRuntimePreferences(this.sidebarView.webContents);
 
     // Load sidebar content
     if (process.env.NODE_ENV === 'development') {
