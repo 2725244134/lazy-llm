@@ -161,8 +161,12 @@ test.describe('Electron Smoke Tests', () => {
 
     await expect.poll(isQuickPromptVisible).toBe(false);
 
+    const paneBtn3 = window.locator('[data-testid="pane-chip-3"]');
+
     await window.keyboard.press('Control+J');
     await expect.poll(isQuickPromptVisible).toBe(true);
+    await paneBtn3.click();
+    await expect(paneBtn3).toHaveClass(/active/);
 
     await window.keyboard.press('Control+J');
     await expect.poll(isQuickPromptVisible).toBe(false);

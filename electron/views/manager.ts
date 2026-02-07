@@ -73,6 +73,14 @@ const injectRuntimePath = resolveFirstExistingPath([
   join(runtimeDir, '..', '..', 'dist-electron', 'inject.js'),
 ]);
 
+const QUICK_PROMPT_PASSTHROUGH_MODE = true;
+const QUICK_PROMPT_MAX_WIDTH = 960;
+const QUICK_PROMPT_MIN_WIDTH = 360;
+const QUICK_PROMPT_HEIGHT = 162;
+const QUICK_PROMPT_MIN_TOP = 96;
+const QUICK_PROMPT_TOP_RATIO = 0.22;
+const QUICK_PROMPT_VIEWPORT_PADDING = 16;
+
 interface PaneView {
   view: WebContentsView;
   paneIndex: number;
@@ -102,29 +110,58 @@ function buildQuickPromptDataUrl(): string {
         margin: 0;
         padding: 0;
         background: transparent;
+        overflow: hidden;
         font-family: "SF Pro Text", "SF Pro SC", "PingFang SC", "Segoe UI", sans-serif;
       }
-      .overlay {
-        position: fixed;
-        inset: 0;
+      body {
         display: flex;
-        align-items: flex-start;
+        align-items: stretch;
         justify-content: center;
-        padding: 22vh 16px 16px;
-        background: transparent;
-        backdrop-filter: none;
       }
-      .dialog {
-        width: min(960px, 100%);
-        padding: 14px 16px 12px;
-        border-radius: 16px;
+      .panel {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        padding: 12px 14px 10px;
+        border-radius: 18px;
         border: 1px solid rgba(148, 163, 184, 0.35);
-        background: rgba(255, 255, 255, 0.93);
-        box-shadow: 0 18px 45px rgba(15, 23, 42, 0.28);
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 12px 36px rgba(15, 23, 42, 0.26);
+        backdrop-filter: blur(10px) saturate(130%);
       }
       @media (prefers-color-scheme: dark) {
-        .dialog {
-          background: rgba(31, 31, 31, 0.94);
+        .panel {
+          border-color: rgba(100, 116, 139, 0.52);
+          background: rgba(22, 27, 34, 0.9);
+        }
+      }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .title {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.7px;
+        text-transform: uppercase;
+        color: #475569;
+      }
+      .shortcut {
+        font-size: 11px;
+        line-height: 1;
+        color: #64748b;
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 999px;
+        padding: 4px 8px;
+      }
+      @media (prefers-color-scheme: dark) {
+        .title { color: #cbd5e1; }
+        .shortcut {
+          color: #94a3b8;
+          border-color: rgba(148, 163, 184, 0.35);
         }
       }
       .input {
@@ -132,7 +169,8 @@ function buildQuickPromptDataUrl(): string {
         border: none;
         background: transparent;
         color: #111827;
-        font-size: 30px;
+        font-size: 31px;
+        font-weight: 580;
         line-height: 1.2;
         letter-spacing: 0.2px;
       }
@@ -144,19 +182,30 @@ function buildQuickPromptDataUrl(): string {
       .input::placeholder { color: #6b7280; }
       .input:focus { outline: none; }
       .hint {
-        margin-top: 8px;
+        margin-top: 7px;
         font-size: 12px;
         color: #6b7280;
+        letter-spacing: 0.12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
       @media (max-width: 640px) {
-        .overlay { padding-top: 18vh; }
-        .dialog { border-radius: 14px; padding: 12px; }
+        .panel {
+          padding: 10px 12px 9px;
+          border-radius: 14px;
+        }
         .input { font-size: 22px; }
+        .hint { font-size: 11px; }
       }
     </style>
   </head>
   <body>
-    <div class="overlay" id="overlay" data-testid="quick-prompt-overlay">
+    <div class="panel" data-testid="quick-prompt-overlay">
+      <div class="header">
+        <div class="title">Quick Prompt</div>
+        <div class="shortcut">Ctrl+J</div>
+      </div>
       <div class="dialog" data-testid="quick-prompt-dialog">
         <input
           id="quickPromptInput"
@@ -170,7 +219,6 @@ function buildQuickPromptDataUrl(): string {
       </div>
     </div>
     <script>
-      const overlay = document.getElementById('overlay');
       const input = document.getElementById('quickPromptInput');
       let isSending = false;
 
@@ -202,12 +250,6 @@ function buildQuickPromptDataUrl(): string {
           input.disabled = false;
         }
       };
-
-      overlay?.addEventListener('click', (event) => {
-        if (event.target === overlay) {
-          void hide();
-        }
-      });
 
       window.addEventListener('keydown', (event) => {
         if (event.key === 'Escape') {
@@ -269,13 +311,40 @@ export class ViewManager {
     };
   }
 
-  private getOverlayBounds(): { x: number; y: number; width: number; height: number } {
+  private getQuickPromptBounds(): { x: number; y: number; width: number; height: number } {
     const contentSize = this.getContentSize();
+    if (!QUICK_PROMPT_PASSTHROUGH_MODE) {
+      return {
+        x: 0,
+        y: 0,
+        width: contentSize.width,
+        height: contentSize.height,
+      };
+    }
+
+    const maxAvailableWidth = Math.max(
+      240,
+      contentSize.width - QUICK_PROMPT_VIEWPORT_PADDING * 2
+    );
+    const minWidth = Math.min(QUICK_PROMPT_MIN_WIDTH, maxAvailableWidth);
+    const width = Math.max(minWidth, Math.min(QUICK_PROMPT_MAX_WIDTH, maxAvailableWidth));
+    const height = Math.min(
+      QUICK_PROMPT_HEIGHT,
+      Math.max(108, contentSize.height - QUICK_PROMPT_VIEWPORT_PADDING * 2)
+    );
+    const x = Math.max(0, Math.floor((contentSize.width - width) / 2));
+    const preferredTop = Math.max(
+      QUICK_PROMPT_MIN_TOP,
+      Math.floor(contentSize.height * QUICK_PROMPT_TOP_RATIO)
+    );
+    const maxTop = Math.max(0, contentSize.height - height - QUICK_PROMPT_VIEWPORT_PADDING);
+    const y = Math.max(0, Math.min(preferredTop, maxTop));
+
     return {
-      x: 0,
-      y: 0,
-      width: contentSize.width,
-      height: contentSize.height,
+      x,
+      y,
+      width,
+      height,
     };
   }
 
@@ -396,7 +465,7 @@ export class ViewManager {
     }
 
     this.window.contentView.addChildView(this.quickPromptView);
-    this.quickPromptView.setBounds(this.getOverlayBounds());
+    this.quickPromptView.setBounds(this.getQuickPromptBounds());
     this.quickPromptVisible = true;
 
     if (this.quickPromptReady) {
@@ -551,9 +620,9 @@ export class ViewManager {
       }
     }
 
-    // Keep quick prompt overlay pinned to full content bounds.
+    // Keep quick prompt pinned to its computed bounds.
     if (this.quickPromptVisible && this.quickPromptView) {
-      this.quickPromptView.setBounds(this.getOverlayBounds());
+      this.quickPromptView.setBounds(this.getQuickPromptBounds());
     }
   }
 
