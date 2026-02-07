@@ -3,7 +3,7 @@ Author: cctop
 Created: 2026-02-08
 Updated: 2026-02-08
 Status: Implemented
-Commits: TBD
+Commits: ae1f1b7
 ---
 
 # CLIP-6: Modularize Electron Smoke Tests by Domain Ownership
