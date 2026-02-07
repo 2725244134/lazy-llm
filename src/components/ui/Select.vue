@@ -114,11 +114,11 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 10px 14px;
+  padding: 10px 12px;
   background: var(--bg);
   border: 1.5px solid var(--border);
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text);
   cursor: pointer;
@@ -139,7 +139,7 @@ onUnmounted(() => {
 .trigger-content {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
   min-width: 0;
 }
@@ -159,6 +159,7 @@ onUnmounted(() => {
 }
 
 .trigger-label {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -201,10 +202,10 @@ onUnmounted(() => {
 .dropdown-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 12px;
+  gap: 10px;
+  padding: 10px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text);
   cursor: pointer;
   transition: all 0.15s ease;
@@ -247,6 +248,10 @@ onUnmounted(() => {
 
 .item-label {
   flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .checkmark {

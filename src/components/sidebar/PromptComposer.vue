@@ -177,7 +177,7 @@ onBeforeUnmount(() => {
   padding: 14px 16px;
   border: 1.5px solid var(--border);
   border-radius: 12px;
-  font-size: 14px;
+  font-size: 15px;
   font-family: inherit;
   font-weight: 500;
   line-height: 1.6;
@@ -242,10 +242,11 @@ onBeforeUnmount(() => {
 
 .composer-shortcut-hint {
   margin: -2px 2px 10px;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 1.4;
   color: var(--text-muted);
   opacity: 0.82;
+  overflow-wrap: anywhere;
 }
 
 .composer-send-btn {
@@ -253,7 +254,7 @@ onBeforeUnmount(() => {
   padding: 11px 14px;
   border: none;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.3px;
   cursor: pointer;

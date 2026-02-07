@@ -25,17 +25,18 @@ const sidebar = inject(SIDEBAR_KEY)!
 
 <style scoped>
 .pane-toggle {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
 
 .chip {
-  flex: 1;
-  padding: 8px 6px;
+  min-width: 0;
+  padding: 8px 4px;
   border: 1.5px solid var(--border);
   background: var(--bg);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-muted);
   cursor: pointer;

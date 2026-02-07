@@ -242,9 +242,13 @@ provide(SIDEBAR_KEY, sidebarContext)
 }
 
 .sidebar-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.5px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sidebar.collapsed .sidebar-title {
@@ -300,6 +304,7 @@ provide(SIDEBAR_KEY, sidebarContext)
   padding-right: 2px;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .sidebar-scroll::-webkit-scrollbar {
