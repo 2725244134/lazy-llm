@@ -74,13 +74,11 @@ const injectRuntimePath = resolveFirstExistingPath([
 ]);
 
 const QUICK_PROMPT_PASSTHROUGH_MODE = true;
-const QUICK_PROMPT_MAX_WIDTH = 720;
-const QUICK_PROMPT_MIN_WIDTH = 320;
-const QUICK_PROMPT_DEFAULT_HEIGHT = 100;
-const QUICK_PROMPT_MIN_HEIGHT = 84;
+const QUICK_PROMPT_MAX_WIDTH = 620;
+const QUICK_PROMPT_MIN_WIDTH = 300;
+const QUICK_PROMPT_DEFAULT_HEIGHT = 92;
+const QUICK_PROMPT_MIN_HEIGHT = 80;
 const QUICK_PROMPT_MAX_HEIGHT = 360;
-const QUICK_PROMPT_MIN_TOP = 96;
-const QUICK_PROMPT_TOP_RATIO = 0.22;
 const QUICK_PROMPT_VIEWPORT_PADDING = 16;
 
 interface PaneView {
@@ -122,59 +120,59 @@ function buildQuickPromptDataUrl(): string {
       .panel {
         width: 100%;
         box-sizing: border-box;
-        padding: 12px 14px;
-        border-radius: 28px;
-        border: 1px solid rgba(148, 163, 184, 0.34);
+        padding: 10px 14px;
+        border-radius: 34px;
+        border: 1px solid rgba(255, 255, 255, 0.44);
         background:
-          linear-gradient(160deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.78));
+          linear-gradient(165deg, rgba(255, 255, 255, 0.46), rgba(255, 255, 255, 0.24));
         box-shadow:
-          0 16px 40px rgba(15, 23, 42, 0.22),
-          inset 0 1px 0 rgba(255, 255, 255, 0.62);
-        backdrop-filter: blur(16px) saturate(145%);
+          0 14px 36px rgba(15, 23, 42, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.52);
+        backdrop-filter: blur(24px) saturate(155%);
       }
       @media (prefers-color-scheme: dark) {
         .panel {
-          border-color: rgba(100, 116, 139, 0.5);
+          border-color: rgba(255, 255, 255, 0.2);
           background:
-            linear-gradient(160deg, rgba(20, 26, 35, 0.88), rgba(19, 23, 30, 0.8));
+            linear-gradient(165deg, rgba(34, 36, 41, 0.5), rgba(18, 20, 25, 0.34));
           box-shadow:
-            0 18px 44px rgba(0, 0, 0, 0.48),
-            inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            0 16px 40px rgba(0, 0, 0, 0.4),
+            inset 0 1px 0 rgba(255, 255, 255, 0.14);
         }
       }
       .input {
         width: 100%;
         border: none;
         background: transparent;
-        color: #111827;
-        font-size: 30px;
+        color: rgba(17, 24, 39, 0.9);
+        font-size: 26px;
         font-weight: 580;
-        line-height: 1.3;
+        line-height: 1.28;
         letter-spacing: 0.2px;
-        min-height: 56px;
+        min-height: 50px;
         max-height: 260px;
-        padding: 2px 0 0;
+        padding: 0;
         resize: none;
         overflow-y: hidden;
       }
       @media (prefers-color-scheme: dark) {
         .input {
-          color: #f8fafc;
+          color: rgba(248, 250, 252, 0.93);
         }
       }
-      .input::placeholder { color: rgba(100, 116, 139, 0.92); }
+      .input::placeholder { color: rgba(71, 85, 105, 0.66); }
       @media (prefers-color-scheme: dark) {
-        .input::placeholder { color: rgba(148, 163, 184, 0.86); }
+        .input::placeholder { color: rgba(148, 163, 184, 0.72); }
       }
       .input:focus { outline: none; }
       @media (max-width: 640px) {
         .panel {
-          padding: 10px 12px;
-          border-radius: 22px;
+          padding: 9px 12px;
+          border-radius: 26px;
         }
         .input {
-          font-size: 21px;
-          min-height: 42px;
+          font-size: 20px;
+          min-height: 38px;
         }
       }
     </style>
@@ -194,9 +192,9 @@ function buildQuickPromptDataUrl(): string {
       let isSending = false;
       let resizeRaf = 0;
       let lastResizeHeight = 0;
-      const MIN_INPUT_HEIGHT = 56;
+      const MIN_INPUT_HEIGHT = 50;
       const MAX_INPUT_HEIGHT = 260;
-      const PANEL_VERTICAL_CHROME = 30;
+      const PANEL_VERTICAL_CHROME = 20;
       let pendingViewHeight = MIN_INPUT_HEIGHT + PANEL_VERTICAL_CHROME;
 
       const focusInput = () => {
@@ -360,12 +358,9 @@ export class ViewManager {
     );
     const height = Math.min(desiredHeight, maxHeightByViewport);
     const x = Math.max(0, Math.floor((contentSize.width - width) / 2));
-    const preferredTop = Math.max(
-      QUICK_PROMPT_MIN_TOP,
-      Math.floor(contentSize.height * QUICK_PROMPT_TOP_RATIO)
-    );
-    const maxTop = Math.max(0, contentSize.height - height - QUICK_PROMPT_VIEWPORT_PADDING);
-    const y = Math.max(0, Math.min(preferredTop, maxTop));
+    const maxY = Math.max(0, contentSize.height - height - QUICK_PROMPT_VIEWPORT_PADDING);
+    const centeredY = Math.floor((contentSize.height - height) / 2);
+    const y = Math.max(QUICK_PROMPT_VIEWPORT_PADDING, Math.min(centeredY, maxY));
 
     return {
       x,
