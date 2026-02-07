@@ -1,33 +1,57 @@
-.PHONY: prepare dev build package check test test-electron-smoke clean
+.DEFAULT_GOAL := prepare
 
-# One-time setup
-prepare:
-	bun install
+# Use bash for predictable shell semantics across targets.
+SHELL := bash
+.SHELLFLAGS := -euo pipefail -c
 
-# Daily development
-dev:
-	bun run dev:electron
+.PHONY: help
+help: ## Show available make targets.
+	@echo "Available make targets:"
+	@awk 'BEGIN { FS = ":.*## " } /^[A-Za-z0-9_.-]+:.*## / { printf "  %-24s %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
 
-# Type checking and linting
-check:
-	bun run typecheck
+.PHONY: prepare
+prepare: ## Install all dependencies.
+	@echo "==> Installing dependencies (bun)"
+	@bun install
 
-# Run tests
-test:
-	bun run test
+.PHONY: dev dev-web
+dev: ## Run Electron app in development mode.
+	@echo "==> Starting Electron dev"
+	@bun run dev:electron
+dev-web: ## Run only the Vite dev server (no Electron).
+	@echo "==> Starting web dev server"
+	@bun run dev
 
-# Electron smoke test
-test-electron-smoke:
-	bun run test:electron:smoke
+.PHONY: build
+build: ## Build for production (renderer + electron).
+	@echo "==> Building production bundle"
+	@bun run build
 
-# Build for production
-build:
-	bun run build
+.PHONY: package
+package: ## Package desktop app with electron-builder.
+	@echo "==> Packaging desktop app"
+	@bun run package
 
-# Package desktop app
-package:
-	bun run package
+.PHONY: preview
+preview: ## Preview the production web build locally.
+	@echo "==> Starting web preview server"
+	@bun run preview
 
-# Clean build artifacts
-clean:
-	rm -rf dist dist-electron release node_modules
+.PHONY: check
+check: ## Run type checking.
+	@echo "==> Type-checking (vue-tsc)"
+	@bun run typecheck
+
+.PHONY: test test-unit test-electron-smoke
+test: test-unit ## Run all test suites.
+test-unit: ## Run unit tests with vitest.
+	@echo "==> Running unit tests"
+	@bun run test:unit
+test-electron-smoke: ## Run Electron smoke tests with Playwright.
+	@echo "==> Running Electron smoke tests"
+	@bun run test:electron:smoke
+
+.PHONY: clean
+clean: ## Remove build artifacts.
+	@echo "==> Cleaning build artifacts"
+	@rm -rf dist dist-electron release node_modules
