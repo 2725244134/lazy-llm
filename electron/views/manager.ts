@@ -74,10 +74,10 @@ const injectRuntimePath = resolveFirstExistingPath([
 ]);
 
 const QUICK_PROMPT_PASSTHROUGH_MODE = true;
-const QUICK_PROMPT_MAX_WIDTH = 960;
-const QUICK_PROMPT_MIN_WIDTH = 360;
-const QUICK_PROMPT_DEFAULT_HEIGHT = 112;
-const QUICK_PROMPT_MIN_HEIGHT = 92;
+const QUICK_PROMPT_MAX_WIDTH = 720;
+const QUICK_PROMPT_MIN_WIDTH = 320;
+const QUICK_PROMPT_DEFAULT_HEIGHT = 100;
+const QUICK_PROMPT_MIN_HEIGHT = 84;
 const QUICK_PROMPT_MAX_HEIGHT = 360;
 const QUICK_PROMPT_MIN_TOP = 96;
 const QUICK_PROMPT_TOP_RATIO = 0.22;
@@ -122,8 +122,8 @@ function buildQuickPromptDataUrl(): string {
       .panel {
         width: 100%;
         box-sizing: border-box;
-        padding: 14px 16px;
-        border-radius: 22px;
+        padding: 12px 14px;
+        border-radius: 28px;
         border: 1px solid rgba(148, 163, 184, 0.34);
         background:
           linear-gradient(160deg, rgba(255, 255, 255, 0.86), rgba(248, 250, 252, 0.78));
@@ -169,12 +169,12 @@ function buildQuickPromptDataUrl(): string {
       .input:focus { outline: none; }
       @media (max-width: 640px) {
         .panel {
-          padding: 12px 14px;
-          border-radius: 16px;
+          padding: 10px 12px;
+          border-radius: 22px;
         }
         .input {
-          font-size: 22px;
-          min-height: 46px;
+          font-size: 21px;
+          min-height: 42px;
         }
       }
     </style>
