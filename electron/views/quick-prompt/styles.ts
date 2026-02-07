@@ -11,6 +11,9 @@ export const QUICK_PROMPT_STYLES = `
   --qp-border: rgba(15, 23, 42, 0.14);
   --qp-border-focus: #2563eb;
   --qp-ring: rgba(37, 99, 235, 0.2);
+  --qp-bottom-line: rgba(37, 99, 235, 0.6);
+  --qp-bottom-line-idle: rgba(15, 23, 42, 0.26);
+  --qp-bottom-glow: rgba(37, 99, 235, 0.38);
   --qp-text: #0f172a;
   --qp-placeholder: #475569;
   --qp-shadow: 0 12px 28px rgba(15, 23, 42, 0.17);
@@ -24,6 +27,9 @@ export const QUICK_PROMPT_STYLES = `
     --qp-border: rgba(148, 163, 184, 0.36);
     --qp-border-focus: #60a5fa;
     --qp-ring: rgba(96, 165, 250, 0.26);
+    --qp-bottom-line: rgba(96, 165, 250, 0.85);
+    --qp-bottom-line-idle: rgba(148, 163, 184, 0.44);
+    --qp-bottom-glow: rgba(96, 165, 250, 0.45);
     --qp-text: #f8fafc;
     --qp-placeholder: #cbd5e1;
     --qp-shadow: 0 14px 34px rgba(2, 6, 23, 0.52);
@@ -46,24 +52,63 @@ body {
 }
 
 .panel {
+  position: relative;
   width: 100%;
   box-sizing: border-box;
   padding: 10px 14px;
   overflow: hidden;
   border-radius: 16px;
-  border: 1px solid var(--qp-border);
+  border: 2px solid var(--qp-border);
+  border-bottom-width: 3px;
   background: linear-gradient(180deg, var(--qp-surface), var(--qp-surface-soft));
   box-shadow: var(--qp-shadow);
   backdrop-filter: blur(14px) saturate(118%);
   -webkit-backdrop-filter: blur(14px) saturate(118%);
-  transition: border-color 0.16s ease-out, box-shadow 0.16s ease-out;
+  transition: border-color 0.16s ease-out, box-shadow 0.16s ease-out, border-bottom-color 0.16s ease-out;
+}
+
+.panel::after {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--qp-bottom-line-idle) 22%,
+    var(--qp-bottom-line) 50%,
+    var(--qp-bottom-line-idle) 78%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  opacity: 0.9;
+  transition: opacity 0.16s ease-out, filter 0.16s ease-out;
 }
 
 .panel:focus-within {
   border-color: var(--qp-border-focus);
+  border-bottom-color: var(--qp-bottom-line);
   box-shadow:
     0 0 0 3px var(--qp-ring),
     var(--qp-shadow);
+}
+
+.panel:focus-within::after {
+  opacity: 1;
+  filter: drop-shadow(0 0 8px var(--qp-bottom-glow));
+  animation: qpBottomSweep 2.2s linear infinite;
+}
+
+@keyframes qpBottomSweep {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .input {
