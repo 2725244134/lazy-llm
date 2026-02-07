@@ -2,8 +2,7 @@
  * ViewManager - manages sidebar and pane WebContentsViews
  */
 
-import { BaseWindow, WebContentsView, app } from 'electron';
-import { existsSync } from 'fs';
+import { BaseWindow, WebContentsView } from 'electron';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { calculateLayout } from './geometry.js';
@@ -15,30 +14,6 @@ import type {
 } from '../ipc/contracts.js';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const SCRIPT_EXTENSIONS = ['.js', '.mjs', '.cjs'] as const;
-
-function resolveElectronScriptPath(scriptName: 'preload' | 'pane-preload'): string {
-  const appPath = app.getAppPath();
-  const candidates = [
-    ...SCRIPT_EXTENSIONS.map((ext) => join(appPath, 'dist-electron', `${scriptName}${ext}`)),
-    ...SCRIPT_EXTENSIONS.map((ext) => join(__dirname, `${scriptName}${ext}`)),
-    ...SCRIPT_EXTENSIONS.map((ext) => join(__dirname, '..', `${scriptName}${ext}`)),
-  ];
-
-  for (const candidate of candidates) {
-    if (existsSync(candidate)) {
-      return candidate;
-    }
-  }
-
-  const fallback = candidates[0];
-  console.warn(`[ViewManager] Could not resolve ${scriptName} script; fallback: ${fallback}`);
-  return fallback;
-}
-
-function resolveRendererEntryPath(): string {
-  return join(app.getAppPath(), 'dist', 'index.html');
-}
 
 interface PaneView {
   view: WebContentsView;
@@ -54,9 +29,6 @@ export class ViewManager {
   private currentPaneCount: PaneCount = 1;
   private currentSidebarWidth: number;
   private providers: Map<string, ProviderMeta>;
-  private readonly sidebarPreloadPath: string;
-  private readonly panePreloadPath: string;
-  private readonly rendererEntryPath: string;
 
   constructor(window: BaseWindow) {
     this.window = window;
@@ -65,9 +37,6 @@ export class ViewManager {
     const config = getConfig();
     this.currentSidebarWidth = config.sidebar.expanded_width;
     this.providers = new Map(config.providers.map(p => [p.key, p]));
-    this.sidebarPreloadPath = resolveElectronScriptPath('preload');
-    this.panePreloadPath = resolveElectronScriptPath('pane-preload');
-    this.rendererEntryPath = resolveRendererEntryPath();
   }
 
   /**
@@ -76,7 +45,7 @@ export class ViewManager {
   initSidebar(): WebContentsView {
     this.sidebarView = new WebContentsView({
       webPreferences: {
-        preload: this.sidebarPreloadPath,
+        preload: join(__dirname, '..', 'preload.mjs'),
         contextIsolation: true,
         nodeIntegration: false,
         sandbox: true,
@@ -89,7 +58,9 @@ export class ViewManager {
     if (process.env.NODE_ENV === 'development') {
       this.sidebarView.webContents.loadURL('http://localhost:5173');
     } else {
-      this.sidebarView.webContents.loadFile(this.rendererEntryPath);
+      this.sidebarView.webContents.loadFile(
+        join(__dirname, '..', '..', 'dist', 'index.html')
+      );
     }
 
     return this.sidebarView;
@@ -118,7 +89,7 @@ export class ViewManager {
 
       const view = new WebContentsView({
         webPreferences: {
-          preload: this.panePreloadPath,
+          preload: join(__dirname, '..', 'pane-preload.mjs'),
           contextIsolation: true,
           nodeIntegration: false,
           sandbox: true,
