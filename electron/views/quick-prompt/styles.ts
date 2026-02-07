@@ -6,23 +6,23 @@
 export const QUICK_PROMPT_STYLES = `
 :root {
   color-scheme: light;
-  --qp-surface: rgba(251, 241, 199, 0.97);
-  --qp-surface-soft: rgba(245, 229, 178, 0.92);
-  --qp-border: rgba(213, 196, 161, 0.92);
+  --qp-surface: rgba(255, 255, 255, 0.97);
+  --qp-surface-soft: rgba(248, 250, 252, 0.93);
+  --qp-border: rgba(235, 219, 178, 0.95);
   --qp-border-focus: rgba(215, 153, 33, 0.95);
   --qp-ring: rgba(215, 153, 33, 0.24);
-  --qp-inner-stroke: rgba(255, 250, 230, 0.82);
+  --qp-inner-stroke: rgba(255, 255, 255, 0.88);
   --qp-text: #3c3836;
   --qp-placeholder: #7c6f64;
-  --qp-shadow: 0 14px 28px rgba(80, 55, 22, 0.18);
-  --qp-shadow-focus: 0 18px 32px rgba(80, 55, 22, 0.25);
+  --qp-shadow: 0 14px 28px rgba(36, 30, 21, 0.15);
+  --qp-shadow-focus: 0 18px 32px rgba(62, 44, 18, 0.24);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --qp-surface: rgba(60, 56, 54, 0.93);
-    --qp-surface-soft: rgba(50, 48, 47, 0.9);
+    --qp-surface: rgba(43, 43, 43, 0.94);
+    --qp-surface-soft: rgba(34, 34, 34, 0.9);
     --qp-border: rgba(168, 153, 132, 0.64);
     --qp-border-focus: rgba(250, 189, 47, 0.95);
     --qp-ring: rgba(250, 189, 47, 0.2);
