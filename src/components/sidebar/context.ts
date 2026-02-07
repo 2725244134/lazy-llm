@@ -8,6 +8,7 @@ export interface SidebarContext {
   activeProviders: Ref<string[]>;
   setPaneCount: (count: number) => Promise<void>;
   setProvider: (paneIndex: number, providerKey: string) => Promise<void>;
+  syncPromptDraft: (text: string) => Promise<void>;
   sendPrompt: (text: string) => Promise<void>;
 }
 

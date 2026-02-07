@@ -13,6 +13,7 @@ export interface SidebarRuntime {
     paneCount: PaneCount;
     sidebarWidth: number;
   }): Promise<void>;
+  syncPromptDraft(text: string): Promise<void>;
   sendPrompt(text: string): Promise<void>;
 }
 

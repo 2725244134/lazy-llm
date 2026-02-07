@@ -142,11 +142,21 @@ const sendPrompt = async (text: string) => {
   }
 }
 
+const syncPromptDraft = async (text: string) => {
+  try {
+    await runtime.syncPromptDraft(text)
+  } catch (e) {
+    // Draft syncing is best-effort and should not break typing flow.
+    console.error('[Sidebar] syncPromptDraft error:', e)
+  }
+}
+
 const sidebarContext: SidebarContext = {
   paneCount,
   activeProviders,
   setPaneCount,
   setProvider,
+  syncPromptDraft,
   sendPrompt,
 }
 

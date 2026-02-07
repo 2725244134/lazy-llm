@@ -54,5 +54,14 @@ export function createElectronRuntime(): SidebarRuntime {
         throw new Error(`Failed to send prompt: ${result.failures?.join(', ') ?? 'unknown error'}`);
       }
     },
+
+    async syncPromptDraft(text: string): Promise<void> {
+      const result = await council.syncPromptDraft({ text });
+      if (!result.success) {
+        throw new Error(
+          `Failed to sync prompt draft: ${result.failures?.join(', ') ?? 'unknown error'}`
+        );
+      }
+    },
   };
 }

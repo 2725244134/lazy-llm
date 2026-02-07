@@ -7,7 +7,11 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { calculateLayout } from './geometry.js';
-import { buildPromptInjectionEvalScript, type PromptInjectionResult } from './promptInjection.js';
+import {
+  buildPromptDraftSyncEvalScript,
+  buildPromptInjectionEvalScript,
+  type PromptInjectionResult,
+} from './promptInjection.js';
 import {
   PANE_ACCEPT_LANGUAGES,
   PANE_DEFAULT_ZOOM_FACTOR,
@@ -286,7 +290,6 @@ export class ViewManager {
    * Send prompt to all panes
    */
   async sendPromptToAll(text: string): Promise<{ success: boolean; failures: string[] }> {
-    const failures: string[] = [];
     let promptEvalScript: string;
 
     try {
@@ -298,6 +301,31 @@ export class ViewManager {
       };
     }
 
+    return this.executePromptEvalScriptOnAllPanes(promptEvalScript);
+  }
+
+  /**
+   * Sync prompt draft text to all panes without submitting
+   */
+  async syncPromptDraftToAll(text: string): Promise<{ success: boolean; failures: string[] }> {
+    let draftSyncEvalScript: string;
+
+    try {
+      draftSyncEvalScript = buildPromptDraftSyncEvalScript(text);
+    } catch (error) {
+      return {
+        success: false,
+        failures: [`invalid-prompt-draft: ${toFailureReason(error)}`],
+      };
+    }
+
+    return this.executePromptEvalScriptOnAllPanes(draftSyncEvalScript);
+  }
+
+  private async executePromptEvalScriptOnAllPanes(
+    promptEvalScript: string
+  ): Promise<{ success: boolean; failures: string[] }> {
+    const failures: string[] = [];
     const injectRuntimeScript = this.getInjectRuntimeScript();
     if (!injectRuntimeScript) {
       return {

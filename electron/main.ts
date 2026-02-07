@@ -4,6 +4,7 @@ import type {
   PaneCountRequest,
   PaneUpdateRequest,
   PromptRequest,
+  PromptSyncRequest,
   LayoutUpdateRequest,
   SidebarWidthRequest,
   PaneCount,
@@ -139,6 +140,17 @@ function registerIPCHandlers() {
     const text = typeof request?.text === 'string' ? request.text : '';
     const result = await viewManager.sendPromptToAll(text);
     console.log('[IPC] prompt:send', { textLength: text.length }, result);
+    return result;
+  });
+
+  // Sync prompt draft to all panes (no submit)
+  ipcMain.handle(IPC_CHANNELS.PROMPT_SYNC_DRAFT, async (_event, request: PromptSyncRequest) => {
+    if (!viewManager) {
+      return { success: false, failures: ['no-view-manager'] };
+    }
+    const text = typeof request?.text === 'string' ? request.text : '';
+    const result = await viewManager.syncPromptDraftToAll(text);
+    console.log('[IPC] prompt:syncDraft', { textLength: text.length }, result);
     return result;
   });
 

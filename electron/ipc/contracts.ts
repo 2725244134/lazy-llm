@@ -10,6 +10,7 @@ export const IPC_CHANNELS = {
   PANE_SET_COUNT: 'pane:setCount',
   PANE_UPDATE_PROVIDER: 'pane:updateProvider',
   PROMPT_SEND: 'prompt:send',
+  PROMPT_SYNC_DRAFT: 'prompt:syncDraft',
   // Layout channels
   LAYOUT_UPDATE: 'layout:update',
   LAYOUT_GET_SNAPSHOT: 'layout:getSnapshot',
@@ -68,6 +69,15 @@ export interface PromptRequest {
 }
 
 export interface PromptResponse {
+  success: boolean;
+  failures?: string[];
+}
+
+export interface PromptSyncRequest {
+  text: string;
+}
+
+export interface PromptSyncResponse {
   success: boolean;
   failures?: string[];
 }
@@ -152,6 +162,10 @@ export interface IPCContract {
   [IPC_CHANNELS.PROMPT_SEND]: {
     request: PromptRequest;
     response: PromptResponse;
+  };
+  [IPC_CHANNELS.PROMPT_SYNC_DRAFT]: {
+    request: PromptSyncRequest;
+    response: PromptSyncResponse;
   };
   [IPC_CHANNELS.LAYOUT_UPDATE]: {
     request: LayoutUpdateRequest;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { SIDEBAR_KEY } from './context'
 
 const sidebar = inject(SIDEBAR_KEY)!
@@ -10,6 +10,15 @@ const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const trimmedText = computed(() => text.value.trim())
 const MIN_TEXTAREA_HEIGHT = 124
 const MAX_TEXTAREA_HEIGHT = 280
+const DRAFT_SYNC_DEBOUNCE_MS = 90
+const SEND_CLEAR_SYNC_GUARD_MS = 650
+
+let draftSyncTimer: ReturnType<typeof setTimeout> | null = null
+let draftSyncInFlight = false
+let queuedDraftText: string | null = null
+let lastSyncedDraftText: string | null = null
+let skipNextDraftSync = false
+let suppressDraftSyncUntil = 0
 
 const canSend = computed(() => trimmedText.value.length > 0 && !isLoading.value)
 
@@ -32,8 +41,11 @@ const handleSend = async () => {
   const prompt = trimmedText.value
 
   isLoading.value = true
+  suppressDraftSyncUntil = Date.now() + SEND_CLEAR_SYNC_GUARD_MS
   try {
     await sidebar.sendPrompt(prompt)
+    skipNextDraftSync = true
+    queuedDraftText = null
     text.value = ''
     await nextTick()
     syncTextareaHeight()
@@ -49,12 +61,74 @@ const handleKeydown = (e: KeyboardEvent) => {
   }
 }
 
+const isDraftSyncSuppressed = () => isLoading.value || Date.now() < suppressDraftSyncUntil
+
+const flushDraftSync = async () => {
+  if (draftSyncInFlight || queuedDraftText === null) return
+
+  if (isDraftSyncSuppressed()) {
+    const delay = Math.max(40, suppressDraftSyncUntil - Date.now())
+    if (draftSyncTimer) {
+      clearTimeout(draftSyncTimer)
+    }
+    draftSyncTimer = setTimeout(() => {
+      draftSyncTimer = null
+      void flushDraftSync()
+    }, delay)
+    return
+  }
+
+  const textToSync = queuedDraftText
+  queuedDraftText = null
+
+  if (textToSync === lastSyncedDraftText) {
+    if (queuedDraftText !== null) {
+      void flushDraftSync()
+    }
+    return
+  }
+
+  draftSyncInFlight = true
+  try {
+    await sidebar.syncPromptDraft(textToSync)
+    lastSyncedDraftText = textToSync
+  } finally {
+    draftSyncInFlight = false
+    if (queuedDraftText !== null && queuedDraftText !== lastSyncedDraftText) {
+      void flushDraftSync()
+    }
+  }
+}
+
+const scheduleDraftSync = (nextText: string) => {
+  queuedDraftText = nextText
+  if (draftSyncTimer) {
+    clearTimeout(draftSyncTimer)
+  }
+  draftSyncTimer = setTimeout(() => {
+    draftSyncTimer = null
+    void flushDraftSync()
+  }, DRAFT_SYNC_DEBOUNCE_MS)
+}
+
 watch(text, () => {
   nextTick(syncTextareaHeight)
+  if (skipNextDraftSync) {
+    skipNextDraftSync = false
+    return
+  }
+  scheduleDraftSync(text.value)
 })
 
 onMounted(() => {
   syncTextareaHeight()
+})
+
+onBeforeUnmount(() => {
+  if (draftSyncTimer) {
+    clearTimeout(draftSyncTimer)
+    draftSyncTimer = null
+  }
 })
 </script>
 

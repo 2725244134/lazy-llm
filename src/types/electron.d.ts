@@ -7,6 +7,8 @@ import type {
   PaneUpdateResponse,
   PromptRequest,
   PromptResponse,
+  PromptSyncRequest,
+  PromptSyncResponse,
   LayoutUpdateRequest,
   LayoutUpdateResponse,
   SidebarWidthRequest,
@@ -20,6 +22,7 @@ export interface CouncilAPI {
   setPaneCount: (request: PaneCountRequest) => Promise<PaneCountResponse>;
   updateProvider: (request: PaneUpdateRequest) => Promise<PaneUpdateResponse>;
   sendPrompt: (request: PromptRequest) => Promise<PromptResponse>;
+  syncPromptDraft: (request: PromptSyncRequest) => Promise<PromptSyncResponse>;
   updateLayout: (request: LayoutUpdateRequest) => Promise<LayoutUpdateResponse>;
   getLayoutSnapshot: () => Promise<LayoutSnapshot>;
   updateSidebarWidth: (request: SidebarWidthRequest) => Promise<SidebarWidthResponse>;

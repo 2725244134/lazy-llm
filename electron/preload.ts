@@ -9,6 +9,8 @@ import type {
   PaneUpdateResponse,
   PromptRequest,
   PromptResponse,
+  PromptSyncRequest,
+  PromptSyncResponse,
   LayoutUpdateRequest,
   LayoutUpdateResponse,
   SidebarWidthRequest,
@@ -41,6 +43,11 @@ const councilAPI = {
   // Send prompt to all panes
   sendPrompt: (request: PromptRequest): Promise<PromptResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SEND, request);
+  },
+
+  // Sync prompt draft to all panes without submitting
+  syncPromptDraft: (request: PromptSyncRequest): Promise<PromptSyncResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SYNC_DRAFT, request);
   },
 
   // Update layout

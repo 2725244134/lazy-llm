@@ -12,6 +12,7 @@ function stubWindowCouncil(overrides: Partial<Window['council']> = {}) {
     setPaneCount: vi.fn().mockResolvedValue({ success: true }),
     updateProvider: vi.fn().mockResolvedValue({ success: true, paneIndex: 0 }),
     sendPrompt: vi.fn().mockResolvedValue({ success: true }),
+    syncPromptDraft: vi.fn().mockResolvedValue({ success: true }),
     updateLayout: vi.fn().mockResolvedValue({ success: true }),
     getLayoutSnapshot: vi.fn(),
     updateSidebarWidth: vi.fn().mockResolvedValue({ success: true }),
@@ -67,5 +68,15 @@ describe('createElectronRuntime', () => {
     const runtime = createElectronRuntime();
 
     await expect(runtime.sendPrompt('hello')).rejects.toThrow('Failed to send prompt: pane-1, pane-2');
+  });
+
+  it('forwards prompt draft sync requests', async () => {
+    const syncPromptDraft = vi.fn().mockResolvedValue({ success: true });
+    stubWindowCouncil({ syncPromptDraft });
+    const runtime = createElectronRuntime();
+
+    await runtime.syncPromptDraft('draft value');
+
+    expect(syncPromptDraft).toHaveBeenCalledWith({ text: 'draft value' });
   });
 });

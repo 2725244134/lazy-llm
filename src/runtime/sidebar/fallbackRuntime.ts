@@ -44,5 +44,8 @@ export function createFallbackRuntime(): SidebarRuntime {
     async sendPrompt(_text: string): Promise<void> {
       console.log('[Fallback] sendPrompt called, but no runtime available');
     },
+    async syncPromptDraft(_text: string): Promise<void> {
+      // No-op in fallback mode
+    },
   };
 }
