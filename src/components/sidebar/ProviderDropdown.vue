@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import Select from '@/components/ui/Select.vue'
-import { providerMetas } from '@/providers'
 
-const props = defineProps<{
+defineProps<{
   selectedKey: string
   testid?: string
 }>()

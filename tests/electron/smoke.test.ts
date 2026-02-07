@@ -36,7 +36,7 @@ test.describe('Electron Smoke Tests', () => {
 
     // Call health check via exposed API
     const health = await window.evaluate(() => {
-      return window.council.healthCheck();
+      return (window as unknown as { council: { healthCheck: () => Promise<{ ok: boolean; runtime: string; version: string }> } }).council.healthCheck();
     });
 
     expect(health.ok).toBe(true);
