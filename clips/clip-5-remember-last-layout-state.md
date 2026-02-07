@@ -3,7 +3,7 @@ Author: cctop
 Created: 2026-02-08
 Updated: 2026-02-08
 Status: Implemented
-Commits: 03e9568
+Commits: 21ca4b7
 ---
 
 # CLIP-5: Remember Last Pane Layout State Across App Restarts
