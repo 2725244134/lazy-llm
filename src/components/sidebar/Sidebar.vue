@@ -8,6 +8,7 @@ import { DEFAULT_ACTIVE_PROVIDERS } from '@/providers'
 import { getSidebarRuntime } from '@/runtime/sidebar'
 
 const runtime = getSidebarRuntime()
+const SIDEBAR_TOGGLE_SHORTCUT_EVENT = 'lazyllm:shortcut-toggle-sidebar'
 
 const collapsed = ref(false)
 const paneCount = ref<PaneCount>(2)
@@ -94,28 +95,13 @@ const handleWindowResize = () => {
   })
 }
 
-const handleGlobalKeydown = (e: KeyboardEvent) => {
-  const isQuickPromptShortcut = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'j'
-  if (isQuickPromptShortcut && !e.repeat) {
-    e.preventDefault()
-    if (window.council) {
-      window.council.toggleQuickPrompt().catch((error) => {
-        console.error('[Sidebar] toggleQuickPrompt error:', error)
-      })
-    }
-    return
-  }
-
-  const isToggleShortcut = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'b'
-  if (!isToggleShortcut || e.repeat) return
-
-  e.preventDefault()
+const handleSidebarToggleShortcut = () => {
   void toggleCollapse()
 }
 
 onMounted(async () => {
   window.addEventListener('resize', handleWindowResize)
-  window.addEventListener('keydown', handleGlobalKeydown)
+  window.addEventListener(SIDEBAR_TOGGLE_SHORTCUT_EVENT, handleSidebarToggleShortcut)
 
   try {
     const config = await runtime.getConfig()
@@ -136,7 +122,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleWindowResize)
-  window.removeEventListener('keydown', handleGlobalKeydown)
+  window.removeEventListener(SIDEBAR_TOGGLE_SHORTCUT_EVENT, handleSidebarToggleShortcut)
   if (resizeRaf !== 0) {
     window.cancelAnimationFrame(resizeRaf)
     resizeRaf = 0

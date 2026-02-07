@@ -81,6 +81,7 @@ const QUICK_PROMPT_DEFAULT_HEIGHT = 74;
 const QUICK_PROMPT_MIN_HEIGHT = 66;
 const QUICK_PROMPT_MAX_HEIGHT = 320;
 const QUICK_PROMPT_VIEWPORT_PADDING = 16;
+const SIDEBAR_TOGGLE_SHORTCUT_EVENT = 'lazyllm:shortcut-toggle-sidebar';
 
 interface PaneView {
   view: WebContentsView;
@@ -187,6 +188,12 @@ export class ViewManager {
     if (isBaseShortcut && key === 'j') {
       event.preventDefault();
       this.toggleQuickPrompt();
+      return;
+    }
+
+    if (isBaseShortcut && key === 'b') {
+      event.preventDefault();
+      this.notifySidebarToggleShortcut();
     }
   }
 
@@ -226,6 +233,7 @@ export class ViewManager {
     });
 
     this.window.contentView.addChildView(this.sidebarView);
+    this.attachGlobalShortcutHooks(this.sidebarView.webContents);
     this.attachSidebarRuntimePreferenceHooks(this.sidebarView.webContents);
     this.applySidebarRuntimePreferences(this.sidebarView.webContents);
 
@@ -345,6 +353,18 @@ export class ViewManager {
       true
     ).catch((error) => {
       console.error('[ViewManager] Failed to focus quick prompt overlay:', error);
+    });
+  }
+
+  private notifySidebarToggleShortcut(): void {
+    if (!this.sidebarView) {
+      return;
+    }
+    this.sidebarView.webContents.executeJavaScript(
+      `window.dispatchEvent(new Event('${SIDEBAR_TOGGLE_SHORTCUT_EVENT}'));`,
+      true
+    ).catch((error) => {
+      console.error('[ViewManager] Failed to dispatch sidebar toggle shortcut event:', error);
     });
   }
 
