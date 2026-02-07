@@ -32,15 +32,8 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist-electron',
-            lib: {
-              formats: ['cjs'],
-              fileName: () => '[name].mjs',
-            },
             rollupOptions: {
               external: ['electron'],
-              output: {
-                inlineDynamicImports: true,
-              },
             },
           },
         },
@@ -53,15 +46,8 @@ export default defineConfig({
         vite: {
           build: {
             outDir: 'dist-electron',
-            lib: {
-              formats: ['cjs'],
-              fileName: () => '[name].mjs',
-            },
             rollupOptions: {
               external: ['electron'],
-              output: {
-                inlineDynamicImports: true,
-              },
             },
           },
         },
