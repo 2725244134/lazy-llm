@@ -115,6 +115,9 @@ const setPaneCount = async (count: number) => {
 
   try {
     await runtime.setPaneCount(newCount)
+    // Sync layout after pane count change
+    invalidateLayoutSignature()
+    await syncLayoutWithErrorHandling()
   } catch (e) {
     invalidateLayoutSignature()
     paneCount.value = oldCount
