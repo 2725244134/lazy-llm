@@ -123,34 +123,45 @@ function buildQuickPromptDataUrl(): string {
         box-sizing: border-box;
         padding: 8px 14px;
         overflow: hidden;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.64);
+        border-radius: 0;
+        border: 1px solid rgba(124, 58, 237, 0.52);
         background:
-          linear-gradient(165deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.56));
+          linear-gradient(165deg, rgba(248, 244, 255, 0.84), rgba(235, 225, 255, 0.68));
         box-shadow:
-          0 10px 30px rgba(15, 23, 42, 0.14),
-          inset 0 1px 0 rgba(255, 255, 255, 0.75);
-        backdrop-filter: blur(28px) saturate(180%);
-        -webkit-backdrop-filter: blur(28px) saturate(180%);
+          0 10px 26px rgba(88, 28, 135, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.72);
+        backdrop-filter: blur(24px) saturate(165%);
+        -webkit-backdrop-filter: blur(24px) saturate(165%);
       }
       .panel::before {
         content: "";
         position: absolute;
         inset: 0;
         pointer-events: none;
-        background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.12));
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0.08));
+      }
+      .panel::after {
+        content: "";
+        position: absolute;
+        inset: 3px;
+        border: 1px solid rgba(167, 139, 250, 0.62);
+        pointer-events: none;
       }
       @media (prefers-color-scheme: dark) {
         .panel {
-          border-color: rgba(255, 255, 255, 0.24);
+          border-color: rgba(196, 181, 253, 0.56);
           background:
-            linear-gradient(165deg, rgba(39, 42, 48, 0.76), rgba(24, 27, 32, 0.6));
+            linear-gradient(165deg, rgba(49, 34, 79, 0.84), rgba(28, 19, 47, 0.74));
           box-shadow:
-            0 12px 34px rgba(0, 0, 0, 0.36),
-            inset 0 1px 0 rgba(255, 255, 255, 0.16);
+            0 12px 28px rgba(0, 0, 0, 0.38),
+            0 0 0 1px rgba(139, 92, 246, 0.24),
+            inset 0 1px 0 rgba(255, 255, 255, 0.14);
         }
         .panel::before {
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.04));
+          background: linear-gradient(180deg, rgba(224, 206, 255, 0.16), rgba(224, 206, 255, 0.03));
+        }
+        .panel::after {
+          border-color: rgba(196, 181, 253, 0.44);
         }
       }
       .input {
