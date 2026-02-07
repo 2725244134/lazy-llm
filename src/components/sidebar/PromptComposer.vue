@@ -55,7 +55,13 @@ const handleSend = async () => {
 }
 
 const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+  if (e.key !== 'Enter') return
+
+  // Shift+Enter is always a newline.
+  if (e.shiftKey) return
+
+  // Ctrl+Enter sends the prompt.
+  if (e.ctrlKey) {
     e.preventDefault()
     void handleSend()
   }
@@ -139,7 +145,7 @@ onBeforeUnmount(() => {
       v-model="text"
       class="composer-textarea"
       data-testid="prompt-textarea"
-      placeholder="Type message... (Ctrl+Enter to send)"
+      placeholder="Type message... (Ctrl+Enter send, Shift+Enter newline)"
       @input="syncTextareaHeight"
       @keydown="handleKeydown"
     ></textarea>
@@ -178,7 +184,7 @@ onBeforeUnmount(() => {
   resize: none;
   overflow-y: hidden;
   margin-bottom: 10px;
-  background: linear-gradient(180deg, var(--bg) 0%, var(--bg-hover) 120%);
+  background: var(--bg);
   color: var(--text);
   caret-color: var(--broadcast);
   transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background 0.2s ease-out;
