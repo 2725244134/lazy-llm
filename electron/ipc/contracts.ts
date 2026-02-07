@@ -36,7 +36,6 @@ export interface ProviderMeta {
   key: string;
   name: string;
   url: string;
-  login_url?: string;
 }
 
 export interface PaneCountRequest {

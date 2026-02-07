@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { providerMetas } from '@/providers'
+import { providerMetas, providerIcons } from '@/providers'
 
 const props = defineProps<{
   modelValue: string
@@ -16,6 +16,8 @@ const isOpen = ref(false)
 const selectedProvider = computed(() =>
   providerMetas.find((p) => p.key === props.modelValue) ?? providerMetas[0]
 )
+
+const selectedIcon = computed(() => providerIcons[props.modelValue])
 
 const toggle = () => {
   isOpen.value = !isOpen.value
@@ -50,7 +52,10 @@ watch(isOpen, (open) => {
       :class="{ open: isOpen }"
       @click="toggle"
     >
-      <span class="select-value">{{ selectedProvider.name }}</span>
+      <span class="select-value">
+        <component :is="selectedIcon" v-if="selectedIcon" class="provider-icon" />
+        {{ selectedProvider.name }}
+      </span>
       <svg
         class="select-arrow"
         xmlns="http://www.w3.org/2000/svg"
@@ -70,6 +75,7 @@ watch(isOpen, (open) => {
         :class="{ selected: provider.key === modelValue }"
         @click="select(provider.key)"
       >
+        <component :is="providerIcons[provider.key]" v-if="providerIcons[provider.key]" class="provider-icon" />
         {{ provider.name }}
       </button>
     </div>
@@ -108,6 +114,18 @@ watch(isOpen, (open) => {
   border-color: var(--accent);
 }
 
+.select-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
 .select-arrow {
   width: 16px;
   height: 16px;
@@ -142,6 +160,9 @@ watch(isOpen, (open) => {
   text-align: left;
   cursor: pointer;
   transition: background 0.15s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .select-option:hover {
