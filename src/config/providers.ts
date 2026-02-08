@@ -55,5 +55,6 @@ export const DEFAULT_ACTIVE_PROVIDER_KEYS = [
 
 export const DEFAULT_PANE_PROVIDER_KEYS = [
   'chatgpt',
-  'claude',
+  'grok',
+  'gemini'
 ] as const satisfies readonly ProviderKey[];
