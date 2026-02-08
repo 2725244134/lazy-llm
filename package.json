@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.1",
   "author": "LazyLLM Maintainer <cccc38753@gmail.com>",
+  "description": "Multi-LLM desktop interface built with Electron, Vue, and TypeScript.",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
@@ -37,7 +38,6 @@
     "cross-env": "^7.0.3",
     "electron": "^38.0.0",
     "electron-builder": "^25.1.8",
-    "electron-rebuild": "^3.2.9",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.6.2",
@@ -64,7 +64,8 @@
     },
     "linux": {
       "target": ["AppImage", "deb"],
-      "category": "Development"
+      "category": "Development",
+      "icon": "build/icon.png"
     },
     "win": {
       "target": ["nsis", "portable"]
