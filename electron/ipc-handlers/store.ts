@@ -4,6 +4,13 @@ const { machineIdSync } = pkg;
 import type { AppConfig } from '../ipc/contracts.js';
 import { APP_CONFIG } from '../../src/config/app.js';
 import { DEFAULT_CONFIG, normalizeConfig } from './configNormalization.js';
+import {
+  ensureExternalConfigFile,
+  mergeAppConfigWithExternal,
+  readExternalConfigFile,
+  resolveRuntimePreferences,
+  type RuntimePreferences,
+} from './externalConfig.js';
 
 // Machine-derived encryption key (not hardcoded)
 const encryptionKey = machineIdSync();
@@ -30,7 +37,9 @@ export const store = new Store<StoreSchema>({
   defaults,
 });
 
-export function getConfig(): AppConfig {
+ensureExternalConfigFile();
+
+function getStoredNormalizedConfig(): AppConfig {
   const current = store.get('config');
   const normalized = normalizeConfig(current);
 
@@ -39,6 +48,18 @@ export function getConfig(): AppConfig {
   }
 
   return normalized;
+}
+
+export function getConfig(): AppConfig {
+  const storedConfig = getStoredNormalizedConfig();
+  const externalConfig = readExternalConfigFile();
+  const mergedConfig = mergeAppConfigWithExternal(storedConfig, externalConfig);
+  return normalizeConfig(mergedConfig);
+}
+
+export function getRuntimePreferences(): RuntimePreferences {
+  const externalConfig = readExternalConfigFile();
+  return resolveRuntimePreferences(externalConfig);
 }
 
 export function getSession() {
@@ -51,7 +72,7 @@ export function setSession(session: Partial<StoreSchema['session']>) {
 }
 
 export function setDefaultPaneCount(paneCount: number): AppConfig {
-  const current = getConfig();
+  const current = getStoredNormalizedConfig();
   const fallbackProvider = current.defaults.providers[0] ?? 'chatgpt';
   const nextProviders = Array.from({ length: paneCount }, (_, paneIndex) => {
     return current.defaults.providers[paneIndex] ?? fallbackProvider;
@@ -71,7 +92,7 @@ export function setDefaultPaneCount(paneCount: number): AppConfig {
 }
 
 export function setDefaultProvider(paneIndex: number, providerKey: string): AppConfig {
-  const current = getConfig();
+  const current = getStoredNormalizedConfig();
   const fallbackProvider = current.defaults.providers[0] ?? 'chatgpt';
   const nextProviders = Array.from(
     { length: current.defaults.pane_count },
