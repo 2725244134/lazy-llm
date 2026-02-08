@@ -18,10 +18,10 @@ const activeProviders = ref<string[]>([...DEFAULT_ACTIVE_PROVIDERS])
 
 // Sidebar width from config (loaded on mount)
 const expandedWidth = ref<number>(APP_CONFIG.layout.sidebar.defaultExpandedWidth)
-const collapsedWidth = ref<number>(APP_CONFIG.layout.sidebar.defaultCollapsedWidth)
+const collapsedWidth = APP_CONFIG.layout.sidebar.defaultCollapsedWidth
 
 const configuredSidebarWidth = computed(() =>
-  collapsed.value ? collapsedWidth.value : expandedWidth.value
+  collapsed.value ? collapsedWidth : expandedWidth.value
 )
 const sidebarWidth = computed(() => `${configuredSidebarWidth.value}px`)
 const sidebarUiDensity = computed(() => {
@@ -120,7 +120,6 @@ onMounted(async () => {
     const config = await runtime.getConfig()
     // Load sidebar width from config
     expandedWidth.value = config.sidebar.expanded_width
-    collapsedWidth.value = config.sidebar.collapsed_width
     if (config.defaults.providers.length > 0) {
       activeProviders.value = [...config.defaults.providers]
     }

@@ -45,7 +45,7 @@ describe('normalizeConfig', () => {
     expect(normalized.defaults.providers).toEqual(['claude', 'chatgpt', 'chatgpt', 'chatgpt']);
   });
 
-  it('clamps sidebar widths and keeps collapsed width <= expanded width', () => {
+  it('clamps expanded width and keeps collapsed width fixed', () => {
     const normalized = normalizeConfig({
       sidebar: {
         expanded_width: 30,
@@ -59,6 +59,20 @@ describe('normalizeConfig', () => {
 
     expect(normalized.sidebar.expanded_width).toBe(40);
     expect(normalized.sidebar.collapsed_width).toBe(40);
+
+    const normalizedWithSmallCollapsed = normalizeConfig({
+      sidebar: {
+        expanded_width: 280,
+        collapsed_width: 24,
+      },
+      defaults: {
+        pane_count: 2,
+        providers: ['chatgpt', 'claude'],
+      },
+    });
+
+    expect(normalizedWithSmallCollapsed.sidebar.expanded_width).toBe(280);
+    expect(normalizedWithSmallCollapsed.sidebar.collapsed_width).toBe(40);
   });
 
   it('handles missing config by returning defaults and canonical providers', () => {

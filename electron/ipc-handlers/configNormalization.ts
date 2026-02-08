@@ -29,7 +29,6 @@ export function normalizeConfig(config: Partial<AppConfig> | null | undefined): 
   const fallbackProvider = CANONICAL_PROVIDERS[0]?.key ?? APP_CONFIG.providers.catalog[0]?.key ?? 'chatgpt';
   const paneCount = normalizePaneCount(config?.defaults?.pane_count);
   const expandedWidthCandidate = config?.sidebar?.expanded_width;
-  const collapsedWidthCandidate = config?.sidebar?.collapsed_width;
 
   const normalizedDefaultProviders = Array.from({ length: paneCount }, (_, paneIndex) => {
     const candidate = config?.defaults?.providers?.[paneIndex];
@@ -43,14 +42,11 @@ export function normalizeConfig(config: Partial<AppConfig> | null | undefined): 
     ? Math.max(APP_CONFIG.layout.sidebar.minExpandedWidth, Math.floor(expandedWidthCandidate))
     : DEFAULT_CONFIG.sidebar.expanded_width;
 
-  const collapsedWidth = typeof collapsedWidthCandidate === 'number' && Number.isFinite(collapsedWidthCandidate)
-    ? Math.max(APP_CONFIG.layout.sidebar.minCollapsedWidth, Math.floor(collapsedWidthCandidate))
-    : DEFAULT_CONFIG.sidebar.collapsed_width;
-
   return {
     sidebar: {
       expanded_width: expandedWidth,
-      collapsed_width: Math.min(expandedWidth, collapsedWidth),
+      // Collapsed width is fixed by product design. Only expanded_width is configurable.
+      collapsed_width: DEFAULT_CONFIG.sidebar.collapsed_width,
     },
     defaults: {
       pane_count: paneCount,
