@@ -10,8 +10,8 @@ describe('theme palette', () => {
   it('provides rose pine sidebar variables', () => {
     const vars = getSidebarThemeVars(ACTIVE_THEME_PRESET);
 
-    expect(vars['--bg']).toBe('#f7f8fb');
-    expect(vars['--broadcast']).toBe('#eb6f92');
+    expect(vars['--bg']).toBe('#ffffff');
+    expect(vars['--broadcast']).toBe('#d7827e');
     expect(vars['--input-focus-ring']).toContain('rgba');
   });
 
