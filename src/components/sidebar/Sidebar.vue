@@ -5,6 +5,7 @@ import ProviderList from './ProviderList.vue'
 import PromptComposer from './PromptComposer.vue'
 import { MAX_PANES, SIDEBAR_KEY, type PaneCount, type SidebarContext } from './context'
 import { APP_CONFIG } from '@/config'
+import { resolveSidebarUiDensity } from '@/config/layout'
 import { DEFAULT_ACTIVE_PROVIDERS } from '@/providers'
 import { getSidebarRuntime } from '@/runtime/sidebar'
 
@@ -23,6 +24,14 @@ const configuredSidebarWidth = computed(() =>
   collapsed.value ? collapsedWidth.value : expandedWidth.value
 )
 const sidebarWidth = computed(() => `${configuredSidebarWidth.value}px`)
+const sidebarUiDensity = computed(() => {
+  if (collapsed.value) {
+    return 'regular'
+  }
+  return resolveSidebarUiDensity(configuredSidebarWidth.value)
+})
+const isCompactSidebar = computed(() => sidebarUiDensity.value !== 'regular')
+const isTightSidebar = computed(() => sidebarUiDensity.value === 'tight')
 
 const normalizePaneCount = (count: number): PaneCount => {
   const normalized = Math.min(
@@ -204,7 +213,11 @@ provide(SIDEBAR_KEY, sidebarContext)
 <template>
   <aside
     class="sidebar"
-    :class="{ collapsed }"
+    :class="{
+      collapsed,
+      'is-compact': isCompactSidebar,
+      'is-tight': isTightSidebar
+    }"
     :style="{ width: sidebarWidth }"
     data-testid="sidebar"
   >
@@ -255,6 +268,14 @@ provide(SIDEBAR_KEY, sidebarContext)
   z-index: 10;
 }
 
+.sidebar.is-compact {
+  padding: 10px;
+}
+
+.sidebar.is-tight {
+  padding: 8px;
+}
+
 .sidebar.collapsed {
   padding: 8px 0;
   align-items: center;
@@ -269,6 +290,18 @@ provide(SIDEBAR_KEY, sidebarContext)
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
   -webkit-app-region: drag;
+}
+
+.sidebar.is-compact .sidebar-header {
+  gap: 6px;
+  padding-bottom: 12px;
+  margin-bottom: 12px;
+}
+
+.sidebar.is-tight .sidebar-header {
+  gap: 4px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
 }
 
 .sidebar.collapsed .sidebar-header {
@@ -287,6 +320,16 @@ provide(SIDEBAR_KEY, sidebarContext)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sidebar.is-compact .sidebar-title {
+  font-size: 13px;
+  letter-spacing: 0.35px;
+}
+
+.sidebar.is-tight .sidebar-title {
+  font-size: 12px;
+  letter-spacing: 0.2px;
 }
 
 .sidebar.collapsed .sidebar-title {
@@ -319,6 +362,16 @@ provide(SIDEBAR_KEY, sidebarContext)
   transition: transform 0.2s;
 }
 
+.sidebar.is-compact .collapse-btn {
+  width: 22px;
+  height: 22px;
+}
+
+.sidebar.is-tight .collapse-btn {
+  width: 20px;
+  height: 20px;
+}
+
 .sidebar.collapsed .collapse-btn {
   width: 28px;
   height: 28px;
@@ -345,6 +398,14 @@ provide(SIDEBAR_KEY, sidebarContext)
   min-width: 0;
 }
 
+.sidebar.is-compact .sidebar-scroll {
+  padding-right: 1px;
+}
+
+.sidebar.is-tight .sidebar-scroll {
+  padding-right: 0;
+}
+
 .sidebar-scroll::-webkit-scrollbar {
   width: 8px;
 }
@@ -356,5 +417,174 @@ provide(SIDEBAR_KEY, sidebarContext)
 
 .sidebar.collapsed .sidebar-content {
   display: none;
+}
+
+.sidebar.is-compact :deep(.section) {
+  margin-bottom: 16px;
+}
+
+.sidebar.is-tight :deep(.section) {
+  margin-bottom: 12px;
+}
+
+.sidebar.is-compact :deep(.section-title) {
+  font-size: 11px;
+  margin-bottom: 9px;
+  letter-spacing: 0.55px;
+  gap: 6px;
+}
+
+.sidebar.is-tight :deep(.section-title) {
+  font-size: 10px;
+  margin-bottom: 7px;
+  letter-spacing: 0.4px;
+  gap: 4px;
+}
+
+.sidebar.is-tight :deep(.section-title::before) {
+  height: 10px;
+}
+
+.sidebar.is-compact :deep(.pane-toggle) {
+  gap: 6px;
+}
+
+.sidebar.is-tight :deep(.pane-toggle) {
+  gap: 4px;
+}
+
+.sidebar.is-compact :deep(.chip) {
+  padding: 7px 4px;
+  font-size: 13px;
+  border-radius: 7px;
+}
+
+.sidebar.is-tight :deep(.chip) {
+  padding: 6px 3px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.sidebar.is-compact :deep(.provider-list) {
+  gap: 9px;
+}
+
+.sidebar.is-tight :deep(.provider-list) {
+  gap: 7px;
+}
+
+.sidebar.is-compact :deep(.provider-item) {
+  gap: 5px;
+}
+
+.sidebar.is-tight :deep(.provider-item) {
+  gap: 4px;
+}
+
+.sidebar.is-compact :deep(.provider-label) {
+  font-size: 12px;
+}
+
+.sidebar.is-tight :deep(.provider-label) {
+  font-size: 11px;
+  letter-spacing: 0.2px;
+}
+
+.sidebar.is-compact :deep(.select-trigger) {
+  padding: 8px 10px;
+  font-size: 14px;
+  border-radius: 8px;
+}
+
+.sidebar.is-tight :deep(.select-trigger) {
+  padding: 7px 9px;
+  font-size: 13px;
+  border-radius: 7px;
+}
+
+.sidebar.is-compact :deep(.trigger-content) {
+  gap: 8px;
+}
+
+.sidebar.is-tight :deep(.trigger-content) {
+  gap: 6px;
+}
+
+.sidebar.is-compact :deep(.trigger-icon),
+.sidebar.is-compact :deep(.item-icon) {
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar.is-tight :deep(.trigger-icon),
+.sidebar.is-tight :deep(.item-icon) {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar.is-compact :deep(.trigger-icon svg),
+.sidebar.is-compact :deep(.item-icon svg) {
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar.is-tight :deep(.trigger-icon svg),
+.sidebar.is-tight :deep(.item-icon svg) {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar.is-compact :deep(.dropdown-item) {
+  gap: 8px;
+  padding: 8px;
+  font-size: 14px;
+}
+
+.sidebar.is-tight :deep(.dropdown-item) {
+  gap: 6px;
+  padding: 7px;
+  font-size: 13px;
+}
+
+.sidebar.is-compact :deep(.composer-section) {
+  margin-top: 10px;
+  padding-top: 12px;
+}
+
+.sidebar.is-tight :deep(.composer-section) {
+  margin-top: 8px;
+  padding-top: 10px;
+}
+
+.sidebar.is-compact :deep(.composer-textarea) {
+  padding: 12px 13px;
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.sidebar.is-tight :deep(.composer-textarea) {
+  padding: 10px 11px;
+  font-size: 13px;
+  margin-bottom: 7px;
+}
+
+.sidebar.is-compact :deep(.composer-shortcut-hint) {
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+
+.sidebar.is-tight :deep(.composer-shortcut-hint) {
+  font-size: 11px;
+  margin-bottom: 7px;
+}
+
+.sidebar.is-compact :deep(.composer-send-btn) {
+  padding: 10px 12px;
+  font-size: 13px;
+}
+
+.sidebar.is-tight :deep(.composer-send-btn) {
+  padding: 9px 10px;
+  font-size: 12px;
 }
 </style>

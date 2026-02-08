@@ -2,14 +2,16 @@ export const LAYOUT_CONFIG = {
   pane: {
     minCount: 1,
     maxCount: 4,
-    defaultCount: 2,
+    defaultCount: 3,
   },
   sidebar: {
-    defaultExpandedWidth: 280,
-    defaultCollapsedWidth: 48,
-    minExpandedWidth: 48,
+    defaultExpandedWidth: 200,
+    defaultCollapsedWidth: 40,
+    minExpandedWidth: 40,
     maxExpandedWidth: 500,
     minCollapsedWidth: 24,
+    compactUiMaxWidth: 220,
+    tightUiMaxWidth: 180,
   },
   quickPrompt: {
     passthroughMode: true,
@@ -28,3 +30,20 @@ export const LAYOUT_CONFIG = {
     maxTextareaHeight: 280,
   },
 } as const;
+
+export type SidebarUiDensity = 'regular' | 'compact' | 'tight';
+
+export function resolveSidebarUiDensity(width: number): SidebarUiDensity {
+  if (typeof width !== 'number' || !Number.isFinite(width)) {
+    return 'regular';
+  }
+
+  const normalizedWidth = Math.max(1, Math.floor(width));
+  if (normalizedWidth <= LAYOUT_CONFIG.sidebar.tightUiMaxWidth) {
+    return 'tight';
+  }
+  if (normalizedWidth <= LAYOUT_CONFIG.sidebar.compactUiMaxWidth) {
+    return 'compact';
+  }
+  return 'regular';
+}

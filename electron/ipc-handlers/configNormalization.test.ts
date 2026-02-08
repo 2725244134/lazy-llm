@@ -57,16 +57,16 @@ describe('normalizeConfig', () => {
       },
     });
 
-    expect(normalized.sidebar.expanded_width).toBe(48);
-    expect(normalized.sidebar.collapsed_width).toBe(48);
+    expect(normalized.sidebar.expanded_width).toBe(40);
+    expect(normalized.sidebar.collapsed_width).toBe(40);
   });
 
   it('handles missing config by returning defaults and canonical providers', () => {
     const normalized = normalizeConfig(undefined);
 
     expect(normalized.defaults).toEqual({
-      pane_count: 2,
-      providers: ['chatgpt', 'chatgpt'],
+      pane_count: 3,
+      providers: ['chatgpt', 'chatgpt', 'chatgpt'],
     });
     expect(normalized.providers).toEqual(CANONICAL_PROVIDERS);
   });
