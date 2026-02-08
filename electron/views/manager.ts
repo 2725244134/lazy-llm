@@ -82,6 +82,7 @@ const QUICK_PROMPT_MIN_HEIGHT = APP_CONFIG.layout.quickPrompt.minHeight;
 const QUICK_PROMPT_MAX_HEIGHT = APP_CONFIG.layout.quickPrompt.maxHeight;
 const QUICK_PROMPT_VIEWPORT_PADDING = APP_CONFIG.layout.quickPrompt.viewportPadding;
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
+const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
 
 interface PaneView {
   view: WebContentsView;
@@ -119,6 +120,7 @@ export class ViewManager {
   private paneZoomFactor: number;
   private sidebarZoomFactor: number;
   private defaultProviders: string[];
+  private providerSwitchLoadTokens = new Map<number, string>();
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -383,6 +385,72 @@ export class ViewManager {
     });
   }
 
+  private dispatchSidebarCustomEvent(eventName: string, detail: unknown): void {
+    if (!this.sidebarView) {
+      return;
+    }
+
+    const serializedEventName = JSON.stringify(eventName);
+    const serializedDetail = JSON.stringify(detail);
+    this.sidebarView.webContents.executeJavaScript(
+      `window.dispatchEvent(new CustomEvent(${serializedEventName}, { detail: ${serializedDetail} }));`,
+      true
+    ).catch((error) => {
+      console.error(`[ViewManager] Failed to dispatch sidebar event ${eventName}:`, error);
+    });
+  }
+
+  private notifyProviderLoadingState(paneIndex: number, loading: boolean): void {
+    this.dispatchSidebarCustomEvent(PROVIDER_LOADING_EVENT, {
+      paneIndex,
+      loading,
+    });
+  }
+
+  private clearProviderLoadingTracking(paneIndex: number): void {
+    if (!this.providerSwitchLoadTokens.has(paneIndex)) {
+      return;
+    }
+
+    this.providerSwitchLoadTokens.delete(paneIndex);
+    this.notifyProviderLoadingState(paneIndex, false);
+  }
+
+  private beginProviderLoadingTracking(paneIndex: number, webContents: WebContents): void {
+    const token = `${paneIndex}:${Date.now()}:${Math.random()}`;
+    this.providerSwitchLoadTokens.set(paneIndex, token);
+    this.notifyProviderLoadingState(paneIndex, true);
+
+    const complete = () => {
+      if (webContents.isLoadingMainFrame()) {
+        return;
+      }
+      cleanup();
+      if (this.providerSwitchLoadTokens.get(paneIndex) !== token) {
+        return;
+      }
+      this.providerSwitchLoadTokens.delete(paneIndex);
+      this.notifyProviderLoadingState(paneIndex, false);
+    };
+
+    const fail = () => {
+      cleanup();
+      if (this.providerSwitchLoadTokens.get(paneIndex) !== token) {
+        return;
+      }
+      this.providerSwitchLoadTokens.delete(paneIndex);
+      this.notifyProviderLoadingState(paneIndex, false);
+    };
+
+    const cleanup = () => {
+      webContents.removeListener('did-stop-loading', complete);
+      webContents.removeListener('did-fail-load', fail);
+    };
+
+    webContents.on('did-stop-loading', complete);
+    webContents.on('did-fail-load', fail);
+  }
+
   private createPaneWebContentsView(paneIndex: number): WebContentsView {
     const view = new WebContentsView({
       webPreferences: {
@@ -439,6 +507,7 @@ export class ViewManager {
     // Remove excess panes
     while (this.paneViews.length > count) {
       const pane = this.paneViews.pop()!;
+      this.clearProviderLoadingTracking(pane.paneIndex);
       this.closePane(pane);
     }
 
@@ -492,7 +561,10 @@ export class ViewManager {
       if (cachedViewEntry.url !== provider.url) {
         cachedViewEntry.url = provider.url;
         this.applyPaneRuntimePreferences(cachedViewEntry.view.webContents);
+        this.beginProviderLoadingTracking(paneIndex, cachedViewEntry.view.webContents);
         cachedViewEntry.view.webContents.loadURL(provider.url);
+      } else {
+        this.clearProviderLoadingTracking(paneIndex);
       }
 
       if (pane.view !== cachedViewEntry.view) {
@@ -512,6 +584,7 @@ export class ViewManager {
 
     const nextView = this.createPaneWebContentsView(paneIndex);
     this.window.contentView.addChildView(nextView);
+    this.beginProviderLoadingTracking(paneIndex, nextView.webContents);
     nextView.webContents.loadURL(provider.url);
     pane.cachedViews.set(providerKey, { view: nextView, url: provider.url });
 
@@ -707,6 +780,7 @@ export class ViewManager {
     // Close all pane webContents
     for (const pane of this.paneViews) {
       try {
+        this.clearProviderLoadingTracking(pane.paneIndex);
         this.closePane(pane);
       } catch (e) {
         console.error(`[ViewManager] Error closing pane ${pane.paneIndex}:`, e);

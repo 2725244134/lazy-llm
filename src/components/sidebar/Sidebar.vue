@@ -11,10 +11,12 @@ import { getSidebarRuntime } from '@/runtime/sidebar'
 
 const runtime = getSidebarRuntime()
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent
+const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent
 
 const collapsed = ref(false)
 const paneCount = ref<PaneCount>(APP_CONFIG.layout.pane.defaultCount as PaneCount)
 const activeProviders = ref<string[]>([...DEFAULT_ACTIVE_PROVIDERS])
+const providerLoadingByPane = ref<Record<number, boolean>>({})
 
 // Sidebar width from config (loaded on mount)
 const expandedWidth = ref<number>(APP_CONFIG.layout.sidebar.defaultExpandedWidth)
@@ -112,9 +114,52 @@ const handleSidebarToggleShortcut = () => {
   void toggleCollapse()
 }
 
+const setProviderLoadingState = (paneIndex: number, loading: boolean) => {
+  const nextState = { ...providerLoadingByPane.value }
+  if (loading) {
+    nextState[paneIndex] = true
+  } else {
+    delete nextState[paneIndex]
+  }
+  providerLoadingByPane.value = nextState
+}
+
+const trimProviderLoadingState = (count: PaneCount) => {
+  const nextState: Record<number, boolean> = {}
+  for (const [paneIndexRaw, loading] of Object.entries(providerLoadingByPane.value)) {
+    const paneIndex = Number(paneIndexRaw)
+    if (!Number.isInteger(paneIndex) || paneIndex < 0 || paneIndex >= count || !loading) {
+      continue
+    }
+    nextState[paneIndex] = true
+  }
+  providerLoadingByPane.value = nextState
+}
+
+type ProviderLoadingEventDetail = {
+  paneIndex: number
+  loading: boolean
+}
+
+const handleProviderLoadingEvent = (event: Event) => {
+  const detail = (event as CustomEvent<ProviderLoadingEventDetail>).detail
+  if (
+    !detail ||
+    typeof detail.paneIndex !== 'number' ||
+    !Number.isInteger(detail.paneIndex) ||
+    detail.paneIndex < 0 ||
+    typeof detail.loading !== 'boolean'
+  ) {
+    return
+  }
+
+  setProviderLoadingState(detail.paneIndex, detail.loading)
+}
+
 onMounted(async () => {
   window.addEventListener('resize', handleWindowResize)
   window.addEventListener(SIDEBAR_TOGGLE_SHORTCUT_EVENT, handleSidebarToggleShortcut)
+  window.addEventListener(PROVIDER_LOADING_EVENT, handleProviderLoadingEvent as EventListener)
 
   try {
     const config = await runtime.getConfig()
@@ -135,6 +180,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleWindowResize)
   window.removeEventListener(SIDEBAR_TOGGLE_SHORTCUT_EVENT, handleSidebarToggleShortcut)
+  window.removeEventListener(PROVIDER_LOADING_EVENT, handleProviderLoadingEvent as EventListener)
   if (resizeRaf !== 0) {
     window.cancelAnimationFrame(resizeRaf)
     resizeRaf = 0
@@ -161,9 +207,11 @@ const setPaneCount = async (count: number) => {
 
   try {
     await runtime.setPaneCount(newCount)
+    trimProviderLoadingState(newCount)
   } catch (e) {
     invalidateLayoutSignature()
     paneCount.value = oldCount
+    trimProviderLoadingState(oldCount)
     console.error('[Sidebar] setPaneCount error:', e)
   }
 }
@@ -175,6 +223,7 @@ const setProvider = async (paneIndex: number, providerKey: string) => {
     await runtime.updateProvider(paneIndex, providerKey)
     activeProviders.value[paneIndex] = providerKey
   } catch (e) {
+    setProviderLoadingState(paneIndex, false)
     console.error('[Sidebar] setProvider error:', e)
   }
 }
@@ -200,6 +249,7 @@ const syncPromptDraft = async (text: string) => {
 const sidebarContext: SidebarContext = {
   paneCount,
   activeProviders,
+  providerLoadingByPane,
   setPaneCount,
   setProvider,
   syncPromptDraft,

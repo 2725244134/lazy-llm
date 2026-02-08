@@ -7,6 +7,7 @@ export type PaneCount = 1 | 2 | 3 | 4;
 export interface SidebarContext {
   paneCount: Ref<PaneCount>;
   activeProviders: Ref<string[]>;
+  providerLoadingByPane: Ref<Record<number, boolean>>;
   setPaneCount: (count: number) => Promise<void>;
   setProvider: (paneIndex: number, providerKey: string) => Promise<void>;
   syncPromptDraft: (text: string) => Promise<void>;

@@ -24,6 +24,7 @@ const paneIndices = computed(() =>
         </div>
         <ProviderDropdown
           :selected-key="sidebar.activeProviders.value[paneIndex] || 'chatgpt'"
+          :loading="Boolean(sidebar.providerLoadingByPane.value[paneIndex])"
           :testid="`provider-select-${paneIndex}`"
           @change="(key) => void sidebar.setProvider(paneIndex, key)"
         />

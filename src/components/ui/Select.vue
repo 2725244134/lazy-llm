@@ -4,6 +4,7 @@ import { providerMetas, providerIcons } from '@/providers'
 
 const props = defineProps<{
   modelValue: string
+  loading?: boolean
   testid?: string
 }>()
 
@@ -49,7 +50,7 @@ onUnmounted(() => {
     <button
       type="button"
       class="select-trigger"
-      :class="{ 'is-open': isOpen }"
+      :class="{ 'is-open': isOpen, 'is-loading': props.loading }"
       @click="toggle"
     >
       <span class="trigger-content">
@@ -58,6 +59,12 @@ onUnmounted(() => {
         </span>
         <span class="trigger-label">{{ selectedProvider.name }}</span>
       </span>
+      <span
+        v-if="props.loading"
+        class="loading-spinner"
+        aria-label="Provider loading"
+        role="status"
+      ></span>
       <svg
         class="chevron"
         :class="{ 'is-open': isOpen }"
@@ -136,6 +143,10 @@ onUnmounted(() => {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
 }
 
+.select-trigger.is-loading {
+  border-color: var(--accent);
+}
+
 .trigger-content {
   display: flex;
   align-items: center;
@@ -171,6 +182,17 @@ onUnmounted(() => {
   flex-shrink: 0;
   opacity: 0.5;
   transition: all 0.25s ease;
+}
+
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  margin-right: 6px;
+  animation: spin 0.8s linear infinite;
 }
 
 .chevron.is-open {
@@ -294,5 +316,11 @@ onUnmounted(() => {
 .dropdown-scroll::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 3px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 </style>

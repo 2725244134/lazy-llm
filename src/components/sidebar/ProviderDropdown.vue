@@ -3,6 +3,7 @@ import Select from '@/components/ui/Select.vue'
 
 defineProps<{
   selectedKey: string
+  loading?: boolean
   testid?: string
 }>()
 
@@ -18,6 +19,7 @@ const handleChange = (key: string) => {
 <template>
   <Select
     :model-value="selectedKey"
+    :loading="loading"
     :testid="testid"
     @update:model-value="handleChange"
   />
