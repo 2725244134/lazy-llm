@@ -11,7 +11,7 @@ describe('theme palette', () => {
     const vars = getSidebarThemeVars(ACTIVE_THEME_PRESET);
 
     expect(vars['--bg']).toBe('#ffffff');
-    expect(vars['--broadcast']).toBe('#ebbcba');
+    expect(vars['--broadcast']).toBe(vars['--accent']);
     expect(vars['--input-focus-ring']).toContain('rgba');
   });
 

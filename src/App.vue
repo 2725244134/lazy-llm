@@ -45,7 +45,7 @@ onMounted(async () => {
   --text: #1f2937;
   --text-muted: #6b7280;
   --accent: #000000;
-  --broadcast: #ebbcba;
+  --broadcast: var(--accent);
   --font-sans: 'SF Pro Text', 'SF Pro SC', 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC',
     'Source Han Sans SC', 'WenQuanYi Micro Hei', -apple-system,
