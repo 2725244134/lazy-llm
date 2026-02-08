@@ -15,8 +15,8 @@ import {
 import { buildQuickPromptDataUrl } from './quick-prompt/index.js';
 import {
   PANE_ACCEPT_LANGUAGES,
+  PANE_DEFAULT_ZOOM_FACTOR,
   SIDEBAR_DEFAULT_ZOOM_FACTOR,
-  getPaneDefaultZoomFactor,
 } from './paneRuntimePreferences.js';
 import { getConfig } from '../ipc-handlers/store.js';
 import type {
@@ -109,7 +109,6 @@ export class ViewManager {
   private quickPromptHeight = QUICK_PROMPT_DEFAULT_HEIGHT;
   private providers: Map<string, ProviderMeta>;
   private injectRuntimeScript: string | null = null;
-  private paneDefaultZoomFactor: number;
 
   constructor(window: BaseWindow) {
     this.window = window;
@@ -118,7 +117,6 @@ export class ViewManager {
     const config = getConfig();
     this.currentSidebarWidth = config.sidebar.expanded_width;
     this.providers = new Map(config.providers.map(p => [p.key, p]));
-    this.paneDefaultZoomFactor = getPaneDefaultZoomFactor();
   }
 
   /**
@@ -202,7 +200,7 @@ export class ViewManager {
   private applyPaneRuntimePreferences(webContents: WebContents): void {
     const rawUserAgent = webContents.getUserAgent();
     webContents.session.setUserAgent(rawUserAgent, PANE_ACCEPT_LANGUAGES);
-    webContents.setZoomFactor(this.paneDefaultZoomFactor);
+    webContents.setZoomFactor(PANE_DEFAULT_ZOOM_FACTOR);
   }
 
   private applySidebarRuntimePreferences(webContents: WebContents): void {
