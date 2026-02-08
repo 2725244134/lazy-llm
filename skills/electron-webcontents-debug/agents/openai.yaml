@@ -1,4 +1,0 @@
-interface:
-  display_name: "Electron WebContents Debug"
-  short_description: "Debug broken Electron WebContents control flows"
-  default_prompt: "Trace and fix Electron control-path failures between renderer UI, preload bridge, IPC, and WebContentsView side effects."
