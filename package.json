@@ -2,6 +2,7 @@
   "name": "lazy-llm",
   "private": true,
   "version": "0.1.1",
+  "author": "LazyLLM Maintainer <cccc38753@gmail.com>",
   "type": "module",
   "main": "dist-electron/main.js",
   "scripts": {
