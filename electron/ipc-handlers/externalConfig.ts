@@ -30,6 +30,11 @@ const EXTERNAL_CONFIG_DIR_NAME = 'lazy-llm';
 const MIN_ZOOM_FACTOR = 0.25;
 const MAX_ZOOM_FACTOR = 3.0;
 
+export const DEFAULT_RUNTIME_PREFERENCES: RuntimePreferences = {
+  paneZoomFactor: APP_CONFIG.runtime.zoom.paneDefaultFactor,
+  sidebarZoomFactor: APP_CONFIG.runtime.zoom.sidebarDefaultFactor,
+};
+
 function getBaseConfigDirectory(): string {
   const xdgConfigHome = process.env.XDG_CONFIG_HOME;
   if (typeof xdgConfigHome === 'string' && xdgConfigHome.trim().length > 0) {
@@ -47,25 +52,11 @@ export function getExternalConfigPath(): string {
 }
 
 export function buildDefaultExternalConfig(): ExternalConfigFile {
-  const paneCount = APP_CONFIG.layout.pane.defaultCount;
-  const fallbackProvider = APP_CONFIG.providers.defaultPaneKeys[0] ?? 'chatgpt';
-  const providers = Array.from({ length: paneCount }, (_, paneIndex) => {
-    return APP_CONFIG.providers.defaultPaneKeys[paneIndex] ?? fallbackProvider;
-  });
-
   return {
-    sidebar: {
-      expanded_width: APP_CONFIG.layout.sidebar.defaultExpandedWidth,
-    },
-    defaults: {
-      pane_count: paneCount,
-      providers,
-    },
+    sidebar: {},
+    defaults: {},
     runtime: {
-      zoom: {
-        pane_factor: APP_CONFIG.runtime.zoom.paneDefaultFactor,
-        sidebar_factor: APP_CONFIG.runtime.zoom.sidebarDefaultFactor,
-      },
+      zoom: {},
     },
   };
 }
@@ -138,17 +129,31 @@ function normalizeZoomFactor(value: unknown, fallback: number): number {
   return Math.max(MIN_ZOOM_FACTOR, Math.min(MAX_ZOOM_FACTOR, value));
 }
 
-export function resolveRuntimePreferences(
+export function normalizeRuntimePreferences(
+  runtimePreferences: Partial<RuntimePreferences> | null | undefined,
+  fallback: RuntimePreferences = DEFAULT_RUNTIME_PREFERENCES
+): RuntimePreferences {
+  return {
+    paneZoomFactor: normalizeZoomFactor(runtimePreferences?.paneZoomFactor, fallback.paneZoomFactor),
+    sidebarZoomFactor: normalizeZoomFactor(
+      runtimePreferences?.sidebarZoomFactor,
+      fallback.sidebarZoomFactor
+    ),
+  };
+}
+
+export function mergeRuntimePreferencesWithExternal(
+  baseRuntimePreferences: RuntimePreferences,
   externalConfig: ExternalConfigFile | null | undefined
 ): RuntimePreferences {
-  const paneZoomDefault = APP_CONFIG.runtime.zoom.paneDefaultFactor;
-  const sidebarZoomDefault = APP_CONFIG.runtime.zoom.sidebarDefaultFactor;
-
   return {
-    paneZoomFactor: normalizeZoomFactor(externalConfig?.runtime?.zoom?.pane_factor, paneZoomDefault),
+    paneZoomFactor: normalizeZoomFactor(
+      externalConfig?.runtime?.zoom?.pane_factor,
+      baseRuntimePreferences.paneZoomFactor
+    ),
     sidebarZoomFactor: normalizeZoomFactor(
       externalConfig?.runtime?.zoom?.sidebar_factor,
-      sidebarZoomDefault
+      baseRuntimePreferences.sidebarZoomFactor
     ),
   };
 }

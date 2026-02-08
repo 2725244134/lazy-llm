@@ -83,6 +83,8 @@ Supported fields:
 
 Notes:
 
+- Resolution priority is strict: external file (`3`) > encrypted store (`2`) > code defaults (`1`).
+- Omitted fields in `config.json` do not override lower-priority sources.
 - Sidebar exposes one effective width value: `sidebar.expanded_width`.
 - `defaults.pane_count` and `defaults.providers` define startup pane count/providers.
 - `runtime.zoom.pane_factor` and `runtime.zoom.sidebar_factor` control default zoom.

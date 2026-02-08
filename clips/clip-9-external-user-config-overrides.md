@@ -11,7 +11,12 @@ Commits: feat(config): expose external user config overrides for sidebar, defaul
 ## Problem statement
 
 当前配置主要存储在加密的 `electron-store` 文件中，用户无法快速直接编辑。  
-对于常见调优项（sidebar 宽度、默认 pane 数量与 providers、sidebar/pane zoom），缺少一个“可见、可改、可回滚”的明文入口。
+对于常见调优项（sidebar 宽度、默认 pane 数量与 providers、sidebar/pane zoom），缺少一个“可见、可改、可回滚”的明文入口。  
+同时配置调用链存在冗余读取与优先级歧义，需要统一为严格优先级：
+
+- `3` 外置明文文件
+- `2` 加密 store
+- `1` 代码默认值
 
 ## Non-goals
 
@@ -23,21 +28,15 @@ Commits: feat(config): expose external user config overrides for sidebar, defaul
 
 ### Data structures
 
-新增外置配置文件 `~/.config/lazy-llm/config.json`（或 `$XDG_CONFIG_HOME/lazy-llm/config.json`）：
+新增外置配置文件 `~/.config/lazy-llm/config.json`（或 `$XDG_CONFIG_HOME/lazy-llm/config.json`）。
+
+默认仅写入空模板（不抢占 lower-priority 配置）：
 
 ```json
 {
-  "sidebar": { "expanded_width": 220 },
-  "defaults": {
-    "pane_count": 3,
-    "providers": ["chatgpt", "claude", "gemini"]
-  },
-  "runtime": {
-    "zoom": {
-      "pane_factor": 1.0,
-      "sidebar_factor": 1.0
-    }
-  }
+  "sidebar": {},
+  "defaults": {},
+  "runtime": { "zoom": {} }
 }
 ```
 
@@ -45,11 +44,14 @@ Commits: feat(config): expose external user config overrides for sidebar, defaul
 
 1. `electron/ipc-handlers/externalConfig.ts`
    - 负责路径计算、模板生成、文件读取、覆盖合并、zoom 参数解析。
+   - 明确字段级覆盖语义：未配置字段不覆盖下层来源。
 2. `electron/ipc-handlers/store.ts`
-   - `getConfig()`：`store` 配置先归一化，再叠加外置覆盖，再归一化输出。
-   - `getRuntimePreferences()`：单独解析 zoom，供 `ViewManager` 使用。
+   - 新增 `getResolvedSettings()`，一次读取并解析：
+     - AppConfig: `3 > 2 > 1`
+     - Runtime zoom: `3 > 2 > 1`
+   - 去除启动阶段重复读取外置配置的冗余链路。
 3. `electron/views/manager.ts`
-   - pane/sidebar zoom 改为读取 `getRuntimePreferences()` 的结果并应用。
+   - 构造时接收 `getResolvedSettings()`，避免重复读取配置文件。
 
 ### Trade-offs
 
@@ -67,6 +69,9 @@ Commits: feat(config): expose external user config overrides for sidebar, defaul
    - 覆盖合并
    - zoom clamp
    - 非法 JSON 容错
-2. 全量回归：
+2. 新增 `store` 优先级测试：
+   - external 缺失字段时回退 store
+   - external 部分覆盖时逐字段覆盖/回退
+3. 全量回归：
    - `make check`
    - `make test`

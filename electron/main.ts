@@ -12,7 +12,12 @@ import type {
   PaneResponseReadyPayload,
   QuickPromptResizeRequest,
 } from './ipc/contracts.js';
-import { getConfig, setDefaultPaneCount, setDefaultProvider } from './ipc-handlers/store.js';
+import {
+  getConfig,
+  getResolvedSettings,
+  setDefaultPaneCount,
+  setDefaultProvider,
+} from './ipc-handlers/store.js';
 import { ViewManager } from './views/manager.js';
 
 // Prevent multiple instances
@@ -38,13 +43,17 @@ function createWindow() {
   // Keep menu hidden by default for frameless mode.
   mainWindow.setMenuBarVisibility(false);
 
+  const settings = getResolvedSettings();
+
   // Initialize ViewManager
-  viewManager = new ViewManager(mainWindow);
+  viewManager = new ViewManager(mainWindow, {
+    config: settings.config,
+    runtimePreferences: settings.runtimePreferences,
+  });
   viewManager.initSidebar();
 
   // Set initial pane count from config
-  const config = getConfig();
-  const initialPaneCount = validatePaneCount(config.defaults.pane_count);
+  const initialPaneCount = validatePaneCount(settings.config.defaults.pane_count);
   viewManager.setPaneCount(initialPaneCount);
 
   // Update layout on window resize

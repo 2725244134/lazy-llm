@@ -17,8 +17,10 @@ import { buildQuickPromptDataUrl } from './quick-prompt/index.js';
 import {
   PANE_ACCEPT_LANGUAGES,
 } from './paneRuntimePreferences.js';
-import { getConfig, getRuntimePreferences } from '../ipc-handlers/store.js';
+import { getConfig } from '../ipc-handlers/store.js';
+import type { RuntimePreferences } from '../ipc-handlers/externalConfig.js';
 import type {
+  AppConfig,
   PaneCount,
   LayoutSnapshot,
   ProviderMeta,
@@ -90,6 +92,11 @@ interface PaneView {
   cachedViews: Map<string, { view: WebContentsView; url: string }>;
 }
 
+interface ViewManagerOptions {
+  config: AppConfig;
+  runtimePreferences: RuntimePreferences;
+}
+
 function toFailureReason(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -112,16 +119,12 @@ export class ViewManager {
   private paneZoomFactor: number;
   private sidebarZoomFactor: number;
 
-  constructor(window: BaseWindow) {
+  constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
-
-    // Load config
-    const config = getConfig();
-    const runtimePreferences = getRuntimePreferences();
-    this.currentSidebarWidth = config.sidebar.expanded_width;
-    this.providers = new Map(config.providers.map(p => [p.key, p]));
-    this.paneZoomFactor = runtimePreferences.paneZoomFactor;
-    this.sidebarZoomFactor = runtimePreferences.sidebarZoomFactor;
+    this.currentSidebarWidth = options.config.sidebar.expanded_width;
+    this.providers = new Map(options.config.providers.map(p => [p.key, p]));
+    this.paneZoomFactor = options.runtimePreferences.paneZoomFactor;
+    this.sidebarZoomFactor = options.runtimePreferences.sidebarZoomFactor;
   }
 
   /**

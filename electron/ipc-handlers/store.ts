@@ -5,10 +5,11 @@ import type { AppConfig } from '../ipc/contracts.js';
 import { APP_CONFIG } from '../../src/config/app.js';
 import { DEFAULT_CONFIG, normalizeConfig } from './configNormalization.js';
 import {
-  ensureExternalConfigFile,
+  DEFAULT_RUNTIME_PREFERENCES,
+  mergeRuntimePreferencesWithExternal,
   mergeAppConfigWithExternal,
+  normalizeRuntimePreferences,
   readExternalConfigFile,
-  resolveRuntimePreferences,
   type RuntimePreferences,
 } from './externalConfig.js';
 
@@ -17,6 +18,7 @@ const encryptionKey = machineIdSync();
 
 interface StoreSchema {
   config: AppConfig;
+  runtimePreferences: RuntimePreferences;
   session: {
     lastPaneCount: number;
     lastProviders: string[];
@@ -25,6 +27,7 @@ interface StoreSchema {
 
 const defaults: StoreSchema = {
   config: DEFAULT_CONFIG,
+  runtimePreferences: DEFAULT_RUNTIME_PREFERENCES,
   session: {
     lastPaneCount: APP_CONFIG.layout.pane.defaultCount,
     lastProviders: [...APP_CONFIG.providers.defaultPaneKeys],
@@ -37,7 +40,10 @@ export const store = new Store<StoreSchema>({
   defaults,
 });
 
-ensureExternalConfigFile();
+export interface ResolvedSettings {
+  config: AppConfig;
+  runtimePreferences: RuntimePreferences;
+}
 
 function getStoredNormalizedConfig(): AppConfig {
   const current = store.get('config');
@@ -50,16 +56,30 @@ function getStoredNormalizedConfig(): AppConfig {
   return normalized;
 }
 
-export function getConfig(): AppConfig {
-  const storedConfig = getStoredNormalizedConfig();
-  const externalConfig = readExternalConfigFile();
-  const mergedConfig = mergeAppConfigWithExternal(storedConfig, externalConfig);
-  return normalizeConfig(mergedConfig);
+function getStoredRuntimePreferences(): RuntimePreferences {
+  const current = store.get('runtimePreferences');
+  const normalized = normalizeRuntimePreferences(current, DEFAULT_RUNTIME_PREFERENCES);
+
+  if (JSON.stringify(current) !== JSON.stringify(normalized)) {
+    store.set('runtimePreferences', normalized);
+  }
+
+  return normalized;
 }
 
-export function getRuntimePreferences(): RuntimePreferences {
+export function getResolvedSettings(): ResolvedSettings {
+  const storedConfig = getStoredNormalizedConfig();
+  const storedRuntimePreferences = getStoredRuntimePreferences();
   const externalConfig = readExternalConfigFile();
-  return resolveRuntimePreferences(externalConfig);
+
+  return {
+    config: normalizeConfig(mergeAppConfigWithExternal(storedConfig, externalConfig)),
+    runtimePreferences: mergeRuntimePreferencesWithExternal(storedRuntimePreferences, externalConfig),
+  };
+}
+
+export function getConfig(): AppConfig {
+  return getResolvedSettings().config;
 }
 
 export function getSession() {

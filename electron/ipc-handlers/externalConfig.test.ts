@@ -3,10 +3,12 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs
 import { join } from 'path';
 import { tmpdir } from 'os';
 import {
+  DEFAULT_RUNTIME_PREFERENCES,
   ensureExternalConfigFile,
   getExternalConfigPath,
+  mergeRuntimePreferencesWithExternal,
   mergeAppConfigWithExternal,
-  resolveRuntimePreferences,
+  normalizeRuntimePreferences,
   readExternalConfigFile,
   type ExternalConfigFile,
 } from './externalConfig';
@@ -36,10 +38,13 @@ describe('externalConfig', () => {
 
     expect(existsSync(configPath)).toBe(true);
     const parsed = JSON.parse(readFileSync(configPath, 'utf8'));
-    expect(parsed.sidebar.expanded_width).toBe(DEFAULT_CONFIG.sidebar.expanded_width);
-    expect(parsed.defaults.pane_count).toBe(DEFAULT_CONFIG.defaults.pane_count);
-    expect(Array.isArray(parsed.defaults.providers)).toBe(true);
-    expect(parsed.defaults.providers).toHaveLength(parsed.defaults.pane_count);
+    expect(parsed).toEqual({
+      sidebar: {},
+      defaults: {},
+      runtime: {
+        zoom: {},
+      },
+    });
   });
 
   it('merges supported external overrides into app config', () => {
@@ -55,8 +60,8 @@ describe('externalConfig', () => {
     expect(merged.defaults.providers).toEqual(['claude', 'chatgpt', 'gemini', 'grok']);
   });
 
-  it('resolves runtime zoom preferences with clamping', () => {
-    const prefs = resolveRuntimePreferences({
+  it('merges runtime zoom using external values and clamps bounds', () => {
+    const prefs = mergeRuntimePreferencesWithExternal(DEFAULT_RUNTIME_PREFERENCES, {
       runtime: {
         zoom: {
           pane_factor: 99,
@@ -67,6 +72,33 @@ describe('externalConfig', () => {
 
     expect(prefs.paneZoomFactor).toBe(3);
     expect(prefs.sidebarZoomFactor).toBe(0.25);
+  });
+
+  it('falls back to base runtime preferences when external zoom fields are missing', () => {
+    const base = {
+      paneZoomFactor: 1.2,
+      sidebarZoomFactor: 1.1,
+    };
+    const merged = mergeRuntimePreferencesWithExternal(base, {
+      runtime: {
+        zoom: {
+          pane_factor: 0.8,
+        },
+      },
+    });
+
+    expect(merged.paneZoomFactor).toBe(0.8);
+    expect(merged.sidebarZoomFactor).toBe(1.1);
+  });
+
+  it('normalizes stored runtime preferences with fallback', () => {
+    const normalized = normalizeRuntimePreferences(
+      { paneZoomFactor: Number.NaN, sidebarZoomFactor: 9 },
+      { paneZoomFactor: 1.4, sidebarZoomFactor: 1.2 }
+    );
+
+    expect(normalized.paneZoomFactor).toBe(1.4);
+    expect(normalized.sidebarZoomFactor).toBe(3);
   });
 
   it('returns null for invalid external config json', () => {
