@@ -1,11 +1,8 @@
 import type { ProviderMeta } from '../types'
+import { APP_CONFIG } from '@/config'
 import Icon from './icon.svg'
 
-export const meta: ProviderMeta = {
-  key: 'aistudio',
-  name: 'AI Studio',
-  url: 'https://aistudio.google.com/prompts/new_chat',
-}
+export const meta: ProviderMeta = { ...APP_CONFIG.providers.byKey.aistudio }
 
 export { inject } from './inject'
 export { Icon }

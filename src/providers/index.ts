@@ -4,6 +4,7 @@ import * as gemini from './gemini'
 import * as grok from './grok'
 import * as perplexity from './perplexity'
 import * as aistudio from './aistudio'
+import { APP_CONFIG } from '@/config'
 
 import type { ProviderMeta, ProviderInject, Provider } from './types'
 export type { ProviderMeta, ProviderInject, Provider }
@@ -30,7 +31,7 @@ export const providerIcons = Object.fromEntries(
 )
 
 // Default active providers
-export const DEFAULT_ACTIVE_PROVIDERS = ['chatgpt', 'claude', 'gemini', 'grok']
+export const DEFAULT_ACTIVE_PROVIDERS = [...APP_CONFIG.providers.defaultActiveKeys]
 
 // Re-export each provider
 export { chatgpt, claude, gemini, grok, perplexity, aistudio }

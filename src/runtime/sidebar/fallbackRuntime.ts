@@ -1,22 +1,16 @@
 import type { AppConfig, PaneCount, SidebarRuntime } from './types';
+import { APP_CONFIG } from '@/config';
 
 const fallbackConfig: AppConfig = {
   sidebar: {
-    expanded_width: 280,
-    collapsed_width: 48,
+    expanded_width: APP_CONFIG.layout.sidebar.defaultExpandedWidth,
+    collapsed_width: APP_CONFIG.layout.sidebar.defaultCollapsedWidth,
   },
   defaults: {
-    pane_count: 2,
-    providers: ['chatgpt', 'claude'],
+    pane_count: APP_CONFIG.layout.pane.defaultCount,
+    providers: [...APP_CONFIG.providers.defaultPaneKeys],
   },
-  providers: [
-    { key: 'chatgpt', name: 'ChatGPT', url: 'https://chatgpt.com/' },
-    { key: 'claude', name: 'Claude', url: 'https://claude.ai/' },
-    { key: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/' },
-    { key: 'grok', name: 'Grok', url: 'https://grok.com/' },
-    { key: 'perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai/' },
-    { key: 'aistudio', name: 'AI Studio', url: 'https://aistudio.google.com/prompts/new_chat' },
-  ],
+  providers: APP_CONFIG.providers.catalog.map((provider) => ({ ...provider })),
 };
 
 export function createFallbackRuntime(): SidebarRuntime {

@@ -6,6 +6,7 @@ import { BaseWindow, type Event, type Input, WebContents, WebContentsView } from
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
+import { APP_CONFIG } from '../../src/config/app.js';
 import { calculateLayout } from './geometry.js';
 import {
   buildPromptDraftSyncEvalScript,
@@ -74,14 +75,14 @@ const injectRuntimePath = resolveFirstExistingPath([
   join(runtimeDir, '..', '..', 'dist-electron', 'inject.js'),
 ]);
 
-const QUICK_PROMPT_PASSTHROUGH_MODE = true;
-const QUICK_PROMPT_MAX_WIDTH = 560;
-const QUICK_PROMPT_MIN_WIDTH = 280;
-const QUICK_PROMPT_DEFAULT_HEIGHT = 74;
-const QUICK_PROMPT_MIN_HEIGHT = 66;
-const QUICK_PROMPT_MAX_HEIGHT = 320;
-const QUICK_PROMPT_VIEWPORT_PADDING = 16;
-const SIDEBAR_TOGGLE_SHORTCUT_EVENT = 'lazyllm:shortcut-toggle-sidebar';
+const QUICK_PROMPT_PASSTHROUGH_MODE = APP_CONFIG.layout.quickPrompt.passthroughMode;
+const QUICK_PROMPT_MAX_WIDTH = APP_CONFIG.layout.quickPrompt.maxWidth;
+const QUICK_PROMPT_MIN_WIDTH = APP_CONFIG.layout.quickPrompt.minWidth;
+const QUICK_PROMPT_DEFAULT_HEIGHT = APP_CONFIG.layout.quickPrompt.defaultHeight;
+const QUICK_PROMPT_MIN_HEIGHT = APP_CONFIG.layout.quickPrompt.minHeight;
+const QUICK_PROMPT_MAX_HEIGHT = APP_CONFIG.layout.quickPrompt.maxHeight;
+const QUICK_PROMPT_VIEWPORT_PADDING = APP_CONFIG.layout.quickPrompt.viewportPadding;
+const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 
 interface PaneView {
   view: WebContentsView;
@@ -106,7 +107,7 @@ export class ViewManager {
   private currentSidebarWidth: number;
   private quickPromptVisible = false;
   private quickPromptReady = false;
-  private quickPromptHeight = QUICK_PROMPT_DEFAULT_HEIGHT;
+  private quickPromptHeight: number = QUICK_PROMPT_DEFAULT_HEIGHT;
   private providers: Map<string, ProviderMeta>;
   private injectRuntimeScript: string | null = null;
 

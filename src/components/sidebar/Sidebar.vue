@@ -4,19 +4,20 @@ import PaneSelector from './PaneSelector.vue'
 import ProviderList from './ProviderList.vue'
 import PromptComposer from './PromptComposer.vue'
 import { MAX_PANES, SIDEBAR_KEY, type PaneCount, type SidebarContext } from './context'
+import { APP_CONFIG } from '@/config'
 import { DEFAULT_ACTIVE_PROVIDERS } from '@/providers'
 import { getSidebarRuntime } from '@/runtime/sidebar'
 
 const runtime = getSidebarRuntime()
-const SIDEBAR_TOGGLE_SHORTCUT_EVENT = 'lazyllm:shortcut-toggle-sidebar'
+const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent
 
 const collapsed = ref(false)
-const paneCount = ref<PaneCount>(2)
+const paneCount = ref<PaneCount>(APP_CONFIG.layout.pane.defaultCount as PaneCount)
 const activeProviders = ref<string[]>([...DEFAULT_ACTIVE_PROVIDERS])
 
 // Sidebar width from config (loaded on mount)
-const expandedWidth = ref(280)
-const collapsedWidth = ref(48)
+const expandedWidth = ref<number>(APP_CONFIG.layout.sidebar.defaultExpandedWidth)
+const collapsedWidth = ref<number>(APP_CONFIG.layout.sidebar.defaultCollapsedWidth)
 
 const configuredSidebarWidth = computed(() =>
   collapsed.value ? collapsedWidth.value : expandedWidth.value
@@ -24,7 +25,10 @@ const configuredSidebarWidth = computed(() =>
 const sidebarWidth = computed(() => `${configuredSidebarWidth.value}px`)
 
 const normalizePaneCount = (count: number): PaneCount => {
-  const normalized = Math.min(MAX_PANES, Math.max(1, Math.floor(count)))
+  const normalized = Math.min(
+    MAX_PANES,
+    Math.max(APP_CONFIG.layout.pane.minCount, Math.floor(count))
+  )
   return normalized as PaneCount
 }
 

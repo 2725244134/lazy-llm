@@ -2,18 +2,23 @@
  * Quick Prompt client-side JavaScript
  */
 
+import { APP_CONFIG } from '../../../src/config/app.js';
+
+const quickPromptConfig = APP_CONFIG.layout.quickPrompt;
+const interactionConfig = APP_CONFIG.interaction;
+
 export const QUICK_PROMPT_SCRIPT = `
 const input = document.getElementById('quickPromptInput');
 const panel = document.querySelector('[data-testid="quick-prompt-overlay"]');
 let isSending = false;
 let resizeRaf = 0;
 let lastResizeHeight = 0;
-const MIN_INPUT_HEIGHT = 44;
-const MAX_INPUT_HEIGHT = 240;
-const DEFAULT_VIEW_HEIGHT = 74;
-const PANEL_HEIGHT_SAFETY_GAP = 2;
-const DRAFT_SYNC_DEBOUNCE_MS = 90;
-const SEND_CLEAR_SYNC_GUARD_MS = 650;
+const MIN_INPUT_HEIGHT = ${quickPromptConfig.inputMinHeight};
+const MAX_INPUT_HEIGHT = ${quickPromptConfig.inputMaxHeight};
+const DEFAULT_VIEW_HEIGHT = ${quickPromptConfig.defaultHeight};
+const PANEL_HEIGHT_SAFETY_GAP = ${quickPromptConfig.panelHeightSafetyGap};
+const DRAFT_SYNC_DEBOUNCE_MS = ${interactionConfig.draftSync.debounceMs};
+const SEND_CLEAR_SYNC_GUARD_MS = ${interactionConfig.draftSync.sendClearGuardMs};
 let pendingViewHeight = DEFAULT_VIEW_HEIGHT;
 let draftSyncTimer = 0;
 let draftSyncInFlight = false;

@@ -1,6 +1,7 @@
 import type { InjectionKey, Ref } from 'vue';
+import { APP_CONFIG } from '@/config';
 
-export const MAX_PANES = 4 as const;
+export const MAX_PANES = APP_CONFIG.layout.pane.maxCount;
 export type PaneCount = 1 | 2 | 3 | 4;
 
 export interface SidebarContext {

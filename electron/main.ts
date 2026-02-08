@@ -1,5 +1,6 @@
 import { app, BaseWindow, ipcMain } from 'electron';
 import { IPC_CHANNELS } from './ipc/contracts.js';
+import { APP_CONFIG } from '../src/config/app.js';
 import type {
   PaneCountRequest,
   PaneUpdateRequest,
@@ -65,19 +66,25 @@ function createWindow() {
 // Input validation helpers
 function validatePaneCount(count: unknown): PaneCount {
   if (typeof count !== 'number' || !Number.isInteger(count)) {
-    return 2;
+    return APP_CONFIG.layout.pane.defaultCount as PaneCount;
   }
-  if (count < 1) return 1;
-  if (count > 4) return 4;
+  if (count < APP_CONFIG.layout.pane.minCount) {
+    return APP_CONFIG.layout.pane.minCount as PaneCount;
+  }
+  if (count > APP_CONFIG.layout.pane.maxCount) {
+    return APP_CONFIG.layout.pane.maxCount as PaneCount;
+  }
   return count as PaneCount;
 }
 
 function validateSidebarWidth(width: unknown): number {
   if (typeof width !== 'number' || !Number.isFinite(width)) {
-    return 280;
+    return APP_CONFIG.layout.sidebar.defaultExpandedWidth;
   }
-  // Clamp to reasonable range
-  return Math.max(48, Math.min(500, Math.floor(width)));
+  return Math.max(
+    APP_CONFIG.layout.sidebar.minExpandedWidth,
+    Math.min(APP_CONFIG.layout.sidebar.maxExpandedWidth, Math.floor(width))
+  );
 }
 
 function validatePaneIndex(index: unknown, maxIndex: number): number | null {

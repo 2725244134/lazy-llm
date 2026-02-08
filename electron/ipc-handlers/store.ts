@@ -2,6 +2,7 @@ import Store from 'electron-store';
 import pkg from 'node-machine-id';
 const { machineIdSync } = pkg;
 import type { AppConfig } from '../ipc/contracts.js';
+import { APP_CONFIG } from '../../src/config/app.js';
 import { DEFAULT_CONFIG, normalizeConfig } from './configNormalization.js';
 
 // Machine-derived encryption key (not hardcoded)
@@ -18,8 +19,8 @@ interface StoreSchema {
 const defaults: StoreSchema = {
   config: DEFAULT_CONFIG,
   session: {
-    lastPaneCount: 2,
-    lastProviders: ['chatgpt', 'claude'],
+    lastPaneCount: APP_CONFIG.layout.pane.defaultCount,
+    lastProviders: [...APP_CONFIG.providers.defaultPaneKeys],
   },
 };
 

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { SIDEBAR_KEY } from './context'
+import { APP_CONFIG } from '@/config'
 
 const sidebar = inject(SIDEBAR_KEY)!
 
@@ -8,10 +9,10 @@ const text = ref('')
 const isLoading = ref(false)
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const trimmedText = computed(() => text.value.trim())
-const MIN_TEXTAREA_HEIGHT = 124
-const MAX_TEXTAREA_HEIGHT = 280
-const DRAFT_SYNC_DEBOUNCE_MS = 90
-const SEND_CLEAR_SYNC_GUARD_MS = 650
+const MIN_TEXTAREA_HEIGHT = APP_CONFIG.layout.promptComposer.minTextareaHeight
+const MAX_TEXTAREA_HEIGHT = APP_CONFIG.layout.promptComposer.maxTextareaHeight
+const DRAFT_SYNC_DEBOUNCE_MS = APP_CONFIG.interaction.draftSync.debounceMs
+const SEND_CLEAR_SYNC_GUARD_MS = APP_CONFIG.interaction.draftSync.sendClearGuardMs
 
 let draftSyncTimer: ReturnType<typeof setTimeout> | null = null
 let draftSyncInFlight = false
