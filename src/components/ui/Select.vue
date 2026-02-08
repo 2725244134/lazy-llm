@@ -154,6 +154,7 @@ onUnmounted(() => {
 }
 
 .trigger-icon :deep(svg) {
+  display: block;
   width: 24px;
   height: 24px;
 }
@@ -235,9 +236,10 @@ onUnmounted(() => {
 }
 
 .item-icon :deep(svg) {
+  display: block;
   width: 24px;
   height: 24px;
-  opacity: 0.85;
+  opacity: 1;
 }
 
 .item-label {

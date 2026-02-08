@@ -14,7 +14,7 @@ const QUICK_PROMPT_CSS_VARS = renderCssVariableBlock(
 
 export const QUICK_PROMPT_STYLES = `
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   ${QUICK_PROMPT_CSS_VARS}
 }
 

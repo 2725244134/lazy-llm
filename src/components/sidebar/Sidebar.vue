@@ -518,30 +518,6 @@ provide(SIDEBAR_KEY, sidebarContext)
   gap: 6px;
 }
 
-.sidebar.is-compact :deep(.trigger-icon),
-.sidebar.is-compact :deep(.item-icon) {
-  width: 20px;
-  height: 20px;
-}
-
-.sidebar.is-tight :deep(.trigger-icon),
-.sidebar.is-tight :deep(.item-icon) {
-  width: 18px;
-  height: 18px;
-}
-
-.sidebar.is-compact :deep(.trigger-icon svg),
-.sidebar.is-compact :deep(.item-icon svg) {
-  width: 20px;
-  height: 20px;
-}
-
-.sidebar.is-tight :deep(.trigger-icon svg),
-.sidebar.is-tight :deep(.item-icon svg) {
-  width: 18px;
-  height: 18px;
-}
-
 .sidebar.is-compact :deep(.dropdown-item) {
   gap: 8px;
   padding: 8px;
