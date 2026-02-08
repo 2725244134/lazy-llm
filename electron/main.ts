@@ -53,7 +53,7 @@ function createWindow() {
   viewManager.initSidebar();
 
   // Set initial pane count from config
-  const initialPaneCount = validatePaneCount(settings.config.defaults.pane_count);
+  const initialPaneCount = validatePaneCount(settings.config.provider.pane_count);
   viewManager.setPaneCount(initialPaneCount);
 
   // Update layout on window resize

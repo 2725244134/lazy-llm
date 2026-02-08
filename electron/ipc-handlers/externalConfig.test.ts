@@ -45,14 +45,17 @@ describe('externalConfig', () => {
 
     const template = JSON.parse(readFileSync(configPath, 'utf8'));
     expect(template).toEqual({
+      provider: {
+        pane_count: 'default',
+        panes: 'default',
+      },
       sidebar: {
         expanded_width: 'default',
       },
-      defaults: {
-        pane_count: 'default',
-        providers: 'default',
+      quick_prompt: {
+        default_height: 'default',
       },
-      runtime: {
+      webview: {
         zoom: {
           pane_factor: 'default',
           sidebar_factor: 'default',
@@ -65,14 +68,17 @@ describe('externalConfig', () => {
 
     const concreteDefaults = JSON.parse(readFileSync(defaultConfigPath, 'utf8'));
     expect(concreteDefaults).toEqual({
+      provider: {
+        pane_count: paneCount,
+        panes: providers,
+      },
       sidebar: {
         expanded_width: APP_CONFIG.layout.sidebar.defaultExpandedWidth,
       },
-      defaults: {
-        pane_count: paneCount,
-        providers,
+      quick_prompt: {
+        default_height: APP_CONFIG.layout.quickPrompt.defaultHeight,
       },
-      runtime: {
+      webview: {
         zoom: {
           pane_factor: APP_CONFIG.runtime.zoom.paneDefaultFactor,
           sidebar_factor: APP_CONFIG.runtime.zoom.sidebarDefaultFactor,
@@ -88,33 +94,37 @@ describe('externalConfig', () => {
 
   it('merges supported external overrides into app config', () => {
     const externalConfig: ExternalConfigFile = {
+      provider: { pane_count: 4, panes: ['claude', 'chatgpt', 'gemini', 'grok'] },
       sidebar: { expanded_width: 260 },
-      defaults: { pane_count: 4, providers: ['claude', 'chatgpt', 'gemini', 'grok'] },
+      quick_prompt: { default_height: 200 },
     };
 
     const merged = mergeAppConfigWithExternal(DEFAULT_CONFIG, externalConfig);
 
     expect(merged.sidebar.expanded_width).toBe(260);
-    expect(merged.defaults.pane_count).toBe(4);
-    expect(merged.defaults.providers).toEqual(['claude', 'chatgpt', 'gemini', 'grok']);
+    expect(merged.provider.pane_count).toBe(4);
+    expect(merged.provider.panes).toEqual(['claude', 'chatgpt', 'gemini', 'grok']);
+    expect(merged.quick_prompt.default_height).toBe(200);
   });
 
   it('treats default sentinel as no app config override', () => {
     const externalConfig: ExternalConfigFile = {
+      provider: { pane_count: 'default', panes: 'default' },
       sidebar: { expanded_width: 'default' },
-      defaults: { pane_count: 'default', providers: 'default' },
+      quick_prompt: { default_height: 'default' },
     };
 
     const merged = mergeAppConfigWithExternal(DEFAULT_CONFIG, externalConfig);
 
     expect(merged.sidebar.expanded_width).toBe(DEFAULT_CONFIG.sidebar.expanded_width);
-    expect(merged.defaults.pane_count).toBe(DEFAULT_CONFIG.defaults.pane_count);
-    expect(merged.defaults.providers).toEqual(DEFAULT_CONFIG.defaults.providers);
+    expect(merged.provider.pane_count).toBe(DEFAULT_CONFIG.provider.pane_count);
+    expect(merged.provider.panes).toEqual(DEFAULT_CONFIG.provider.panes);
+    expect(merged.quick_prompt.default_height).toBe(DEFAULT_CONFIG.quick_prompt.default_height);
   });
 
   it('merges runtime zoom using external values and clamps bounds', () => {
     const prefs = mergeRuntimePreferencesWithExternal(DEFAULT_RUNTIME_PREFERENCES, {
-      runtime: {
+      webview: {
         zoom: {
           pane_factor: 99,
           sidebar_factor: 0.1,
@@ -132,7 +142,7 @@ describe('externalConfig', () => {
       sidebarZoomFactor: 1.1,
     };
     const merged = mergeRuntimePreferencesWithExternal(base, {
-      runtime: {
+      webview: {
         zoom: {
           pane_factor: 0.8,
         },
@@ -150,7 +160,7 @@ describe('externalConfig', () => {
         sidebarZoomFactor: 1.07,
       },
       {
-        runtime: {
+        webview: {
           zoom: {
             pane_factor: 'default',
             sidebar_factor: 'default',

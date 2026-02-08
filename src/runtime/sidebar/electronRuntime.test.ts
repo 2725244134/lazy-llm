@@ -5,9 +5,9 @@ function stubWindowCouncil(overrides: Partial<Window['council']> = {}) {
   const council: Window['council'] = {
     healthCheck: vi.fn(),
     getConfig: vi.fn().mockResolvedValue({
+      provider: { pane_count: 2, panes: ['chatgpt', 'claude'], catalog: [] },
       sidebar: { expanded_width: 280, collapsed_width: 48 },
-      defaults: { pane_count: 2, providers: ['chatgpt', 'claude'] },
-      providers: [],
+      quick_prompt: { default_height: 74 },
     }),
     setPaneCount: vi.fn().mockResolvedValue({ success: true }),
     updateProvider: vi.fn().mockResolvedValue({ success: true, paneIndex: 0 }),

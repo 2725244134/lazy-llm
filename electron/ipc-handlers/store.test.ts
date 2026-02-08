@@ -62,9 +62,10 @@ describe('store config resolution priority', () => {
         ...DEFAULT_CONFIG.sidebar,
         expanded_width: 333,
       },
-      defaults: {
+      provider: {
+        ...DEFAULT_CONFIG.provider,
         pane_count: 3,
-        providers: ['grok', 'claude', 'gemini'],
+        panes: ['grok', 'claude', 'gemini'],
       },
     });
     storeModule.store.set('runtimePreferences', {
@@ -75,15 +76,15 @@ describe('store config resolution priority', () => {
     const externalConfigPath = externalConfigModule.ensureExternalConfigFile();
     writeFileSync(
       externalConfigPath,
-      `${JSON.stringify({ sidebar: {}, defaults: {}, runtime: { zoom: {} } }, null, 2)}\n`,
+      `${JSON.stringify({ provider: {}, sidebar: {}, quick_prompt: {}, webview: { zoom: {} } }, null, 2)}\n`,
       'utf8'
     );
 
     const resolved = storeModule.getResolvedSettings();
 
     expect(resolved.config.sidebar.expanded_width).toBe(333);
-    expect(resolved.config.defaults.pane_count).toBe(3);
-    expect(resolved.config.defaults.providers).toEqual(['grok', 'claude', 'gemini']);
+    expect(resolved.config.provider.pane_count).toBe(3);
+    expect(resolved.config.provider.panes).toEqual(['grok', 'claude', 'gemini']);
     expect(resolved.runtimePreferences.paneZoomFactor).toBe(1.25);
     expect(resolved.runtimePreferences.sidebarZoomFactor).toBe(1.15);
   });
@@ -98,9 +99,10 @@ describe('store config resolution priority', () => {
         ...DEFAULT_CONFIG.sidebar,
         expanded_width: 280,
       },
-      defaults: {
+      provider: {
+        ...DEFAULT_CONFIG.provider,
         pane_count: 3,
-        providers: ['grok', 'claude', 'gemini'],
+        panes: ['grok', 'claude', 'gemini'],
       },
     });
     storeModule.store.set('runtimePreferences', {
@@ -113,9 +115,9 @@ describe('store config resolution priority', () => {
       externalConfigPath,
       `${JSON.stringify(
         {
+          provider: { panes: ['chatgpt', 'chatgpt', 'chatgpt'] },
           sidebar: { expanded_width: 220 },
-          defaults: { providers: ['chatgpt', 'chatgpt', 'chatgpt'] },
-          runtime: { zoom: { pane_factor: 0.9 } },
+          webview: { zoom: { pane_factor: 0.9 } },
         },
         null,
         2
@@ -126,8 +128,8 @@ describe('store config resolution priority', () => {
     const resolved = storeModule.getResolvedSettings();
 
     expect(resolved.config.sidebar.expanded_width).toBe(220);
-    expect(resolved.config.defaults.pane_count).toBe(3);
-    expect(resolved.config.defaults.providers).toEqual(['chatgpt', 'chatgpt', 'chatgpt']);
+    expect(resolved.config.provider.pane_count).toBe(3);
+    expect(resolved.config.provider.panes).toEqual(['chatgpt', 'chatgpt', 'chatgpt']);
     expect(resolved.runtimePreferences.paneZoomFactor).toBe(0.9);
     expect(resolved.runtimePreferences.sidebarZoomFactor).toBe(1.2);
   });

@@ -67,14 +67,17 @@ LazyLLM auto-creates plaintext config files at:
 
 ```json
 {
+  "provider": {
+    "pane_count": "default",
+    "panes": "default"
+  },
   "sidebar": {
     "expanded_width": "default"
   },
-  "defaults": {
-    "pane_count": "default",
-    "providers": "default"
+  "quick_prompt": {
+    "default_height": "default"
   },
-  "runtime": {
+  "webview": {
     "zoom": {
       "pane_factor": "default",
       "sidebar_factor": "default"
@@ -87,6 +90,7 @@ Notes:
 
 - Resolution priority is strict: external file (`3`) > encrypted store (`2`) > code defaults (`1`).
 - In `config.json`, both omitted fields and `"default"` are treated as "no override".
+- `provider.pane_count` and `provider.panes` define startup pane count/providers.
 - Sidebar exposes one effective width value: `sidebar.expanded_width`.
-- `defaults.pane_count` and `defaults.providers` define startup pane count/providers.
-- `runtime.zoom.pane_factor` and `runtime.zoom.sidebar_factor` control default zoom.
+- `quick_prompt.default_height` controls initial quick prompt height.
+- `webview.zoom.pane_factor` and `webview.zoom.sidebar_factor` control default zoom.

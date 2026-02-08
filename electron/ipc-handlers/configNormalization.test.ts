@@ -4,13 +4,15 @@ import {
   DEFAULT_CONFIG,
   normalizeConfig,
   normalizePaneCount,
+  normalizeQuickPromptHeight,
 } from './configNormalization';
+import { APP_CONFIG } from '../../src/config/app';
 
 describe('normalizePaneCount', () => {
   it('falls back to defaults for non-integer values', () => {
-    expect(normalizePaneCount(undefined)).toBe(DEFAULT_CONFIG.defaults.pane_count);
-    expect(normalizePaneCount(2.5)).toBe(DEFAULT_CONFIG.defaults.pane_count);
-    expect(normalizePaneCount('2')).toBe(DEFAULT_CONFIG.defaults.pane_count);
+    expect(normalizePaneCount(undefined)).toBe(DEFAULT_CONFIG.provider.pane_count);
+    expect(normalizePaneCount(2.5)).toBe(DEFAULT_CONFIG.provider.pane_count);
+    expect(normalizePaneCount('2')).toBe(DEFAULT_CONFIG.provider.pane_count);
   });
 
   it('clamps pane count into supported range', () => {
@@ -20,29 +22,37 @@ describe('normalizePaneCount', () => {
   });
 });
 
+describe('normalizeQuickPromptHeight', () => {
+  it('falls back to defaults for invalid values and clamps bounds', () => {
+    expect(normalizeQuickPromptHeight(undefined)).toBe(DEFAULT_CONFIG.quick_prompt.default_height);
+    expect(normalizeQuickPromptHeight(0)).toBe(66);
+    expect(normalizeQuickPromptHeight(999)).toBe(320);
+  });
+});
+
 describe('normalizeConfig', () => {
   it('normalizes pane providers and replaces invalid provider keys', () => {
     const normalized = normalizeConfig({
-      defaults: {
+      provider: {
         pane_count: 3,
-        providers: ['gemini', 'unknown-provider', 'claude'],
+        panes: ['gemini', 'unknown-provider', 'claude'],
       },
     });
 
-    expect(normalized.defaults.pane_count).toBe(3);
-    expect(normalized.defaults.providers).toEqual(['gemini', 'chatgpt', 'claude']);
-    expect(normalized.providers).toEqual(CANONICAL_PROVIDERS);
+    expect(normalized.provider.pane_count).toBe(3);
+    expect(normalized.provider.panes).toEqual(['gemini', 'chatgpt', 'claude']);
+    expect(normalized.provider.catalog).toEqual(CANONICAL_PROVIDERS);
   });
 
   it('pads missing providers using fallback provider', () => {
     const normalized = normalizeConfig({
-      defaults: {
+      provider: {
         pane_count: 4,
-        providers: ['claude'],
+        panes: ['claude'],
       },
     });
 
-    expect(normalized.defaults.providers).toEqual(['claude', 'chatgpt', 'chatgpt', 'chatgpt']);
+    expect(normalized.provider.panes).toEqual(['claude', 'chatgpt', 'chatgpt', 'chatgpt']);
   });
 
   it('clamps expanded width and keeps collapsed width fixed', () => {
@@ -51,9 +61,9 @@ describe('normalizeConfig', () => {
         expanded_width: 30,
         collapsed_width: 120,
       },
-      defaults: {
+      provider: {
         pane_count: 2,
-        providers: ['chatgpt', 'claude'],
+        panes: ['chatgpt', 'claude'],
       },
     });
 
@@ -65,9 +75,9 @@ describe('normalizeConfig', () => {
         expanded_width: 280,
         collapsed_width: 24,
       },
-      defaults: {
+      provider: {
         pane_count: 2,
-        providers: ['chatgpt', 'claude'],
+        panes: ['chatgpt', 'claude'],
       },
     });
 
@@ -77,11 +87,17 @@ describe('normalizeConfig', () => {
 
   it('handles missing config by returning defaults and canonical providers', () => {
     const normalized = normalizeConfig(undefined);
+    const fallbackProvider = APP_CONFIG.providers.defaultPaneKeys[0] ?? 'chatgpt';
+    const expectedPanes = Array.from(
+      { length: APP_CONFIG.layout.pane.defaultCount },
+      (_, paneIndex) => APP_CONFIG.providers.defaultPaneKeys[paneIndex] ?? fallbackProvider
+    );
 
-    expect(normalized.defaults).toEqual({
-      pane_count: 3,
-      providers: ['chatgpt', 'chatgpt', 'chatgpt'],
+    expect(normalized.provider).toEqual({
+      pane_count: APP_CONFIG.layout.pane.defaultCount,
+      panes: expectedPanes,
+      catalog: CANONICAL_PROVIDERS,
     });
-    expect(normalized.providers).toEqual(CANONICAL_PROVIDERS);
+    expect(normalized.quick_prompt.default_height).toBe(APP_CONFIG.layout.quickPrompt.defaultHeight);
   });
 });

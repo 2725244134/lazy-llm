@@ -4,7 +4,7 @@ const { machineIdSync } = pkg;
 import type { AppConfig } from '../ipc/contracts.js';
 import { APP_CONFIG } from '../../src/config/app.js';
 import { DEFAULT_CONFIG, normalizeConfig } from './configNormalization.js';
-import { padProviderSequence } from './providerConfig.js';
+import { buildDefaultPaneProviders, padProviderSequence } from './providerConfig.js';
 import {
   DEFAULT_RUNTIME_PREFERENCES,
   mergeRuntimePreferencesWithExternal,
@@ -31,7 +31,7 @@ const defaults: StoreSchema = {
   runtimePreferences: DEFAULT_RUNTIME_PREFERENCES,
   session: {
     lastPaneCount: APP_CONFIG.layout.pane.defaultCount,
-    lastProviders: [...APP_CONFIG.providers.defaultPaneKeys],
+    lastProviders: buildDefaultPaneProviders(APP_CONFIG.layout.pane.defaultCount),
   },
 };
 
@@ -94,14 +94,14 @@ export function setSession(session: Partial<StoreSchema['session']>) {
 
 export function setDefaultPaneCount(paneCount: number): AppConfig {
   const current = getStoredNormalizedConfig();
-  const nextProviders = padProviderSequence(current.defaults.providers, paneCount);
+  const nextProviders = padProviderSequence(current.provider.panes, paneCount);
 
   const nextConfig = normalizeConfig({
     ...current,
-    defaults: {
-      ...current.defaults,
+    provider: {
+      ...current.provider,
       pane_count: paneCount,
-      providers: nextProviders,
+      panes: nextProviders,
     },
   });
 
@@ -111,7 +111,7 @@ export function setDefaultPaneCount(paneCount: number): AppConfig {
 
 export function setDefaultProvider(paneIndex: number, providerKey: string): AppConfig {
   const current = getStoredNormalizedConfig();
-  const nextProviders = padProviderSequence(current.defaults.providers, current.defaults.pane_count);
+  const nextProviders = padProviderSequence(current.provider.panes, current.provider.pane_count);
 
   if (paneIndex >= 0 && paneIndex < nextProviders.length) {
     nextProviders[paneIndex] = providerKey;
@@ -119,9 +119,9 @@ export function setDefaultProvider(paneIndex: number, providerKey: string): AppC
 
   const nextConfig = normalizeConfig({
     ...current,
-    defaults: {
-      ...current.defaults,
-      providers: nextProviders,
+    provider: {
+      ...current.provider,
+      panes: nextProviders,
     },
   });
 

@@ -120,10 +120,10 @@ onMounted(async () => {
     const config = await runtime.getConfig()
     // Load sidebar width from config
     expandedWidth.value = config.sidebar.expanded_width
-    if (config.defaults.providers.length > 0) {
-      activeProviders.value = [...config.defaults.providers]
+    if (config.provider.panes.length > 0) {
+      activeProviders.value = [...config.provider.panes]
     }
-    paneCount.value = normalizePaneCount(config.defaults.pane_count)
+    paneCount.value = normalizePaneCount(config.provider.pane_count)
   } catch (e) {
     console.error('[Sidebar] loadConfig error:', e)
   }

@@ -1,16 +1,25 @@
 import type { AppConfig, PaneCount, SidebarRuntime } from './types';
 import { APP_CONFIG } from '@/config';
 
+const defaultPaneCount = APP_CONFIG.layout.pane.defaultCount;
+const fallbackProvider = APP_CONFIG.providers.defaultPaneKeys[0] ?? 'chatgpt';
+const defaultPanes = Array.from({ length: defaultPaneCount }, (_, paneIndex) => {
+  return APP_CONFIG.providers.defaultPaneKeys[paneIndex] ?? fallbackProvider;
+});
+
 const fallbackConfig: AppConfig = {
+  provider: {
+    pane_count: defaultPaneCount,
+    panes: defaultPanes,
+    catalog: APP_CONFIG.providers.catalog.map((provider) => ({ ...provider })),
+  },
   sidebar: {
     expanded_width: APP_CONFIG.layout.sidebar.defaultExpandedWidth,
     collapsed_width: APP_CONFIG.layout.sidebar.defaultCollapsedWidth,
   },
-  defaults: {
-    pane_count: APP_CONFIG.layout.pane.defaultCount,
-    providers: [...APP_CONFIG.providers.defaultPaneKeys],
+  quick_prompt: {
+    default_height: APP_CONFIG.layout.quickPrompt.defaultHeight,
   },
-  providers: APP_CONFIG.providers.catalog.map((provider) => ({ ...provider })),
 };
 
 export function createFallbackRuntime(): SidebarRuntime {

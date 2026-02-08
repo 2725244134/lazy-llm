@@ -6,14 +6,17 @@ import { APP_CONFIG } from '../../src/config/app.js';
 import { buildDefaultPaneProviders } from './providerConfig.js';
 
 export interface ExternalConfigFile {
+  provider?: {
+    pane_count?: number | 'default';
+    panes?: string[] | 'default';
+  };
   sidebar?: {
     expanded_width?: number | 'default';
   };
-  defaults?: {
-    pane_count?: number | 'default';
-    providers?: string[] | 'default';
+  quick_prompt?: {
+    default_height?: number | 'default';
   };
-  runtime?: {
+  webview?: {
     zoom?: {
       pane_factor?: number | 'default';
       sidebar_factor?: number | 'default';
@@ -60,17 +63,20 @@ export function getExternalDefaultConfigPath(): string {
 
 function buildConcreteExternalDefaults(): ExternalConfigFile {
   const paneCount = APP_CONFIG.layout.pane.defaultCount;
-  const providers = buildDefaultPaneProviders(paneCount);
+  const panes = buildDefaultPaneProviders(paneCount);
 
   return {
+    provider: {
+      pane_count: paneCount,
+      panes,
+    },
     sidebar: {
       expanded_width: APP_CONFIG.layout.sidebar.defaultExpandedWidth,
     },
-    defaults: {
-      pane_count: paneCount,
-      providers,
+    quick_prompt: {
+      default_height: APP_CONFIG.layout.quickPrompt.defaultHeight,
     },
-    runtime: {
+    webview: {
       zoom: {
         pane_factor: APP_CONFIG.runtime.zoom.paneDefaultFactor,
         sidebar_factor: APP_CONFIG.runtime.zoom.sidebarDefaultFactor,
@@ -81,14 +87,17 @@ function buildConcreteExternalDefaults(): ExternalConfigFile {
 
 export function buildDefaultExternalConfig(): ExternalConfigFile {
   return {
+    provider: {
+      pane_count: DEFAULT_SENTINEL,
+      panes: DEFAULT_SENTINEL,
+    },
     sidebar: {
       expanded_width: DEFAULT_SENTINEL,
     },
-    defaults: {
-      pane_count: DEFAULT_SENTINEL,
-      providers: DEFAULT_SENTINEL,
+    quick_prompt: {
+      default_height: DEFAULT_SENTINEL,
     },
-    runtime: {
+    webview: {
       zoom: {
         pane_factor: DEFAULT_SENTINEL,
         sidebar_factor: DEFAULT_SENTINEL,
@@ -163,20 +172,25 @@ export function mergeAppConfigWithExternal(
     return baseConfig;
   }
 
+  const paneCount = resolveNumberOverride(externalConfig.provider?.pane_count);
+  const panes = resolveProvidersOverride(externalConfig.provider?.panes);
   const expandedWidth = resolveNumberOverride(externalConfig.sidebar?.expanded_width);
-  const paneCount = resolveNumberOverride(externalConfig.defaults?.pane_count);
-  const providers = resolveProvidersOverride(externalConfig.defaults?.providers);
+  const quickPromptDefaultHeight = resolveNumberOverride(externalConfig.quick_prompt?.default_height);
 
   return {
     ...baseConfig,
+    provider: {
+      ...baseConfig.provider,
+      pane_count: paneCount ?? baseConfig.provider.pane_count,
+      panes: panes ?? baseConfig.provider.panes,
+    },
     sidebar: {
       ...baseConfig.sidebar,
       expanded_width: expandedWidth ?? baseConfig.sidebar.expanded_width,
     },
-    defaults: {
-      ...baseConfig.defaults,
-      pane_count: paneCount ?? baseConfig.defaults.pane_count,
-      providers: providers ?? baseConfig.defaults.providers,
+    quick_prompt: {
+      ...baseConfig.quick_prompt,
+      default_height: quickPromptDefaultHeight ?? baseConfig.quick_prompt.default_height,
     },
   };
 }
@@ -205,8 +219,8 @@ export function mergeRuntimePreferencesWithExternal(
   baseRuntimePreferences: RuntimePreferences,
   externalConfig: ExternalConfigFile | null | undefined
 ): RuntimePreferences {
-  const paneFactor = resolveNumberOverride(externalConfig?.runtime?.zoom?.pane_factor);
-  const sidebarFactor = resolveNumberOverride(externalConfig?.runtime?.zoom?.sidebar_factor);
+  const paneFactor = resolveNumberOverride(externalConfig?.webview?.zoom?.pane_factor);
+  const sidebarFactor = resolveNumberOverride(externalConfig?.webview?.zoom?.sidebar_factor);
 
   return {
     paneZoomFactor: normalizeZoomFactor(

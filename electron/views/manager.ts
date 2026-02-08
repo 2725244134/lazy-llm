@@ -78,7 +78,6 @@ const injectRuntimePath = resolveFirstExistingPath([
 const QUICK_PROMPT_PASSTHROUGH_MODE = APP_CONFIG.layout.quickPrompt.passthroughMode;
 const QUICK_PROMPT_MAX_WIDTH = APP_CONFIG.layout.quickPrompt.maxWidth;
 const QUICK_PROMPT_MIN_WIDTH = APP_CONFIG.layout.quickPrompt.minWidth;
-const QUICK_PROMPT_DEFAULT_HEIGHT = APP_CONFIG.layout.quickPrompt.defaultHeight;
 const QUICK_PROMPT_MIN_HEIGHT = APP_CONFIG.layout.quickPrompt.minHeight;
 const QUICK_PROMPT_MAX_HEIGHT = APP_CONFIG.layout.quickPrompt.maxHeight;
 const QUICK_PROMPT_VIEWPORT_PADDING = APP_CONFIG.layout.quickPrompt.viewportPadding;
@@ -113,7 +112,8 @@ export class ViewManager {
   private currentSidebarWidth: number;
   private quickPromptVisible = false;
   private quickPromptReady = false;
-  private quickPromptHeight: number = QUICK_PROMPT_DEFAULT_HEIGHT;
+  private quickPromptDefaultHeight: number;
+  private quickPromptHeight: number;
   private providers: Map<string, ProviderMeta>;
   private injectRuntimeScript: string | null = null;
   private paneZoomFactor: number;
@@ -123,12 +123,14 @@ export class ViewManager {
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
     this.currentSidebarWidth = options.config.sidebar.expanded_width;
-    this.providers = new Map(options.config.providers.map(p => [p.key, p]));
+    this.providers = new Map(options.config.provider.catalog.map(p => [p.key, p]));
     this.paneZoomFactor = options.runtimePreferences.paneZoomFactor;
     this.sidebarZoomFactor = options.runtimePreferences.sidebarZoomFactor;
+    this.quickPromptDefaultHeight = options.config.quick_prompt.default_height;
+    this.quickPromptHeight = this.quickPromptDefaultHeight;
     this.defaultProviders = padProviderSequence(
-      options.config.defaults.providers,
-      options.config.defaults.pane_count
+      options.config.provider.panes,
+      options.config.provider.pane_count
     );
   }
 
@@ -305,7 +307,7 @@ export class ViewManager {
       return this.quickPromptVisible;
     }
 
-    this.quickPromptHeight = QUICK_PROMPT_DEFAULT_HEIGHT;
+    this.quickPromptHeight = this.quickPromptDefaultHeight;
     this.window.contentView.addChildView(this.quickPromptView);
     this.quickPromptView.setBounds(this.getQuickPromptBounds());
     this.quickPromptView.webContents.focus();
@@ -324,7 +326,7 @@ export class ViewManager {
     }
     this.window.contentView.removeChildView(this.quickPromptView);
     this.quickPromptVisible = false;
-    this.quickPromptHeight = QUICK_PROMPT_DEFAULT_HEIGHT;
+    this.quickPromptHeight = this.quickPromptDefaultHeight;
     this.focusSidebarIfAvailable();
     return this.quickPromptVisible;
   }

@@ -32,15 +32,18 @@ export interface HealthResponse {
 }
 
 export interface AppConfig {
+  provider: {
+    pane_count: number;
+    panes: string[];
+    catalog: ProviderMeta[];
+  };
   sidebar: {
     expanded_width: number;
     collapsed_width: number;
   };
-  defaults: {
-    pane_count: number;
-    providers: string[];
+  quick_prompt: {
+    default_height: number;
   };
-  providers: ProviderMeta[];
 }
 
 export interface ProviderMeta {
