@@ -54,28 +54,30 @@ lazy-llm/
 | `pane:updateProvider` | `{ paneIndex, providerKey }` | `{ success, paneIndex }` |
 | `prompt:send` | `{ text }` | `{ success, failures? }` |
 
-## User Config File
+## User Config Files
 
-LazyLLM auto-creates a plaintext config file at:
+LazyLLM auto-creates plaintext config files at:
 
-- Linux: `~/.config/lazy-llm/config.json`
-- Or `$XDG_CONFIG_HOME/lazy-llm/config.json` when `XDG_CONFIG_HOME` is set
+- Linux: `~/.config/lazy-llm/config.default.json` and `~/.config/lazy-llm/config.json`
+- Or `$XDG_CONFIG_HOME/lazy-llm/config.default.json` and `$XDG_CONFIG_HOME/lazy-llm/config.json` when `XDG_CONFIG_HOME` is set
 
-Supported fields:
+`config.default.json` contains concrete baseline values generated from code defaults.
+
+`config.json` is your override file. Use `"default"` to inherit lower-priority values:
 
 ```json
 {
   "sidebar": {
-    "expanded_width": 220
+    "expanded_width": "default"
   },
   "defaults": {
-    "pane_count": 3,
-    "providers": ["chatgpt", "claude", "gemini"]
+    "pane_count": "default",
+    "providers": "default"
   },
   "runtime": {
     "zoom": {
-      "pane_factor": 1.0,
-      "sidebar_factor": 1.0
+      "pane_factor": "default",
+      "sidebar_factor": "default"
     }
   }
 }
@@ -84,7 +86,7 @@ Supported fields:
 Notes:
 
 - Resolution priority is strict: external file (`3`) > encrypted store (`2`) > code defaults (`1`).
-- Omitted fields in `config.json` do not override lower-priority sources.
+- In `config.json`, both omitted fields and `"default"` are treated as "no override".
 - Sidebar exposes one effective width value: `sidebar.expanded_width`.
 - `defaults.pane_count` and `defaults.providers` define startup pane count/providers.
 - `runtime.zoom.pane_factor` and `runtime.zoom.sidebar_factor` control default zoom.

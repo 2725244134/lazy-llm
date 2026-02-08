@@ -6,6 +6,7 @@ import {
   DEFAULT_RUNTIME_PREFERENCES,
   ensureExternalConfigFile,
   getExternalConfigPath,
+  getExternalDefaultConfigPath,
   mergeRuntimePreferencesWithExternal,
   mergeAppConfigWithExternal,
   normalizeRuntimePreferences,
@@ -13,6 +14,7 @@ import {
   type ExternalConfigFile,
 } from './externalConfig';
 import { DEFAULT_CONFIG } from './configNormalization';
+import { APP_CONFIG } from '../../src/config/app';
 
 describe('externalConfig', () => {
   let previousXdgConfigHome: string | undefined;
@@ -33,18 +35,57 @@ describe('externalConfig', () => {
     rmSync(tempConfigHome, { recursive: true, force: true });
   });
 
-  it('creates an external config file with defaults when missing', () => {
+  it('creates external config files with inherit template and concrete defaults', () => {
     const configPath = ensureExternalConfigFile();
+    const defaultConfigPath = getExternalDefaultConfigPath();
 
     expect(existsSync(configPath)).toBe(true);
-    const parsed = JSON.parse(readFileSync(configPath, 'utf8'));
-    expect(parsed).toEqual({
-      sidebar: {},
-      defaults: {},
+    expect(existsSync(defaultConfigPath)).toBe(true);
+
+    const template = JSON.parse(readFileSync(configPath, 'utf8'));
+    expect(template).toEqual({
+      sidebar: {
+        expanded_width: 'default',
+      },
+      defaults: {
+        pane_count: 'default',
+        providers: 'default',
+      },
       runtime: {
-        zoom: {},
+        zoom: {
+          pane_factor: 'default',
+          sidebar_factor: 'default',
+        },
       },
     });
+
+    const paneCount = APP_CONFIG.layout.pane.defaultCount;
+    const fallbackProvider = APP_CONFIG.providers.defaultPaneKeys[0] ?? 'chatgpt';
+    const providers = Array.from({ length: paneCount }, (_, paneIndex) => {
+      return APP_CONFIG.providers.defaultPaneKeys[paneIndex] ?? fallbackProvider;
+    });
+
+    const concreteDefaults = JSON.parse(readFileSync(defaultConfigPath, 'utf8'));
+    expect(concreteDefaults).toEqual({
+      sidebar: {
+        expanded_width: APP_CONFIG.layout.sidebar.defaultExpandedWidth,
+      },
+      defaults: {
+        pane_count: paneCount,
+        providers,
+      },
+      runtime: {
+        zoom: {
+          pane_factor: APP_CONFIG.runtime.zoom.paneDefaultFactor,
+          sidebar_factor: APP_CONFIG.runtime.zoom.sidebarDefaultFactor,
+        },
+      },
+    });
+
+    writeFileSync(defaultConfigPath, `${JSON.stringify({ sidebar: { expanded_width: 999 } }, null, 2)}\n`, 'utf8');
+    ensureExternalConfigFile();
+    const refreshedDefaults = JSON.parse(readFileSync(defaultConfigPath, 'utf8'));
+    expect(refreshedDefaults).toEqual(concreteDefaults);
   });
 
   it('merges supported external overrides into app config', () => {
@@ -58,6 +99,19 @@ describe('externalConfig', () => {
     expect(merged.sidebar.expanded_width).toBe(260);
     expect(merged.defaults.pane_count).toBe(4);
     expect(merged.defaults.providers).toEqual(['claude', 'chatgpt', 'gemini', 'grok']);
+  });
+
+  it('treats default sentinel as no app config override', () => {
+    const externalConfig: ExternalConfigFile = {
+      sidebar: { expanded_width: 'default' },
+      defaults: { pane_count: 'default', providers: 'default' },
+    };
+
+    const merged = mergeAppConfigWithExternal(DEFAULT_CONFIG, externalConfig);
+
+    expect(merged.sidebar.expanded_width).toBe(DEFAULT_CONFIG.sidebar.expanded_width);
+    expect(merged.defaults.pane_count).toBe(DEFAULT_CONFIG.defaults.pane_count);
+    expect(merged.defaults.providers).toEqual(DEFAULT_CONFIG.defaults.providers);
   });
 
   it('merges runtime zoom using external values and clamps bounds', () => {
@@ -89,6 +143,26 @@ describe('externalConfig', () => {
 
     expect(merged.paneZoomFactor).toBe(0.8);
     expect(merged.sidebarZoomFactor).toBe(1.1);
+  });
+
+  it('treats default sentinel as no runtime preference override', () => {
+    const merged = mergeRuntimePreferencesWithExternal(
+      {
+        paneZoomFactor: 1.18,
+        sidebarZoomFactor: 1.07,
+      },
+      {
+        runtime: {
+          zoom: {
+            pane_factor: 'default',
+            sidebar_factor: 'default',
+          },
+        },
+      }
+    );
+
+    expect(merged.paneZoomFactor).toBe(1.18);
+    expect(merged.sidebarZoomFactor).toBe(1.07);
   });
 
   it('normalizes stored runtime preferences with fallback', () => {
