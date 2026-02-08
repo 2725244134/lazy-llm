@@ -89,6 +89,7 @@ interface PaneView {
   paneIndex: number;
   providerKey: string;
   url: string;
+  cachedViews: Map<string, { view: WebContentsView; url: string }>;
 }
 
 function toFailureReason(error: unknown): string {
@@ -369,6 +370,53 @@ export class ViewManager {
     });
   }
 
+  private createPaneWebContentsView(paneIndex: number): WebContentsView {
+    const view = new WebContentsView({
+      webPreferences: {
+        preload: panePreloadPath,
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+        additionalArguments: [`--pane-index=${paneIndex}`],
+      },
+    });
+    this.attachGlobalShortcutHooks(view.webContents);
+    this.attachPaneRuntimePreferenceHooks(view.webContents);
+    this.applyPaneRuntimePreferences(view.webContents);
+    return view;
+  }
+
+  private removePaneViewFromContent(view: WebContentsView): void {
+    try {
+      this.window.contentView.removeChildView(view);
+    } catch {
+      // The view may be detached already when it is only kept in cache.
+    }
+  }
+
+  private closePane(pane: PaneView): void {
+    const uniqueViews = new Set<WebContentsView>();
+    for (const cached of pane.cachedViews.values()) {
+      uniqueViews.add(cached.view);
+    }
+    uniqueViews.add(pane.view);
+
+    for (const view of uniqueViews) {
+      this.removePaneViewFromContent(view);
+      if (!view.webContents.isDestroyed()) {
+        view.webContents.close();
+      }
+    }
+  }
+
+  private keepQuickPromptOnTop(): void {
+    if (!this.quickPromptVisible || !this.quickPromptView) {
+      return;
+    }
+    this.window.contentView.removeChildView(this.quickPromptView);
+    this.window.contentView.addChildView(this.quickPromptView);
+  }
+
   /**
    * Set pane count, creating or destroying WebContentsViews as needed
    */
@@ -379,8 +427,7 @@ export class ViewManager {
     // Remove excess panes
     while (this.paneViews.length > count) {
       const pane = this.paneViews.pop()!;
-      this.window.contentView.removeChildView(pane.view);
-      pane.view.webContents.close();
+      this.closePane(pane);
     }
 
     // Add missing panes
@@ -389,21 +436,9 @@ export class ViewManager {
       const providerKey = defaultProviders[paneIndex] || defaultProviders[0] || 'chatgpt';
       const provider = this.providers.get(providerKey);
       const url = provider?.url || 'about:blank';
-
-      const view = new WebContentsView({
-        webPreferences: {
-          preload: panePreloadPath,
-          contextIsolation: true,
-          nodeIntegration: false,
-          sandbox: true,
-          additionalArguments: [`--pane-index=${paneIndex}`],
-        },
-      });
+      const view = this.createPaneWebContentsView(paneIndex);
 
       this.window.contentView.addChildView(view);
-      this.attachGlobalShortcutHooks(view.webContents);
-      this.attachPaneRuntimePreferenceHooks(view.webContents);
-      this.applyPaneRuntimePreferences(view.webContents);
       view.webContents.loadURL(url);
 
       this.paneViews.push({
@@ -411,14 +446,12 @@ export class ViewManager {
         paneIndex,
         providerKey,
         url,
+        cachedViews: new Map([[providerKey, { view, url }]]),
       });
     }
 
     this.currentPaneCount = count;
-    if (this.quickPromptVisible && this.quickPromptView) {
-      this.window.contentView.removeChildView(this.quickPromptView);
-      this.window.contentView.addChildView(this.quickPromptView);
-    }
+    this.keepQuickPromptOnTop();
     this.updateLayout();
   }
 
@@ -438,10 +471,43 @@ export class ViewManager {
     }
 
     const pane = this.paneViews[paneIndex];
+    if (pane.providerKey === providerKey) {
+      return true;
+    }
+
+    const cachedViewEntry = pane.cachedViews.get(providerKey);
+    if (cachedViewEntry) {
+      if (cachedViewEntry.url !== provider.url) {
+        cachedViewEntry.url = provider.url;
+        this.applyPaneRuntimePreferences(cachedViewEntry.view.webContents);
+        cachedViewEntry.view.webContents.loadURL(provider.url);
+      }
+
+      if (pane.view !== cachedViewEntry.view) {
+        this.removePaneViewFromContent(pane.view);
+        this.window.contentView.addChildView(cachedViewEntry.view);
+      }
+
+      pane.view = cachedViewEntry.view;
+      pane.providerKey = providerKey;
+      pane.url = cachedViewEntry.url;
+      this.applyPaneRuntimePreferences(pane.view.webContents);
+      this.keepQuickPromptOnTop();
+      this.updateLayout();
+      return true;
+    }
+
+    const nextView = this.createPaneWebContentsView(paneIndex);
+    this.window.contentView.addChildView(nextView);
+    nextView.webContents.loadURL(provider.url);
+    pane.cachedViews.set(providerKey, { view: nextView, url: provider.url });
+
+    this.removePaneViewFromContent(pane.view);
+    pane.view = nextView;
     pane.providerKey = providerKey;
     pane.url = provider.url;
-    this.applyPaneRuntimePreferences(pane.view.webContents);
-    pane.view.webContents.loadURL(provider.url);
+    this.keepQuickPromptOnTop();
+    this.updateLayout();
 
     return true;
   }
@@ -627,8 +693,7 @@ export class ViewManager {
     // Close all pane webContents
     for (const pane of this.paneViews) {
       try {
-        this.window.contentView.removeChildView(pane.view);
-        pane.view.webContents.close();
+        this.closePane(pane);
       } catch (e) {
         console.error(`[ViewManager] Error closing pane ${pane.paneIndex}:`, e);
       }
