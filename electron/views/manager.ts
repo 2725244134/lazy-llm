@@ -17,7 +17,6 @@ import { buildQuickPromptDataUrl } from './quick-prompt/index.js';
 import {
   PANE_ACCEPT_LANGUAGES,
 } from './paneRuntimePreferences.js';
-import { getConfig } from '../ipc-handlers/store.js';
 import type { RuntimePreferences } from '../ipc-handlers/externalConfig.js';
 import type {
   AppConfig,
@@ -118,6 +117,7 @@ export class ViewManager {
   private injectRuntimeScript: string | null = null;
   private paneZoomFactor: number;
   private sidebarZoomFactor: number;
+  private defaultProviders: string[];
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -125,6 +125,7 @@ export class ViewManager {
     this.providers = new Map(options.config.providers.map(p => [p.key, p]));
     this.paneZoomFactor = options.runtimePreferences.paneZoomFactor;
     this.sidebarZoomFactor = options.runtimePreferences.sidebarZoomFactor;
+    this.defaultProviders = [...options.config.defaults.providers];
   }
 
   /**
@@ -427,8 +428,10 @@ export class ViewManager {
    * Set pane count, creating or destroying WebContentsViews as needed
    */
   setPaneCount(count: PaneCount): void {
-    const config = getConfig();
-    const defaultProviders = config.defaults.providers;
+    const fallbackProvider = this.defaultProviders[0] ?? 'chatgpt';
+    this.defaultProviders = Array.from({ length: count }, (_, paneIndex) => {
+      return this.defaultProviders[paneIndex] ?? fallbackProvider;
+    });
 
     // Remove excess panes
     while (this.paneViews.length > count) {
@@ -439,7 +442,7 @@ export class ViewManager {
     // Add missing panes
     while (this.paneViews.length < count) {
       const paneIndex = this.paneViews.length;
-      const providerKey = defaultProviders[paneIndex] || defaultProviders[0] || 'chatgpt';
+      const providerKey = this.defaultProviders[paneIndex] ?? fallbackProvider;
       const provider = this.providers.get(providerKey);
       const url = provider?.url || 'about:blank';
       const view = this.createPaneWebContentsView(paneIndex);
@@ -497,6 +500,7 @@ export class ViewManager {
       pane.view = cachedViewEntry.view;
       pane.providerKey = providerKey;
       pane.url = cachedViewEntry.url;
+      this.defaultProviders[paneIndex] = providerKey;
       this.applyPaneRuntimePreferences(pane.view.webContents);
       this.keepQuickPromptOnTop();
       this.updateLayout();
@@ -512,6 +516,7 @@ export class ViewManager {
     pane.view = nextView;
     pane.providerKey = providerKey;
     pane.url = provider.url;
+    this.defaultProviders[paneIndex] = providerKey;
     this.keepQuickPromptOnTop();
     this.updateLayout();
 
