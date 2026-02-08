@@ -1,37 +1,21 @@
 /**
  * Quick Prompt CSS styles
- * Style: Clear hierarchy + accessible contrast + compact spacing
  */
+
+import {
+  ACTIVE_THEME_PRESET,
+  getQuickPromptThemeVars,
+  renderCssVariableBlock,
+} from '../../../src/theme/palette.js';
+
+const QUICK_PROMPT_CSS_VARS = renderCssVariableBlock(
+  getQuickPromptThemeVars(ACTIVE_THEME_PRESET)
+);
 
 export const QUICK_PROMPT_STYLES = `
 :root {
-  color-scheme: light;
-  --qp-surface: rgba(255, 255, 255, 0.97);
-  --qp-surface-soft: rgba(248, 250, 252, 0.93);
-  --qp-border: #d5c4a1;
-  --qp-border-focus: #b57614;
-  --qp-ring: rgba(181, 118, 20, 0.26);
-  --qp-inner-stroke: rgba(255, 255, 255, 0.88);
-  --qp-text: #3c3836;
-  --qp-placeholder: #7c6f64;
-  --qp-shadow: 0 14px 28px rgba(36, 30, 21, 0.15);
-  --qp-shadow-focus: 0 18px 32px rgba(62, 44, 18, 0.24);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --qp-surface: rgba(43, 43, 43, 0.94);
-    --qp-surface-soft: rgba(34, 34, 34, 0.9);
-    --qp-border: rgba(189, 174, 147, 0.7);
-    --qp-border-focus: #d79921;
-    --qp-ring: rgba(215, 153, 33, 0.24);
-    --qp-inner-stroke: rgba(235, 219, 178, 0.22);
-    --qp-text: #fbf1c7;
-    --qp-placeholder: #d5c4a1;
-    --qp-shadow: 0 16px 34px rgba(20, 18, 16, 0.48);
-    --qp-shadow-focus: 0 20px 42px rgba(20, 18, 16, 0.58);
-  }
+  color-scheme: dark;
+  ${QUICK_PROMPT_CSS_VARS}
 }
 
 html, body {
@@ -60,8 +44,8 @@ body {
   background: linear-gradient(180deg, var(--qp-surface), var(--qp-surface-soft));
   box-shadow:
     var(--qp-shadow),
-    inset 0 1px 0 rgba(255, 255, 255, 0.55),
-    inset 0 -1px 0 rgba(181, 118, 20, 0.28);
+    inset 0 1px 0 var(--qp-inset-top),
+    inset 0 -1px 0 var(--qp-inset-bottom);
   backdrop-filter: blur(14px) saturate(118%);
   -webkit-backdrop-filter: blur(14px) saturate(118%);
   transition: border-color 0.16s ease-out, box-shadow 0.16s ease-out;
@@ -82,8 +66,8 @@ body {
   box-shadow:
     var(--qp-shadow-focus),
     inset 0 0 0 1px var(--qp-ring),
-    inset 0 1px 0 rgba(255, 255, 255, 0.64),
-    inset 0 -1px 0 rgba(181, 118, 20, 0.38);
+    inset 0 1px 0 var(--qp-inset-top-focus),
+    inset 0 -1px 0 var(--qp-inset-bottom-focus);
 }
 
 .panel:focus-within::after {
@@ -126,12 +110,12 @@ body {
 }
 
 .input::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.45);
+  background: var(--qp-scrollbar-thumb);
   border-radius: 3px;
 }
 
 .input::-webkit-scrollbar-thumb:hover {
-  background: rgba(71, 85, 105, 0.66);
+  background: var(--qp-scrollbar-thumb-hover);
 }
 
 @media (max-width: 640px) {
