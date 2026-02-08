@@ -15,6 +15,7 @@ import {
 } from './externalConfig';
 import { DEFAULT_CONFIG } from './configNormalization';
 import { APP_CONFIG } from '../../src/config/app';
+import { buildDefaultPaneProviders } from './providerConfig';
 
 describe('externalConfig', () => {
   let previousXdgConfigHome: string | undefined;
@@ -60,10 +61,7 @@ describe('externalConfig', () => {
     });
 
     const paneCount = APP_CONFIG.layout.pane.defaultCount;
-    const fallbackProvider = APP_CONFIG.providers.defaultPaneKeys[0] ?? 'chatgpt';
-    const providers = Array.from({ length: paneCount }, (_, paneIndex) => {
-      return APP_CONFIG.providers.defaultPaneKeys[paneIndex] ?? fallbackProvider;
-    });
+    const providers = buildDefaultPaneProviders(paneCount);
 
     const concreteDefaults = JSON.parse(readFileSync(defaultConfigPath, 'utf8'));
     expect(concreteDefaults).toEqual({

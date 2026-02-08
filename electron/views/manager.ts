@@ -18,6 +18,7 @@ import {
   PANE_ACCEPT_LANGUAGES,
 } from './paneRuntimePreferences.js';
 import type { RuntimePreferences } from '../ipc-handlers/externalConfig.js';
+import { padProviderSequence } from '../ipc-handlers/providerConfig.js';
 import type {
   AppConfig,
   PaneCount,
@@ -125,7 +126,10 @@ export class ViewManager {
     this.providers = new Map(options.config.providers.map(p => [p.key, p]));
     this.paneZoomFactor = options.runtimePreferences.paneZoomFactor;
     this.sidebarZoomFactor = options.runtimePreferences.sidebarZoomFactor;
-    this.defaultProviders = [...options.config.defaults.providers];
+    this.defaultProviders = padProviderSequence(
+      options.config.defaults.providers,
+      options.config.defaults.pane_count
+    );
   }
 
   /**
@@ -428,10 +432,7 @@ export class ViewManager {
    * Set pane count, creating or destroying WebContentsViews as needed
    */
   setPaneCount(count: PaneCount): void {
-    const fallbackProvider = this.defaultProviders[0] ?? 'chatgpt';
-    this.defaultProviders = Array.from({ length: count }, (_, paneIndex) => {
-      return this.defaultProviders[paneIndex] ?? fallbackProvider;
-    });
+    this.defaultProviders = padProviderSequence(this.defaultProviders, count);
 
     // Remove excess panes
     while (this.paneViews.length > count) {
@@ -442,7 +443,7 @@ export class ViewManager {
     // Add missing panes
     while (this.paneViews.length < count) {
       const paneIndex = this.paneViews.length;
-      const providerKey = this.defaultProviders[paneIndex] ?? fallbackProvider;
+      const providerKey = this.defaultProviders[paneIndex] ?? 'chatgpt';
       const provider = this.providers.get(providerKey);
       const url = provider?.url || 'about:blank';
       const view = this.createPaneWebContentsView(paneIndex);

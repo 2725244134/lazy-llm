@@ -4,6 +4,7 @@ const { machineIdSync } = pkg;
 import type { AppConfig } from '../ipc/contracts.js';
 import { APP_CONFIG } from '../../src/config/app.js';
 import { DEFAULT_CONFIG, normalizeConfig } from './configNormalization.js';
+import { padProviderSequence } from './providerConfig.js';
 import {
   DEFAULT_RUNTIME_PREFERENCES,
   mergeRuntimePreferencesWithExternal,
@@ -93,10 +94,7 @@ export function setSession(session: Partial<StoreSchema['session']>) {
 
 export function setDefaultPaneCount(paneCount: number): AppConfig {
   const current = getStoredNormalizedConfig();
-  const fallbackProvider = current.defaults.providers[0] ?? 'chatgpt';
-  const nextProviders = Array.from({ length: paneCount }, (_, paneIndex) => {
-    return current.defaults.providers[paneIndex] ?? fallbackProvider;
-  });
+  const nextProviders = padProviderSequence(current.defaults.providers, paneCount);
 
   const nextConfig = normalizeConfig({
     ...current,
@@ -113,11 +111,7 @@ export function setDefaultPaneCount(paneCount: number): AppConfig {
 
 export function setDefaultProvider(paneIndex: number, providerKey: string): AppConfig {
   const current = getStoredNormalizedConfig();
-  const fallbackProvider = current.defaults.providers[0] ?? 'chatgpt';
-  const nextProviders = Array.from(
-    { length: current.defaults.pane_count },
-    (_, index) => current.defaults.providers[index] ?? fallbackProvider
-  );
+  const nextProviders = padProviderSequence(current.defaults.providers, current.defaults.pane_count);
 
   if (paneIndex >= 0 && paneIndex < nextProviders.length) {
     nextProviders[paneIndex] = providerKey;

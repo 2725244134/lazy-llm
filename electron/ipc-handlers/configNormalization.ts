@@ -1,9 +1,8 @@
 import type { AppConfig } from '../ipc/contracts.js';
 import { APP_CONFIG } from '../../src/config/app.js';
+import { CANONICAL_PROVIDERS, normalizeProviderSequence } from './providerConfig.js';
 
-export const CANONICAL_PROVIDERS: AppConfig['providers'] = [
-  ...APP_CONFIG.providers.catalog.map((provider) => ({ ...provider })),
-];
+export { CANONICAL_PROVIDERS } from './providerConfig.js';
 
 export const DEFAULT_CONFIG: AppConfig = {
   sidebar: {
@@ -25,18 +24,9 @@ export function normalizePaneCount(value: unknown): number {
 }
 
 export function normalizeConfig(config: Partial<AppConfig> | null | undefined): AppConfig {
-  const validProviderKeys = new Set(CANONICAL_PROVIDERS.map((provider) => provider.key));
-  const fallbackProvider = CANONICAL_PROVIDERS[0]?.key ?? APP_CONFIG.providers.catalog[0]?.key ?? 'chatgpt';
   const paneCount = normalizePaneCount(config?.defaults?.pane_count);
   const expandedWidthCandidate = config?.sidebar?.expanded_width;
-
-  const normalizedDefaultProviders = Array.from({ length: paneCount }, (_, paneIndex) => {
-    const candidate = config?.defaults?.providers?.[paneIndex];
-    if (typeof candidate === 'string' && validProviderKeys.has(candidate)) {
-      return candidate;
-    }
-    return fallbackProvider;
-  });
+  const normalizedDefaultProviders = normalizeProviderSequence(config?.defaults?.providers, paneCount);
 
   const expandedWidth = typeof expandedWidthCandidate === 'number' && Number.isFinite(expandedWidthCandidate)
     ? Math.max(APP_CONFIG.layout.sidebar.minExpandedWidth, Math.floor(expandedWidthCandidate))

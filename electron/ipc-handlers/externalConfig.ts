@@ -3,6 +3,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 import type { AppConfig } from '../ipc/contracts.js';
 import { APP_CONFIG } from '../../src/config/app.js';
+import { buildDefaultPaneProviders } from './providerConfig.js';
 
 export interface ExternalConfigFile {
   sidebar?: {
@@ -59,10 +60,7 @@ export function getExternalDefaultConfigPath(): string {
 
 function buildConcreteExternalDefaults(): ExternalConfigFile {
   const paneCount = APP_CONFIG.layout.pane.defaultCount;
-  const fallbackProvider = APP_CONFIG.providers.defaultPaneKeys[0] ?? 'chatgpt';
-  const providers = Array.from({ length: paneCount }, (_, paneIndex) => {
-    return APP_CONFIG.providers.defaultPaneKeys[paneIndex] ?? fallbackProvider;
-  });
+  const providers = buildDefaultPaneProviders(paneCount);
 
   return {
     sidebar: {
