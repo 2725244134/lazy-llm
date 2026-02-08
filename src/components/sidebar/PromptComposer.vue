@@ -202,9 +202,9 @@ onBeforeUnmount(() => {
   color: var(--text);
   caret-color: var(--broadcast);
   transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out, background 0.2s ease-out;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: inset 0 1px 0 var(--input-inner-highlight), 0 1px 2px rgba(0, 0, 0, 0.16);
   scrollbar-width: thin;
-  scrollbar-color: rgba(79, 70, 229, 0.45) transparent;
+  scrollbar-color: var(--input-scrollbar-thumb) transparent;
 }
 
 .composer-textarea::-webkit-scrollbar {
@@ -217,20 +217,20 @@ onBeforeUnmount(() => {
 }
 
 .composer-textarea::-webkit-scrollbar-thumb {
-  background: rgba(79, 70, 229, 0.4);
+  background: var(--input-scrollbar-thumb);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .composer-textarea:hover::-webkit-scrollbar-thumb {
-  background: rgba(79, 70, 229, 0.55);
+  background: var(--input-scrollbar-thumb-hover);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 
 .composer-textarea:focus::-webkit-scrollbar-thumb {
-  background: rgba(79, 70, 229, 0.7);
+  background: var(--input-scrollbar-thumb-focus);
   border: 2px solid transparent;
   background-clip: padding-box;
 }
@@ -241,16 +241,16 @@ onBeforeUnmount(() => {
 }
 
 .composer-textarea:hover {
-  border-color: #8f88f7;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 3px 10px rgba(0, 0, 0, 0.06);
+  border-color: var(--input-border-hover);
+  box-shadow: inset 0 1px 0 var(--input-inner-highlight-hover), 0 3px 10px rgba(0, 0, 0, 0.2);
 }
 
 .composer-textarea:focus {
   outline: none;
   border-color: var(--broadcast);
   background: var(--bg);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2),
-    0 10px 24px rgba(79, 70, 229, 0.12);
+  box-shadow: 0 0 0 3px var(--input-focus-ring),
+    0 10px 24px var(--input-focus-shadow);
 }
 
 .composer-shortcut-hint {

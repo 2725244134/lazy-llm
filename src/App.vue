@@ -45,22 +45,11 @@ onMounted(async () => {
   --text: #1f2937;
   --text-muted: #6b7280;
   --accent: #000000;
-  --broadcast: #4f46e5;
+  --broadcast: var(--accent);
   --font-sans: 'SF Pro Text', 'SF Pro SC', 'PingFang SC', 'Hiragino Sans GB',
     'Microsoft YaHei UI', 'Microsoft YaHei', 'Noto Sans CJK SC',
     'Source Han Sans SC', 'WenQuanYi Micro Hei', -apple-system,
     BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #1f1f1f;
-    --bg-hover: #2a2a2a;
-    --border: #3a3a3a;
-    --text: #f6f6f6;
-    --text-muted: #a0a0a0;
-    --accent: #ffffff;
-  }
 }
 
 * {

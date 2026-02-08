@@ -8,6 +8,7 @@ import { APP_CONFIG } from '@/config'
 import { resolveSidebarUiDensity } from '@/config/layout'
 import { DEFAULT_ACTIVE_PROVIDERS } from '@/providers'
 import { getSidebarRuntime } from '@/runtime/sidebar'
+import { ACTIVE_THEME_PRESET, getSidebarThemeVars } from '@/theme/palette'
 
 const runtime = getSidebarRuntime()
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent
@@ -26,6 +27,10 @@ const configuredSidebarWidth = computed(() =>
   collapsed.value ? collapsedWidth : expandedWidth.value
 )
 const sidebarWidth = computed(() => `${configuredSidebarWidth.value}px`)
+const sidebarStyle = computed(() => ({
+  width: sidebarWidth.value,
+  ...getSidebarThemeVars(ACTIVE_THEME_PRESET),
+}))
 const sidebarUiDensity = computed(() => {
   if (collapsed.value) {
     return 'regular'
@@ -267,7 +272,7 @@ provide(SIDEBAR_KEY, sidebarContext)
       'is-compact': isCompactSidebar,
       'is-tight': isTightSidebar
     }"
-    :style="{ width: sidebarWidth }"
+    :style="sidebarStyle"
     data-testid="sidebar"
   >
     <div class="sidebar-header">
@@ -460,8 +465,12 @@ provide(SIDEBAR_KEY, sidebarContext)
 }
 
 .sidebar-scroll::-webkit-scrollbar-thumb {
-  background: #d1d5db;
+  background: var(--sidebar-scrollbar-thumb);
   border-radius: 8px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--sidebar-scrollbar-thumb-hover);
 }
 
 .sidebar.collapsed .sidebar-content {
@@ -557,30 +566,6 @@ provide(SIDEBAR_KEY, sidebarContext)
 
 .sidebar.is-tight :deep(.trigger-content) {
   gap: 6px;
-}
-
-.sidebar.is-compact :deep(.trigger-icon),
-.sidebar.is-compact :deep(.item-icon) {
-  width: 20px;
-  height: 20px;
-}
-
-.sidebar.is-tight :deep(.trigger-icon),
-.sidebar.is-tight :deep(.item-icon) {
-  width: 18px;
-  height: 18px;
-}
-
-.sidebar.is-compact :deep(.trigger-icon svg),
-.sidebar.is-compact :deep(.item-icon svg) {
-  width: 20px;
-  height: 20px;
-}
-
-.sidebar.is-tight :deep(.trigger-icon svg),
-.sidebar.is-tight :deep(.item-icon svg) {
-  width: 18px;
-  height: 18px;
 }
 
 .sidebar.is-compact :deep(.dropdown-item) {
