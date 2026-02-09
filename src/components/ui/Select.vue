@@ -5,7 +5,6 @@ import { providerMetas, providerIcons } from '@/providers'
 const props = defineProps<{
   modelValue: string
   loading?: boolean
-  testid?: string
 }>()
 
 const emit = defineEmits<{
@@ -46,7 +45,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div ref="selectRef" class="select-container" :data-testid="testid">
+  <div ref="selectRef" class="select-container">
     <button
       type="button"
       class="select-trigger"

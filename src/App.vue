@@ -23,12 +23,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="app-layout" data-testid="app-layout">
+  <div class="app-layout">
     <Sidebar />
-    <main class="main-content" data-testid="main-content">
-      <div class="placeholder" data-testid="main-placeholder">
+    <main class="main-content">
+      <div class="placeholder">
         <p>LazyLLM - Multi-LLM Interface</p>
-        <p class="hint" data-testid="placeholder-hint">
+        <p class="hint">
           Status: {{ healthStatus }}
         </p>
         <p class="hint" v-if="runtimeInfo">{{ runtimeInfo }}</p>

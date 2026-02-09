@@ -1,16 +1,18 @@
 import { expect, type Page } from '@playwright/test';
 import type {
   HealthResponse,
-  LayoutSnapshot,
   PaneUpdateRequest,
   PaneUpdateResponse,
+  QuickPromptHideResponse,
   QuickPromptResizeRequest,
   QuickPromptResizeResponse,
+  QuickPromptToggleResponse,
 } from '../../../electron/ipc/contracts';
 
 type CouncilApi = {
   healthCheck: () => Promise<HealthResponse>;
-  getLayoutSnapshot: () => Promise<LayoutSnapshot>;
+  toggleQuickPrompt: () => Promise<QuickPromptToggleResponse>;
+  hideQuickPrompt: () => Promise<QuickPromptHideResponse>;
   resizeQuickPrompt: (request: QuickPromptResizeRequest) => Promise<QuickPromptResizeResponse>;
   updateProvider: (request: PaneUpdateRequest) => Promise<PaneUpdateResponse>;
 };
@@ -19,25 +21,14 @@ type BrowserWindowWithCouncil = Window & {
   council: CouncilApi;
 };
 
-export type LayoutMetrics = {
-  innerWidth: number;
-  innerHeight: number;
-  snapshot: LayoutSnapshot;
-};
-
-export type QuickPromptState = {
-  visible: boolean;
-  height: number;
-};
-
 async function ensureCouncilReady(page: Page): Promise<void> {
   await expect.poll(
     async () => {
       return page.evaluate(() => {
         const bridge = globalThis as unknown as {
-          council?: { getLayoutSnapshot?: unknown };
+          council?: { healthCheck?: unknown };
         };
-        return typeof bridge.council?.getLayoutSnapshot === 'function';
+        return typeof bridge.council?.healthCheck === 'function';
       });
     },
     { timeout: 15000 },
@@ -51,33 +42,6 @@ export async function getHealthCheck(page: Page): Promise<HealthResponse> {
   });
 }
 
-export async function getLayoutSnapshot(page: Page): Promise<LayoutSnapshot> {
-  await ensureCouncilReady(page);
-  return page.evaluate(() => {
-    return (window as unknown as BrowserWindowWithCouncil).council.getLayoutSnapshot();
-  });
-}
-
-export async function getLayoutMetrics(page: Page): Promise<LayoutMetrics> {
-  return page.evaluate(async () => {
-    const browserWindow = window as unknown as BrowserWindowWithCouncil;
-    const snapshot = await browserWindow.council.getLayoutSnapshot();
-    return {
-      innerWidth: browserWindow.innerWidth,
-      innerHeight: browserWindow.innerHeight,
-      snapshot,
-    };
-  });
-}
-
-export async function getQuickPromptState(page: Page): Promise<QuickPromptState> {
-  const snapshot = await getLayoutSnapshot(page);
-  return {
-    visible: snapshot.quickPromptVisible,
-    height: snapshot.quickPromptBounds?.height ?? 0,
-  };
-}
-
 export async function resizeQuickPrompt(
   page: Page,
   request: QuickPromptResizeRequest,
@@ -86,6 +50,20 @@ export async function resizeQuickPrompt(
   return page.evaluate((payload: QuickPromptResizeRequest) => {
     return (window as unknown as BrowserWindowWithCouncil).council.resizeQuickPrompt(payload);
   }, request);
+}
+
+export async function toggleQuickPrompt(page: Page): Promise<QuickPromptToggleResponse> {
+  await ensureCouncilReady(page);
+  return page.evaluate(() => {
+    return (window as unknown as BrowserWindowWithCouncil).council.toggleQuickPrompt();
+  });
+}
+
+export async function hideQuickPrompt(page: Page): Promise<QuickPromptHideResponse> {
+  await ensureCouncilReady(page);
+  return page.evaluate(() => {
+    return (window as unknown as BrowserWindowWithCouncil).council.hideQuickPrompt();
+  });
 }
 
 export async function updateProvider(

@@ -14,7 +14,6 @@ function stubWindowCouncil(overrides: Partial<Window['council']> = {}) {
     sendPrompt: vi.fn().mockResolvedValue({ success: true }),
     syncPromptDraft: vi.fn().mockResolvedValue({ success: true }),
     updateLayout: vi.fn().mockResolvedValue({ success: true }),
-    getLayoutSnapshot: vi.fn(),
     updateSidebarWidth: vi.fn().mockResolvedValue({ success: true }),
     toggleQuickPrompt: vi.fn().mockResolvedValue({ success: true, visible: true }),
     hideQuickPrompt: vi.fn().mockResolvedValue({ success: true, visible: false }),

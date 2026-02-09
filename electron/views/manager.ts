@@ -22,7 +22,6 @@ import { padProviderSequence } from '../ipc-handlers/providerConfig.js';
 import type {
   AppConfig,
   PaneCount,
-  LayoutSnapshot,
   ProviderMeta,
 } from '../ipc/contracts.js';
 
@@ -639,32 +638,6 @@ export class ViewManager {
     if (this.quickPromptVisible && this.quickPromptView) {
       this.quickPromptView.setBounds(this.getQuickPromptBounds());
     }
-  }
-
-  /**
-   * Get current layout snapshot for testing/debugging
-   */
-  getSnapshot(): LayoutSnapshot {
-    const contentSize = this.getContentSize();
-    const sidebarBounds = this.sidebarView?.getBounds() || { x: 0, y: 0, width: 0, height: 0 };
-    const quickPromptBounds = this.quickPromptVisible && this.quickPromptView
-      ? this.quickPromptView.getBounds()
-      : null;
-
-    return {
-      windowWidth: contentSize.width,
-      windowHeight: contentSize.height,
-      sidebar: sidebarBounds,
-      paneCount: this.currentPaneCount,
-      quickPromptVisible: this.quickPromptVisible,
-      quickPromptBounds,
-      panes: this.paneViews.map(pane => ({
-        paneIndex: pane.paneIndex,
-        bounds: pane.view.getBounds(),
-        providerKey: pane.providerKey,
-        url: pane.url,
-      })),
-    };
   }
 
   /**

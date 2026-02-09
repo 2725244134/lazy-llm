@@ -17,15 +17,13 @@ const paneIndices = computed(() =>
         v-for="paneIndex in paneIndices"
         :key="paneIndex"
         class="provider-item"
-        :data-testid="`provider-row-${paneIndex}`"
       >
-        <div class="provider-label" :data-testid="`provider-label-${paneIndex}`">
+        <div class="provider-label">
           Pane {{ paneIndex + 1 }}
         </div>
         <ProviderDropdown
           :selected-key="sidebar.activeProviders.value[paneIndex] || 'chatgpt'"
           :loading="Boolean(sidebar.providerLoadingByPane.value[paneIndex])"
-          :testid="`provider-select-${paneIndex}`"
           @change="(key) => void sidebar.setProvider(paneIndex, key)"
         />
       </div>

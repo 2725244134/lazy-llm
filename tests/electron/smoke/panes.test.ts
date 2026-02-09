@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/electronApp';
-import { getLayoutSnapshot, updateProvider } from '../helpers/council';
+import { updateProvider } from '../helpers/council';
 import { selectors } from '../helpers/selectors';
 
 test.describe('Smoke / Panes', () => {
@@ -7,29 +7,23 @@ test.describe('Smoke / Panes', () => {
     const paneButton3 = appWindow.locator(selectors.paneChip3);
     await paneButton3.click();
     await expect(paneButton3).toHaveClass(/active/);
-
-    const snapshotAfterPane3 = await getLayoutSnapshot(appWindow);
-    expect(snapshotAfterPane3.paneCount).toBe(3);
-    expect(snapshotAfterPane3.panes.length).toBe(3);
+    await expect(appWindow.locator('.provider-list .provider-item')).toHaveCount(3);
 
     const paneButton1 = appWindow.locator(selectors.paneChip1);
     await paneButton1.click();
     await expect(paneButton1).toHaveClass(/active/);
-
-    const snapshotAfterPane1 = await getLayoutSnapshot(appWindow);
-    expect(snapshotAfterPane1.paneCount).toBe(1);
-    expect(snapshotAfterPane1.panes.length).toBe(1);
+    await expect(appWindow.locator('.provider-list .provider-item')).toHaveCount(1);
   });
 
-  test('provider update changes pane webview target', async ({ appWindow }) => {
+  test('provider update changes sidebar selection state', async ({ appWindow }) => {
     const updateResult = await updateProvider(appWindow, {
       paneIndex: 0,
       providerKey: 'grok',
     });
 
     expect(updateResult.success).toBe(true);
-
-    const snapshot = await getLayoutSnapshot(appWindow);
-    expect(snapshot.panes[0]?.providerKey).toBe('grok');
+    await expect(
+      appWindow.locator('.provider-list .provider-item').first().locator('.trigger-label')
+    ).toHaveText(/grok/i);
   });
 });

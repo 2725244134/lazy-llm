@@ -13,7 +13,6 @@ export const IPC_CHANNELS = {
   PROMPT_SYNC_DRAFT: 'prompt:syncDraft',
   // Layout channels
   LAYOUT_UPDATE: 'layout:update',
-  LAYOUT_GET_SNAPSHOT: 'layout:getSnapshot',
   SIDEBAR_UPDATE_WIDTH: 'sidebar:updateWidth',
   QUICK_PROMPT_TOGGLE: 'quickPrompt:toggle',
   QUICK_PROMPT_HIDE: 'quickPrompt:hide',
@@ -98,13 +97,6 @@ export interface ViewRect {
   height: number;
 }
 
-export interface PaneState {
-  paneIndex: number;
-  bounds: ViewRect;
-  providerKey: string;
-  url: string;
-}
-
 export interface LayoutUpdateRequest {
   sidebarWidth: number;
   paneCount: PaneCount;
@@ -112,16 +104,6 @@ export interface LayoutUpdateRequest {
 
 export interface LayoutUpdateResponse {
   success: boolean;
-}
-
-export interface LayoutSnapshot {
-  windowWidth: number;
-  windowHeight: number;
-  sidebar: ViewRect;
-  paneCount: PaneCount;
-  quickPromptVisible: boolean;
-  quickPromptBounds: ViewRect | null;
-  panes: PaneState[];
 }
 
 export interface SidebarWidthRequest {
@@ -198,10 +180,6 @@ export interface IPCContract {
   [IPC_CHANNELS.LAYOUT_UPDATE]: {
     request: LayoutUpdateRequest;
     response: LayoutUpdateResponse;
-  };
-  [IPC_CHANNELS.LAYOUT_GET_SNAPSHOT]: {
-    request: void;
-    response: LayoutSnapshot;
   };
   [IPC_CHANNELS.SIDEBAR_UPDATE_WIDTH]: {
     request: SidebarWidthRequest;

@@ -188,22 +188,6 @@ function registerIPCHandlers() {
     return { success: true };
   });
 
-  // Get layout snapshot
-  ipcMain.handle(IPC_CHANNELS.LAYOUT_GET_SNAPSHOT, () => {
-    if (!viewManager) {
-      return {
-        windowWidth: 0,
-        windowHeight: 0,
-        sidebar: { x: 0, y: 0, width: 0, height: 0 },
-        paneCount: 1,
-        quickPromptVisible: false,
-        quickPromptBounds: null,
-        panes: [],
-      };
-    }
-    return viewManager.getSnapshot();
-  });
-
   // Sidebar width update
   ipcMain.handle(IPC_CHANNELS.SIDEBAR_UPDATE_WIDTH, (_event, request: SidebarWidthRequest) => {
     if (!viewManager) {

@@ -1,14 +1,10 @@
-function byTestId(testId: string): string {
-  return `[data-testid="${testId}"]`;
-}
-
 export const selectors = {
-  appLayout: byTestId('app-layout'),
-  sidebar: byTestId('sidebar'),
-  mainContent: byTestId('main-content'),
-  sidebarCollapse: byTestId('sidebar-collapse'),
-  promptTextarea: byTestId('prompt-textarea'),
-  promptSendButton: byTestId('prompt-send-btn'),
-  paneChip1: byTestId('pane-chip-1'),
-  paneChip3: byTestId('pane-chip-3'),
+  appLayout: '.app-layout',
+  sidebar: 'aside.sidebar',
+  mainContent: 'main.main-content',
+  sidebarCollapse: 'aside.sidebar .collapse-btn',
+  promptTextarea: 'textarea.composer-textarea',
+  promptSendButton: 'button.composer-send-btn',
+  paneChip1: '.pane-toggle .chip:nth-child(1)',
+  paneChip3: '.pane-toggle .chip:nth-child(3)',
 } as const;

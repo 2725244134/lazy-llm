@@ -30,9 +30,9 @@ async function hasCouncilBridge(page: Page): Promise<boolean> {
   try {
     return await page.evaluate(() => {
       const bridge = globalThis as unknown as {
-        council?: { getLayoutSnapshot?: unknown };
+        council?: { healthCheck?: unknown };
       };
-      return typeof bridge.council?.getLayoutSnapshot === 'function';
+      return typeof bridge.council?.healthCheck === 'function';
     });
   } catch {
     return false;

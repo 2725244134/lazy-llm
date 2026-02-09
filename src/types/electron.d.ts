@@ -17,7 +17,6 @@ import type {
   QuickPromptHideResponse,
   QuickPromptResizeRequest,
   QuickPromptResizeResponse,
-  LayoutSnapshot,
 } from '../../electron/ipc/contracts';
 
 export interface CouncilAPI {
@@ -28,7 +27,6 @@ export interface CouncilAPI {
   sendPrompt: (request: PromptRequest) => Promise<PromptResponse>;
   syncPromptDraft: (request: PromptSyncRequest) => Promise<PromptSyncResponse>;
   updateLayout: (request: LayoutUpdateRequest) => Promise<LayoutUpdateResponse>;
-  getLayoutSnapshot: () => Promise<LayoutSnapshot>;
   updateSidebarWidth: (request: SidebarWidthRequest) => Promise<SidebarWidthResponse>;
   toggleQuickPrompt: () => Promise<QuickPromptToggleResponse>;
   hideQuickPrompt: () => Promise<QuickPromptHideResponse>;

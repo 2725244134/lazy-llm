@@ -19,7 +19,6 @@ import type {
   QuickPromptHideResponse,
   QuickPromptResizeRequest,
   QuickPromptResizeResponse,
-  LayoutSnapshot,
 } from './ipc/contracts.js';
 
 // Type-safe API exposed to renderer
@@ -57,11 +56,6 @@ const councilAPI = {
   // Update layout
   updateLayout: (request: LayoutUpdateRequest): Promise<LayoutUpdateResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.LAYOUT_UPDATE, request);
-  },
-
-  // Get layout snapshot (for testing/debugging)
-  getLayoutSnapshot: (): Promise<LayoutSnapshot> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.LAYOUT_GET_SNAPSHOT);
   },
 
   // Update sidebar width

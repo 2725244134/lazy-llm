@@ -31,9 +31,8 @@ test.describe('Smoke / Sidebar', () => {
     await expect(sidebar).not.toHaveClass(/collapsed/);
     await expect.poll(async () => {
       return appWindow.evaluate(() => {
-        const active = document.activeElement;
-        return active?.getAttribute('data-testid') ?? '';
+        return document.activeElement?.classList.contains('composer-textarea') ?? false;
       });
-    }).toBe('prompt-textarea');
+    }).toBe(true);
   });
 });

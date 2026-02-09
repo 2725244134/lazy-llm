@@ -4,7 +4,6 @@ import Select from '@/components/ui/Select.vue'
 defineProps<{
   selectedKey: string
   loading?: boolean
-  testid?: string
 }>()
 
 const emit = defineEmits<{
@@ -20,7 +19,6 @@ const handleChange = (key: string) => {
   <Select
     :model-value="selectedKey"
     :loading="loading"
-    :testid="testid"
     @update:model-value="handleChange"
   />
 </template>

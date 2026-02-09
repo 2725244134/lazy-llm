@@ -16,11 +16,10 @@ export function buildQuickPromptHtml(): string {
     <style>${QUICK_PROMPT_STYLES}</style>
   </head>
   <body>
-    <div class="panel" data-testid="quick-prompt-overlay">
+    <div class="panel">
       <textarea
         id="quickPromptInput"
         class="input"
-        data-testid="quick-prompt-input"
         placeholder="Type your prompt and press Enter"
         autocomplete="off"
       ></textarea>

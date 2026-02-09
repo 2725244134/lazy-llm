@@ -99,7 +99,7 @@ const focusPromptComposer = async () => {
   }
   focusRaf = window.requestAnimationFrame(() => {
     focusRaf = 0
-    const textarea = document.querySelector<HTMLTextAreaElement>('[data-testid="prompt-textarea"]')
+    const textarea = document.querySelector<HTMLTextAreaElement>('textarea.composer-textarea')
     if (!textarea || textarea.disabled) return
     textarea.focus()
     const cursorPos = textarea.value.length
@@ -273,14 +273,12 @@ provide(SIDEBAR_KEY, sidebarContext)
       'is-tight': isTightSidebar
     }"
     :style="sidebarStyle"
-    data-testid="sidebar"
   >
     <div class="sidebar-header">
-      <span class="sidebar-title" data-testid="sidebar-title">LAZY LLM</span>
+      <span class="sidebar-title">LAZY LLM</span>
       <button
         class="collapse-btn"
         title="Toggle sidebar (Ctrl+B)"
-        data-testid="sidebar-collapse"
         @click="void toggleCollapse()"
       >
         <svg
@@ -298,8 +296,8 @@ provide(SIDEBAR_KEY, sidebarContext)
       </button>
     </div>
 
-    <div class="sidebar-content" data-testid="sidebar-content">
-      <div class="sidebar-scroll" data-testid="sidebar-scroll">
+    <div class="sidebar-content">
+      <div class="sidebar-scroll">
         <PaneSelector />
         <ProviderList />
         <PromptComposer />

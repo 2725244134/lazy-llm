@@ -157,7 +157,6 @@ onBeforeUnmount(() => {
       ref="textareaEl"
       v-model="text"
       class="composer-textarea"
-      data-testid="prompt-textarea"
       placeholder="Just prompt."
       @input="syncTextareaHeight"
       @keydown="handleKeydown"
@@ -167,7 +166,6 @@ onBeforeUnmount(() => {
       class="composer-send-btn"
       :class="{ loading: isLoading }"
       :disabled="!canSend"
-      data-testid="prompt-send-btn"
       @click="void handleSend()"
     >
       SEND

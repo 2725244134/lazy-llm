@@ -14,7 +14,6 @@ const sidebar = inject(SIDEBAR_KEY)!
         :key="n"
         class="chip"
         :class="{ active: sidebar.paneCount.value === n }"
-        :data-testid="`pane-chip-${n}`"
         @click="void sidebar.setPaneCount(n)"
       >
         {{ n }}

@@ -9,7 +9,7 @@ const interactionConfig = APP_CONFIG.interaction;
 
 export const QUICK_PROMPT_SCRIPT = `
 const input = document.getElementById('quickPromptInput');
-const panel = document.querySelector('[data-testid="quick-prompt-overlay"]');
+const panel = document.querySelector('.panel');
 let isSending = false;
 let resizeRaf = 0;
 let lastResizeHeight = 0;
