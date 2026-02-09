@@ -1,5 +1,4 @@
 import { test, expect } from '../fixtures/electronApp';
-import { updateProvider } from '../helpers/council';
 import { selectors } from '../helpers/selectors';
 
 test.describe('Smoke / Panes', () => {
@@ -15,15 +14,13 @@ test.describe('Smoke / Panes', () => {
     await expect(appWindow.locator('.provider-list .provider-item')).toHaveCount(1);
   });
 
-  test('provider update changes sidebar selection state', async ({ appWindow }) => {
-    const updateResult = await updateProvider(appWindow, {
-      paneIndex: 0,
-      providerKey: 'grok',
-    });
+  test('provider dropdown updates sidebar selection state', async ({ appWindow }) => {
+    const firstProvider = appWindow.locator('.provider-list .provider-item').first();
+    const trigger = firstProvider.locator('.select-trigger');
 
-    expect(updateResult.success).toBe(true);
-    await expect(
-      appWindow.locator('.provider-list .provider-item').first().locator('.trigger-label')
-    ).toHaveText(/grok/i);
+    await trigger.click();
+    await appWindow.locator('.dropdown-menu .dropdown-item').filter({ hasText: 'Grok' }).first().click();
+
+    await expect(firstProvider.locator('.trigger-label')).toHaveText(/grok/i);
   });
 });
