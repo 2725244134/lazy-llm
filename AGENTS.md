@@ -12,19 +12,18 @@ LazyLLM is a multi-LLM interface built with Electron + Vue + TypeScript. It allo
 
 ## Command Entry Points
 
-All commands go through `Makefile`. Never use raw `bun run` in workflows.
+All commands go through `justfile`. Never use raw `bun run` in workflows.
 
 ```bash
-make prepare              # Install dependencies
-make dev                  # Start Electron dev mode
-make dev-web              # Start Vite only (no Electron)
-make build                # Production build
-make package              # Package desktop app
-make check                # Type checking
-make test                 # Run all tests
-make test-electron-smoke  # Electron smoke tests
-make clean                # Remove build artifacts
-make help                 # Show all targets
+just prepare                                      # Install dependencies
+just dev                                          # Start Electron dev mode
+just build                                        # Production build
+just package                                      # Package desktop app
+just check                                        # Type checking
+just test                                         # Run all tests (unit + smoke)
+EXPECTED_VERSION=vX.Y.Z just release-verify-tag  # Verify tag/version contract
+just clean                                        # Remove build artifacts
+just help                                         # Show all recipes
 ```
 
 ## Architecture
@@ -88,16 +87,15 @@ Follow Conventional Commits:
 
 Before merging:
 
-1. `make check` passes
-2. `make test` passes
-3. `make test-electron-smoke` passes (for UI changes)
+1. `just check` passes
+2. `just test` passes
 
 ## Version Contract
 
 - Keep release tag and app version aligned (validated on tag push):
   - `package.json#version`
 - Validate locally before tagging:
-  - `make release-verify-tag EXPECTED_VERSION=vX.Y.Z`
+  - `EXPECTED_VERSION=vX.Y.Z just release-verify-tag`
 
 ## Git Workflow
 
@@ -132,10 +130,10 @@ Suggested types:
 2. Create a release branch, e.g. `bump-0.2.0`.
 3. Bump `package.json#version`.
 4. Run local validation:
-   - `make check`
-   - `make test`
-   - (Optional) `make package`
-   - `make release-verify-tag EXPECTED_VERSION=vX.Y.Z`
+   - `just check`
+   - `just test`
+   - (Optional) `just package`
+   - `EXPECTED_VERSION=vX.Y.Z just release-verify-tag`
 5. Commit and merge (via PR if you prefer).
 6. Switch back to `main` and pull latest.
 7. Tag and push:
@@ -145,5 +143,5 @@ Suggested types:
 
 ## CI
 
-- `.github/workflows/ci.yml`: runs `make check` + tests on PR/push.
+- `.github/workflows/ci.yml`: runs `just check` + `just test` on PR/push.
 - `.github/workflows/validate-tag.yml`: validates tag/version alignment on tag pushes.

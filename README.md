@@ -6,22 +6,22 @@ Multi-LLM interface built with Electron + Vue + TypeScript.
 
 ```bash
 # Install dependencies
-make prepare
+just prepare
 
 # Start development
-make dev
+just dev
 
 # Type check
-make check
+just check
 
 # Run tests
-make test
+just test
 
 # Build for production
-make build
+just build
 
 # Package desktop app
-make package
+just package
 ```
 
 ## Project Structure

@@ -18,5 +18,8 @@ jobs:
         with:
           bun-version: "1.3.5"
 
+      - name: Set up just
+        uses: taiki-e/install-action@just
+
       - name: Validate package version against tag
-        run: make release-verify-tag EXPECTED_VERSION="${GITHUB_REF_NAME}"
+        run: EXPECTED_VERSION="${GITHUB_REF_NAME}" just release-verify-tag
