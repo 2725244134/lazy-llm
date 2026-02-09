@@ -13,11 +13,11 @@ test.describe('Smoke / Quick Prompt', () => {
     });
     await expect.poll(async () => (await getQuickPromptState(appWindow)).visible).toBe(true);
 
-    const initialHeight = (await getQuickPromptState(appWindow)).height;
-    const resizeResult = await resizeQuickPrompt(appWindow, { height: 260 });
+    const resizeResult = await resizeQuickPrompt(appWindow, { height: 66 });
     expect(resizeResult.success).toBe(true);
+    expect(resizeResult.height).toBe(66);
 
-    await expect.poll(async () => (await getQuickPromptState(appWindow)).height).toBeGreaterThan(initialHeight);
+    await expect.poll(async () => (await getQuickPromptState(appWindow)).height).toBe(66);
 
     await paneButton3.click();
     await expect(paneButton3).toHaveClass(/active/);
