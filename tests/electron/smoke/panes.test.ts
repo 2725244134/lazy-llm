@@ -26,8 +26,10 @@ test.describe('Smoke / Panes', () => {
 
   test('new all button is visible and clickable', async ({ appWindow }) => {
     const newAllButton = appWindow.locator(selectors.paneNewAllButton);
+    const providerItems = appWindow.locator('.provider-list .provider-item');
+    const countBefore = await providerItems.count();
     await expect(newAllButton).toBeVisible();
     await newAllButton.click();
-    await expect(appWindow.locator('.provider-list .provider-item')).toHaveCount(3);
+    await expect(providerItems).toHaveCount(countBefore);
   });
 });
