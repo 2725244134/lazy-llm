@@ -97,7 +97,7 @@ Before merging:
 - Validate locally before tagging:
   - `EXPECTED_VERSION=vX.Y.Z just release-verify-tag`
 
-## Git Workflow
+## But Workflow
 
 ### Commit Messages
  每次完成代码修改之后，先遵循conventional commits进行代码提交，然后向我解释为什么要进行每一部分的代码修改，为什么这么修改能够解决问题
@@ -115,28 +115,42 @@ Suggested types:
 
 - Keep `main` linear and readable; avoid "WIP" commits on `main`.
 - Prefer short-lived branches (feature/proto/release) and squash-merge into `main`.
+- Daily branch workflow should use `but`:
+  - Sync with target branch: `but pull --check` then `but pull`
+  - Create a branch from `main`: `but branch new <branch-name> --anchor main`
+  - Check workspace state: `but status` and `but branch list`
+  - Commit changes: `but commit <branch-name> -m "<type>(<scope>): <subject>"`
+  - Push changes: `but push <branch-name>`
+  - Open PR: `but pr new`
+  - Merge (if not using GitHub UI): `but merge <branch-name>`
 
 ### Release Tags
 
 - Tag format: `vX.Y.Z` (or `X.Y.Z`).
 - Pushing a tag triggers `Validate Release Tag` (`.github/workflows/validate-tag.yml`) which
   enforces tag/version alignment.
+- Use `git` only for tag operations (GitButler CLI currently does not provide tag commands).
 
 ## Release Workflow
 
 1. Ensure `main` is up to date:
-   - `git switch main`
-   - `git pull --rebase`
+   - `but pull --check`
+   - `but pull`
 2. Create a release branch, e.g. `bump-0.2.0`.
+   - `but branch new bump-0.2.0 --anchor main`
 3. Bump `package.json#version`.
 4. Run local validation:
    - `just check`
    - `just test`
    - (Optional) `just package`
    - `EXPECTED_VERSION=vX.Y.Z just release-verify-tag`
-5. Commit and merge (via PR if you prefer).
-6. Switch back to `main` and pull latest.
-7. Tag and push:
+5. Commit, push, and merge:
+   - `but commit bump-0.2.0 -m "chore(release): bump version to X.Y.Z"`
+   - `but push bump-0.2.0`
+   - `but pr new` (or `but merge bump-0.2.0`)
+6. Sync workspace after merge:
+   - `but pull`
+7. Tag and push (tag-only git exception):
    - `git tag vX.Y.Z`
    - `git push origin vX.Y.Z`
 8. GitHub Actions validates the tag/version contract (`.github/workflows/validate-tag.yml`).
