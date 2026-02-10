@@ -18,8 +18,7 @@ import { fileURLToPath } from 'url';
 import { APP_CONFIG } from '../../src/config/app.js';
 import { calculateLayout, type LayoutResult } from './geometry.js';
 import { calculateQuickPromptBounds } from './quickPromptGeometry.js';
-import { decidePaneLoadRecovery, type PaneRecoveryState } from './paneRecovery.js';
-import { buildPaneLoadErrorDataUrl } from './paneErrorPage.js';
+import { PaneLoadMonitor, areUrlsEquivalent } from './paneLoadMonitor.js';
 import {
   buildPromptDraftSyncEvalScript,
   buildPromptInjectionEvalScript,
@@ -137,7 +136,7 @@ export class ViewManager {
   private providerSwitchLoadTokens = new Map<number, string>();
   private quickPromptAnchorPaneIndex = 0;
   private lastLayout: LayoutResult | null = null;
-  private paneLoadRecoveryByWebContents = new Map<number, PaneRecoveryState>();
+  private paneLoadMonitor: PaneLoadMonitor;
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -151,6 +150,21 @@ export class ViewManager {
       options.config.provider.panes,
       options.config.provider.pane_count
     );
+    this.paneLoadMonitor = new PaneLoadMonitor({
+      maxRetries: PANE_LOAD_MAX_RETRIES,
+      retryBaseDelayMs: PANE_LOAD_RETRY_BASE_DELAY_MS,
+      getTargetUrlForPane: (paneIndex, failedUrl) => {
+        const pane = this.paneViews[paneIndex];
+        return pane?.url ?? failedUrl;
+      },
+      getProviderKeyForPane: (paneIndex) => {
+        const pane = this.paneViews[paneIndex];
+        return pane?.providerKey ?? null;
+      },
+      getProviderNameForKey: (providerKey) => {
+        return this.providers.get(providerKey)?.name ?? providerKey;
+      },
+    });
   }
 
   /**
@@ -576,176 +590,18 @@ export class ViewManager {
     webContents.on('did-fail-load', fail);
   }
 
-  private areUrlsEquivalent(left: string, right: string): boolean {
-    if (left === right) {
-      return true;
-    }
-    if (!left || !right) {
-      return false;
-    }
-
-    try {
-      const leftUrl = new URL(left);
-      const rightUrl = new URL(right);
-      return (
-        leftUrl.origin === rightUrl.origin
-        && leftUrl.pathname === rightUrl.pathname
-        && leftUrl.search === rightUrl.search
-      );
-    } catch {
-      return false;
-    }
-  }
-
-  private setPaneLoadTarget(webContents: WebContents, targetUrl: string): void {
-    this.paneLoadRecoveryByWebContents.set(webContents.id, {
-      targetUrl,
-      attemptCount: 0,
-    });
-  }
-
   private loadPaneUrl(
     paneIndex: number,
     view: WebContentsView,
     targetUrl: string,
     trackLoading: boolean
   ): void {
-    this.setPaneLoadTarget(view.webContents, targetUrl);
+    this.paneLoadMonitor.markTarget(view.webContents.id, targetUrl);
     if (trackLoading) {
       this.beginProviderLoadingTracking(paneIndex, view.webContents);
     }
     view.webContents.loadURL(targetUrl).catch((error) => {
       console.error(`[ViewManager] Failed to load URL for pane ${paneIndex}: ${targetUrl}`, error);
-    });
-  }
-
-  private handlePaneLoadFailure(options: {
-    paneIndex: number;
-    webContents: WebContents;
-    errorCode: number;
-    errorDescription: string;
-    failedUrl: string;
-    isMainFrame: boolean;
-  }): void {
-    const {
-      paneIndex,
-      webContents,
-      errorCode,
-      errorDescription,
-      failedUrl,
-      isMainFrame,
-    } = options;
-    const previousState = this.paneLoadRecoveryByWebContents.get(webContents.id);
-    const pane = this.paneViews[paneIndex];
-    const targetUrl = previousState?.targetUrl ?? pane?.url ?? failedUrl;
-    const decision = decidePaneLoadRecovery({
-      isMainFrame,
-      errorCode,
-      failedUrl,
-      targetUrl,
-      maxRetries: PANE_LOAD_MAX_RETRIES,
-      previousState,
-    });
-
-    if (decision.action === 'ignore') {
-      return;
-    }
-
-    this.paneLoadRecoveryByWebContents.set(webContents.id, decision.state);
-
-    if (decision.action === 'retry') {
-      const expectedAttempt = decision.state.attemptCount;
-      const expectedTargetUrl = decision.state.targetUrl;
-      const delayMs = PANE_LOAD_RETRY_BASE_DELAY_MS * expectedAttempt;
-
-      setTimeout(() => {
-        if (webContents.isDestroyed()) {
-          return;
-        }
-
-        const latestState = this.paneLoadRecoveryByWebContents.get(webContents.id);
-        if (!latestState) {
-          return;
-        }
-        if (
-          latestState.targetUrl !== expectedTargetUrl
-          || latestState.attemptCount !== expectedAttempt
-        ) {
-          return;
-        }
-
-        webContents.loadURL(expectedTargetUrl).catch((error) => {
-          console.error(`[ViewManager] Retry load failed for pane ${paneIndex}:`, error);
-        });
-      }, delayMs);
-      return;
-    }
-
-    if (!pane || webContents.isDestroyed()) {
-      return;
-    }
-
-    const providerName = this.providers.get(pane.providerKey)?.name ?? pane.providerKey;
-    const fallbackUrl = buildPaneLoadErrorDataUrl({
-      providerName,
-      targetUrl: decision.state.targetUrl,
-      errorCode,
-      errorDescription,
-      attemptCount: decision.state.attemptCount,
-    });
-
-    webContents.loadURL(fallbackUrl).catch((error) => {
-      console.error(`[ViewManager] Failed to render load error fallback for pane ${paneIndex}:`, error);
-    });
-  }
-
-  private attachPaneLoadRecoveryHooks(paneIndex: number, webContents: WebContents): void {
-    webContents.on('did-finish-load', () => {
-      const state = this.paneLoadRecoveryByWebContents.get(webContents.id);
-      if (!state) {
-        return;
-      }
-      const currentUrl = webContents.getURL();
-      if (this.areUrlsEquivalent(currentUrl, state.targetUrl)) {
-        this.paneLoadRecoveryByWebContents.set(webContents.id, {
-          targetUrl: state.targetUrl,
-          attemptCount: 0,
-        });
-      }
-    });
-
-    webContents.on(
-      'did-fail-load',
-      (
-        _event: Event,
-        errorCode: number,
-        errorDescription: string,
-        validatedURL: string,
-        isMainFrame: boolean
-      ) => {
-        this.handlePaneLoadFailure({
-          paneIndex,
-          webContents,
-          errorCode,
-          errorDescription,
-          failedUrl: validatedURL,
-          isMainFrame,
-        });
-      }
-    );
-
-    webContents.on('render-process-gone', (_event, details) => {
-      const recoveryState = this.paneLoadRecoveryByWebContents.get(webContents.id);
-      const pane = this.paneViews[paneIndex];
-      const failedUrl = recoveryState?.targetUrl ?? pane?.url ?? '';
-      this.handlePaneLoadFailure({
-        paneIndex,
-        webContents,
-        errorCode: -1000,
-        errorDescription: `Renderer process gone (${details.reason})`,
-        failedUrl,
-        isMainFrame: true,
-      });
     });
   }
 
@@ -762,7 +618,7 @@ export class ViewManager {
     this.attachGlobalShortcutHooks(view.webContents);
     this.attachPaneContextMenuHooks(view.webContents);
     this.attachPaneRuntimePreferenceHooks(view.webContents);
-    this.attachPaneLoadRecoveryHooks(paneIndex, view.webContents);
+    this.paneLoadMonitor.attachPane(paneIndex, view.webContents);
     view.webContents.on('focus', () => {
       this.setQuickPromptAnchorPaneIndex(paneIndex);
     });
@@ -788,7 +644,7 @@ export class ViewManager {
     for (const view of uniqueViews) {
       this.removePaneViewFromContent(view);
       if (!view.webContents.isDestroyed()) {
-        this.paneLoadRecoveryByWebContents.delete(view.webContents.id);
+        this.paneLoadMonitor.clear(view.webContents.id);
         view.webContents.close();
       }
     }
@@ -868,8 +724,8 @@ export class ViewManager {
     const cachedViewEntry = pane.cachedViews.get(providerKey);
     if (cachedViewEntry) {
       const cachedCurrentUrl = cachedViewEntry.view.webContents.getURL();
-      const shouldReload = !this.areUrlsEquivalent(cachedViewEntry.url, provider.url)
-        || !this.areUrlsEquivalent(cachedCurrentUrl, provider.url);
+      const shouldReload = !areUrlsEquivalent(cachedViewEntry.url, provider.url)
+        || !areUrlsEquivalent(cachedCurrentUrl, provider.url);
 
       if (shouldReload) {
         cachedViewEntry.url = provider.url;
@@ -1117,7 +973,7 @@ export class ViewManager {
       }
     }
     this.paneViews = [];
-    this.paneLoadRecoveryByWebContents.clear();
+    this.paneLoadMonitor.clearAll();
     this.lastLayout = null;
 
     // Close quick prompt webContents
