@@ -8,14 +8,17 @@ import {
   type ContextMenuParams,
   type Event,
   type Input,
-  WebContents,
+  type WebContents,
   WebContentsView,
+  webContents,
 } from 'electron';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { APP_CONFIG } from '../../src/config/app.js';
-import { calculateLayout } from './geometry.js';
+import { calculateLayout, type LayoutResult } from './geometry.js';
+import { calculateQuickPromptBounds } from './quickPromptGeometry.js';
+import { decidePaneLoadRecovery, type PaneRecoveryState } from './paneRecovery.js';
 import {
   buildPromptDraftSyncEvalScript,
   buildPromptInjectionEvalScript,
@@ -31,6 +34,7 @@ import type {
   AppConfig,
   PaneCount,
   ProviderMeta,
+  ViewRect,
 } from '../ipc/contracts.js';
 
 const runtimeDir = fileURLToPath(new URL('.', import.meta.url));
@@ -90,6 +94,8 @@ const QUICK_PROMPT_MAX_HEIGHT = APP_CONFIG.layout.quickPrompt.maxHeight;
 const QUICK_PROMPT_VIEWPORT_PADDING = APP_CONFIG.layout.quickPrompt.viewportPadding;
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
+const PANE_LOAD_MAX_RETRIES = 2;
+const PANE_LOAD_RETRY_BASE_DELAY_MS = 450;
 
 interface PaneView {
   view: WebContentsView;
@@ -111,6 +117,15 @@ function toFailureReason(error: unknown): string {
   return String(error);
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export class ViewManager {
   private window: BaseWindow;
   private sidebarView: WebContentsView | null = null;
@@ -128,6 +143,9 @@ export class ViewManager {
   private sidebarZoomFactor: number;
   private defaultProviders: string[];
   private providerSwitchLoadTokens = new Map<number, string>();
+  private quickPromptAnchorPaneIndex = 0;
+  private lastLayout: LayoutResult | null = null;
+  private paneLoadRecoveryByWebContents = new Map<number, PaneRecoveryState>();
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -154,52 +172,88 @@ export class ViewManager {
     };
   }
 
-  private getQuickPromptBounds(): { x: number; y: number; width: number; height: number } {
-    const contentSize = this.getContentSize();
-    if (!QUICK_PROMPT_PASSTHROUGH_MODE) {
-      return {
-        x: 0,
-        y: 0,
-        width: contentSize.width,
-        height: contentSize.height,
-      };
+  private getPaneAreaFallbackBounds(contentSize: { width: number; height: number }): ViewRect {
+    const paneAreaX = Math.max(0, Math.min(this.currentSidebarWidth, contentSize.width - 1));
+    return {
+      x: paneAreaX,
+      y: 0,
+      width: Math.max(1, contentSize.width - paneAreaX),
+      height: contentSize.height,
+    };
+  }
+
+  private getQuickPromptAnchorBounds(contentSize: { width: number; height: number }): ViewRect {
+    if (!this.lastLayout || this.lastLayout.panes.length === 0) {
+      return this.getPaneAreaFallbackBounds(contentSize);
     }
 
-    const maxAvailableWidth = Math.max(
-      240,
-      contentSize.width - QUICK_PROMPT_VIEWPORT_PADDING * 2
+    const paneIndex = Math.max(
+      0,
+      Math.min(this.quickPromptAnchorPaneIndex, this.lastLayout.panes.length - 1)
     );
-    const minWidth = Math.min(QUICK_PROMPT_MIN_WIDTH, maxAvailableWidth);
-    const width = Math.max(minWidth, Math.min(QUICK_PROMPT_MAX_WIDTH, maxAvailableWidth));
-    const maxHeightByViewport = Math.max(
-      QUICK_PROMPT_MIN_HEIGHT,
-      contentSize.height - QUICK_PROMPT_VIEWPORT_PADDING * 2
-    );
-    const desiredHeight = Math.max(
-      QUICK_PROMPT_MIN_HEIGHT,
-      Math.min(QUICK_PROMPT_MAX_HEIGHT, this.quickPromptHeight)
-    );
-    const height = Math.min(desiredHeight, maxHeightByViewport);
-    const x = Math.max(0, Math.floor((contentSize.width - width) / 2));
-    const maxY = Math.max(0, contentSize.height - height - QUICK_PROMPT_VIEWPORT_PADDING);
-    const centeredY = Math.floor((contentSize.height - height) / 2);
-    const y = Math.max(QUICK_PROMPT_VIEWPORT_PADDING, Math.min(centeredY, maxY));
+    return this.lastLayout.panes[paneIndex] ?? this.lastLayout.panes[0];
+  }
 
-    return {
-      x,
-      y,
-      width,
-      height,
-    };
+  private getQuickPromptBounds(): { x: number; y: number; width: number; height: number } {
+    const contentSize = this.getContentSize();
+    const anchor = this.getQuickPromptAnchorBounds(contentSize);
+
+    return calculateQuickPromptBounds({
+      viewport: contentSize,
+      anchor,
+      requestedHeight: this.quickPromptHeight,
+      passthroughMode: QUICK_PROMPT_PASSTHROUGH_MODE,
+      minWidth: QUICK_PROMPT_MIN_WIDTH,
+      maxWidth: QUICK_PROMPT_MAX_WIDTH,
+      minHeight: QUICK_PROMPT_MIN_HEIGHT,
+      maxHeight: QUICK_PROMPT_MAX_HEIGHT,
+      viewportPadding: QUICK_PROMPT_VIEWPORT_PADDING,
+    });
+  }
+
+  private setQuickPromptAnchorPaneIndex(paneIndex: number): void {
+    if (!Number.isInteger(paneIndex) || paneIndex < 0) {
+      return;
+    }
+    this.quickPromptAnchorPaneIndex = paneIndex;
+  }
+
+  private findPaneIndexByWebContents(webContents: WebContents): number | null {
+    for (const pane of this.paneViews) {
+      if (pane.view.webContents.id === webContents.id) {
+        return pane.paneIndex;
+      }
+    }
+    return null;
+  }
+
+  private updateQuickPromptAnchorFromFocusedWebContents(): void {
+    const focused = webContents.getFocusedWebContents();
+    if (!focused) {
+      return;
+    }
+    const paneIndex = this.findPaneIndexByWebContents(focused);
+    if (paneIndex !== null) {
+      this.setQuickPromptAnchorPaneIndex(paneIndex);
+    }
+  }
+
+  private updateQuickPromptAnchorFromSource(sourceWebContents: WebContents): void {
+    const paneIndex = this.findPaneIndexByWebContents(sourceWebContents);
+    if (paneIndex !== null) {
+      this.setQuickPromptAnchorPaneIndex(paneIndex);
+      return;
+    }
+    this.updateQuickPromptAnchorFromFocusedWebContents();
   }
 
   private attachGlobalShortcutHooks(webContents: WebContents): void {
     webContents.on('before-input-event', (event: Event, input: Input) => {
-      this.handleGlobalShortcut(event, input);
+      this.handleGlobalShortcut(event, input, webContents);
     });
   }
 
-  private handleGlobalShortcut(event: Event, input: Input): void {
+  private handleGlobalShortcut(event: Event, input: Input, sourceWebContents: WebContents): void {
     const isKeyDownLike = input.type === 'keyDown' || input.type === 'rawKeyDown';
     if (!isKeyDownLike || input.isAutoRepeat) {
       return;
@@ -211,6 +265,7 @@ export class ViewManager {
 
     if (isBaseShortcut && key === 'j') {
       event.preventDefault();
+      this.updateQuickPromptAnchorFromSource(sourceWebContents);
       this.toggleQuickPrompt();
       return;
     }
@@ -386,6 +441,7 @@ export class ViewManager {
       return this.quickPromptVisible;
     }
 
+    this.updateQuickPromptAnchorFromFocusedWebContents();
     this.quickPromptHeight = this.quickPromptDefaultHeight;
     this.window.contentView.addChildView(this.quickPromptView);
     this.quickPromptView.setBounds(this.getQuickPromptBounds());
@@ -528,6 +584,280 @@ export class ViewManager {
     webContents.on('did-fail-load', fail);
   }
 
+  private areUrlsEquivalent(left: string, right: string): boolean {
+    if (left === right) {
+      return true;
+    }
+    if (!left || !right) {
+      return false;
+    }
+
+    try {
+      const leftUrl = new URL(left);
+      const rightUrl = new URL(right);
+      return (
+        leftUrl.origin === rightUrl.origin
+        && leftUrl.pathname === rightUrl.pathname
+        && leftUrl.search === rightUrl.search
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  private setPaneLoadTarget(webContents: WebContents, targetUrl: string): void {
+    this.paneLoadRecoveryByWebContents.set(webContents.id, {
+      targetUrl,
+      attemptCount: 0,
+    });
+  }
+
+  private loadPaneUrl(
+    paneIndex: number,
+    view: WebContentsView,
+    targetUrl: string,
+    trackLoading: boolean
+  ): void {
+    this.setPaneLoadTarget(view.webContents, targetUrl);
+    if (trackLoading) {
+      this.beginProviderLoadingTracking(paneIndex, view.webContents);
+    }
+    view.webContents.loadURL(targetUrl).catch((error) => {
+      console.error(`[ViewManager] Failed to load URL for pane ${paneIndex}: ${targetUrl}`, error);
+    });
+  }
+
+  private buildPaneLoadErrorDataUrl(options: {
+    providerName: string;
+    targetUrl: string;
+    errorCode: number;
+    errorDescription: string;
+    attemptCount: number;
+  }): string {
+    const title = escapeHtml(`${options.providerName} failed to load`);
+    const description = escapeHtml(options.errorDescription || 'Unknown error');
+    const safeTargetUrl = escapeHtml(options.targetUrl);
+    const serializedTargetUrl = JSON.stringify(options.targetUrl);
+    const attemptText = escapeHtml(String(options.attemptCount));
+    const errorCodeText = escapeHtml(String(options.errorCode));
+
+    const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title}</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "SF Pro Text", "SF Pro SC", "PingFang SC", "Segoe UI", sans-serif;
+        background: #f7f8fa;
+        color: #1f2937;
+      }
+      body {
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      .card {
+        width: min(560px, 100%);
+        background: #ffffff;
+        border: 1px solid #d7dce6;
+        border-radius: 16px;
+        padding: 20px;
+        box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+      }
+      h1 {
+        margin: 0 0 10px;
+        font-size: 18px;
+        line-height: 1.3;
+      }
+      p {
+        margin: 0 0 10px;
+        line-height: 1.5;
+      }
+      .meta {
+        margin-top: 12px;
+        color: #4b5563;
+        font-size: 13px;
+        word-break: break-word;
+      }
+      button {
+        margin-top: 14px;
+        border: none;
+        border-radius: 10px;
+        background: #ebbcba;
+        color: #1f2937;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 10px 14px;
+        cursor: pointer;
+      }
+      button:hover {
+        filter: brightness(0.98);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>${title}</h1>
+      <p>Web view did not finish loading after automatic retries.</p>
+      <p>Reason: ${description}</p>
+      <div class="meta">
+        <div>Error code: ${errorCodeText}</div>
+        <div>Retry attempts: ${attemptText}</div>
+        <div>Target URL: ${safeTargetUrl}</div>
+      </div>
+      <button id="retryButton" type="button">Retry</button>
+    </div>
+    <script>
+      const targetUrl = ${serializedTargetUrl};
+      document.getElementById('retryButton')?.addEventListener('click', () => {
+        window.location.assign(targetUrl);
+      });
+    </script>
+  </body>
+</html>`;
+
+    return `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
+  }
+
+  private handlePaneLoadFailure(options: {
+    paneIndex: number;
+    webContents: WebContents;
+    errorCode: number;
+    errorDescription: string;
+    failedUrl: string;
+    isMainFrame: boolean;
+  }): void {
+    const {
+      paneIndex,
+      webContents,
+      errorCode,
+      errorDescription,
+      failedUrl,
+      isMainFrame,
+    } = options;
+    const previousState = this.paneLoadRecoveryByWebContents.get(webContents.id);
+    const pane = this.paneViews[paneIndex];
+    const targetUrl = previousState?.targetUrl ?? pane?.url ?? failedUrl;
+    const decision = decidePaneLoadRecovery({
+      isMainFrame,
+      errorCode,
+      failedUrl,
+      targetUrl,
+      maxRetries: PANE_LOAD_MAX_RETRIES,
+      previousState,
+    });
+
+    if (decision.action === 'ignore') {
+      return;
+    }
+
+    this.paneLoadRecoveryByWebContents.set(webContents.id, decision.state);
+
+    if (decision.action === 'retry') {
+      const expectedAttempt = decision.state.attemptCount;
+      const expectedTargetUrl = decision.state.targetUrl;
+      const delayMs = PANE_LOAD_RETRY_BASE_DELAY_MS * expectedAttempt;
+
+      setTimeout(() => {
+        if (webContents.isDestroyed()) {
+          return;
+        }
+
+        const latestState = this.paneLoadRecoveryByWebContents.get(webContents.id);
+        if (!latestState) {
+          return;
+        }
+        if (
+          latestState.targetUrl !== expectedTargetUrl
+          || latestState.attemptCount !== expectedAttempt
+        ) {
+          return;
+        }
+
+        webContents.loadURL(expectedTargetUrl).catch((error) => {
+          console.error(`[ViewManager] Retry load failed for pane ${paneIndex}:`, error);
+        });
+      }, delayMs);
+      return;
+    }
+
+    if (!pane || webContents.isDestroyed()) {
+      return;
+    }
+
+    const providerName = this.providers.get(pane.providerKey)?.name ?? pane.providerKey;
+    const fallbackUrl = this.buildPaneLoadErrorDataUrl({
+      providerName,
+      targetUrl: decision.state.targetUrl,
+      errorCode,
+      errorDescription,
+      attemptCount: decision.state.attemptCount,
+    });
+
+    webContents.loadURL(fallbackUrl).catch((error) => {
+      console.error(`[ViewManager] Failed to render load error fallback for pane ${paneIndex}:`, error);
+    });
+  }
+
+  private attachPaneLoadRecoveryHooks(paneIndex: number, webContents: WebContents): void {
+    webContents.on('did-finish-load', () => {
+      const state = this.paneLoadRecoveryByWebContents.get(webContents.id);
+      if (!state) {
+        return;
+      }
+      const currentUrl = webContents.getURL();
+      if (this.areUrlsEquivalent(currentUrl, state.targetUrl)) {
+        this.paneLoadRecoveryByWebContents.set(webContents.id, {
+          targetUrl: state.targetUrl,
+          attemptCount: 0,
+        });
+      }
+    });
+
+    webContents.on(
+      'did-fail-load',
+      (
+        _event: Event,
+        errorCode: number,
+        errorDescription: string,
+        validatedURL: string,
+        isMainFrame: boolean
+      ) => {
+        this.handlePaneLoadFailure({
+          paneIndex,
+          webContents,
+          errorCode,
+          errorDescription,
+          failedUrl: validatedURL,
+          isMainFrame,
+        });
+      }
+    );
+
+    webContents.on('render-process-gone', (_event, details) => {
+      const recoveryState = this.paneLoadRecoveryByWebContents.get(webContents.id);
+      const pane = this.paneViews[paneIndex];
+      const failedUrl = recoveryState?.targetUrl ?? pane?.url ?? '';
+      this.handlePaneLoadFailure({
+        paneIndex,
+        webContents,
+        errorCode: -1000,
+        errorDescription: `Renderer process gone (${details.reason})`,
+        failedUrl,
+        isMainFrame: true,
+      });
+    });
+  }
+
   private createPaneWebContentsView(paneIndex: number): WebContentsView {
     const view = new WebContentsView({
       webPreferences: {
@@ -541,6 +871,10 @@ export class ViewManager {
     this.attachGlobalShortcutHooks(view.webContents);
     this.attachPaneContextMenuHooks(view.webContents);
     this.attachPaneRuntimePreferenceHooks(view.webContents);
+    this.attachPaneLoadRecoveryHooks(paneIndex, view.webContents);
+    view.webContents.on('focus', () => {
+      this.setQuickPromptAnchorPaneIndex(paneIndex);
+    });
     this.applyPaneRuntimePreferences(view.webContents);
     return view;
   }
@@ -563,6 +897,7 @@ export class ViewManager {
     for (const view of uniqueViews) {
       this.removePaneViewFromContent(view);
       if (!view.webContents.isDestroyed()) {
+        this.paneLoadRecoveryByWebContents.delete(view.webContents.id);
         view.webContents.close();
       }
     }
@@ -598,7 +933,7 @@ export class ViewManager {
       const view = this.createPaneWebContentsView(paneIndex);
 
       this.window.contentView.addChildView(view);
-      view.webContents.loadURL(url);
+      this.loadPaneUrl(paneIndex, view, url, false);
 
       this.paneViews.push({
         view,
@@ -610,6 +945,10 @@ export class ViewManager {
     }
 
     this.currentPaneCount = count;
+    this.quickPromptAnchorPaneIndex = Math.max(
+      0,
+      Math.min(this.quickPromptAnchorPaneIndex, this.paneViews.length - 1)
+    );
     this.keepQuickPromptOnTop();
     this.updateLayout();
   }
@@ -633,14 +972,18 @@ export class ViewManager {
     if (pane.providerKey === providerKey) {
       return true;
     }
+    this.setQuickPromptAnchorPaneIndex(paneIndex);
 
     const cachedViewEntry = pane.cachedViews.get(providerKey);
     if (cachedViewEntry) {
-      if (cachedViewEntry.url !== provider.url) {
+      const cachedCurrentUrl = cachedViewEntry.view.webContents.getURL();
+      const shouldReload = !this.areUrlsEquivalent(cachedViewEntry.url, provider.url)
+        || !this.areUrlsEquivalent(cachedCurrentUrl, provider.url);
+
+      if (shouldReload) {
         cachedViewEntry.url = provider.url;
         this.applyPaneRuntimePreferences(cachedViewEntry.view.webContents);
-        this.beginProviderLoadingTracking(paneIndex, cachedViewEntry.view.webContents);
-        cachedViewEntry.view.webContents.loadURL(provider.url);
+        this.loadPaneUrl(paneIndex, cachedViewEntry.view, provider.url, true);
       } else {
         this.clearProviderLoadingTracking(paneIndex);
       }
@@ -662,8 +1005,7 @@ export class ViewManager {
 
     const nextView = this.createPaneWebContentsView(paneIndex);
     this.window.contentView.addChildView(nextView);
-    this.beginProviderLoadingTracking(paneIndex, nextView.webContents);
-    nextView.webContents.loadURL(provider.url);
+    this.loadPaneUrl(paneIndex, nextView, provider.url, true);
     pane.cachedViews.set(providerKey, { view: nextView, url: provider.url });
 
     this.removePaneViewFromContent(pane.view);
@@ -711,8 +1053,7 @@ export class ViewManager {
       }
 
       this.applyPaneRuntimePreferences(pane.view.webContents);
-      this.beginProviderLoadingTracking(pane.paneIndex, pane.view.webContents);
-      pane.view.webContents.loadURL(providerUrl);
+      this.loadPaneUrl(pane.paneIndex, pane.view, providerUrl, true);
       pane.url = providerUrl;
       this.defaultProviders[pane.paneIndex] = pane.providerKey;
     }
@@ -745,6 +1086,7 @@ export class ViewManager {
       sidebarWidth: this.currentSidebarWidth,
       paneCount: this.currentPaneCount,
     });
+    this.lastLayout = layout;
 
     // Apply sidebar bounds
     if (this.sidebarView) {
@@ -884,6 +1226,8 @@ export class ViewManager {
       }
     }
     this.paneViews = [];
+    this.paneLoadRecoveryByWebContents.clear();
+    this.lastLayout = null;
 
     // Close quick prompt webContents
     if (this.quickPromptView) {
