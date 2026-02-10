@@ -63,8 +63,7 @@ Sidebar uses `SidebarRuntime` interface (`src/runtime/sidebar/types.ts`) to deco
 - No direct `ipcRenderer` exposure to renderer
 
 ## CLIP Workflow
-
-Non-trivial changes require a CLIP (Core Logic Improvement Proposal):
+when user is asked to proposal a new clip for Non-trivial changes,  now require a CLIP (Core Logic Improvement Proposal):
 
 1. Create `clips/clip-<id>-<slug>.md`
 2. Define problem, non-goals, design, test plan
