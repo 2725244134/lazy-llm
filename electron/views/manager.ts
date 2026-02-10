@@ -16,15 +16,13 @@ import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { APP_CONFIG } from '../../src/config/app.js';
-import { calculateLayout, type LayoutResult } from './geometry.js';
-import { calculateQuickPromptBounds } from './quickPromptGeometry.js';
+import { type LayoutResult } from './geometry.js';
+import { LayoutService } from './layoutService.js';
 import { PaneLoadMonitor, areUrlsEquivalent } from './paneLoadMonitor.js';
-import {
-  buildPromptDraftSyncEvalScript,
-  buildPromptInjectionEvalScript,
-  type PromptInjectionResult,
-} from './promptInjection.js';
+import { PromptDispatchService } from './promptDispatchService.js';
 import { buildQuickPromptDataUrl } from './quick-prompt/index.js';
+import { resolveShortcutAction } from './shortcutDispatcher.js';
+import { SidebarEventBridge } from './sidebarEventBridge.js';
 import {
   PANE_ACCEPT_LANGUAGES,
 } from './paneRuntimePreferences.js';
@@ -34,7 +32,6 @@ import type {
   AppConfig,
   PaneCount,
   ProviderMeta,
-  ViewRect,
 } from '../ipc/contracts.js';
 
 const runtimeDir = fileURLToPath(new URL('.', import.meta.url));
@@ -92,6 +89,14 @@ const QUICK_PROMPT_MIN_WIDTH = APP_CONFIG.layout.quickPrompt.minWidth;
 const QUICK_PROMPT_MIN_HEIGHT = APP_CONFIG.layout.quickPrompt.minHeight;
 const QUICK_PROMPT_MAX_HEIGHT = APP_CONFIG.layout.quickPrompt.maxHeight;
 const QUICK_PROMPT_VIEWPORT_PADDING = APP_CONFIG.layout.quickPrompt.viewportPadding;
+const QUICK_PROMPT_LAYOUT_CONFIG = {
+  passthroughMode: QUICK_PROMPT_PASSTHROUGH_MODE,
+  minWidth: QUICK_PROMPT_MIN_WIDTH,
+  maxWidth: QUICK_PROMPT_MAX_WIDTH,
+  minHeight: QUICK_PROMPT_MIN_HEIGHT,
+  maxHeight: QUICK_PROMPT_MAX_HEIGHT,
+  viewportPadding: QUICK_PROMPT_VIEWPORT_PADDING,
+} as const;
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
 const PANE_LOAD_MAX_RETRIES = 2;
@@ -110,13 +115,6 @@ interface ViewManagerOptions {
   runtimePreferences: RuntimePreferences;
 }
 
-function toFailureReason(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
-
 export class ViewManager {
   private window: BaseWindow;
   private sidebarView: WebContentsView | null = null;
@@ -133,10 +131,12 @@ export class ViewManager {
   private paneZoomFactor: number;
   private sidebarZoomFactor: number;
   private defaultProviders: string[];
-  private providerSwitchLoadTokens = new Map<number, string>();
   private quickPromptAnchorPaneIndex = 0;
   private lastLayout: LayoutResult | null = null;
   private paneLoadMonitor: PaneLoadMonitor;
+  private layoutService: LayoutService;
+  private sidebarEventBridge: SidebarEventBridge;
+  private promptDispatchService: PromptDispatchService;
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -150,6 +150,23 @@ export class ViewManager {
       options.config.provider.panes,
       options.config.provider.pane_count
     );
+    this.layoutService = new LayoutService(QUICK_PROMPT_LAYOUT_CONFIG);
+    this.sidebarEventBridge = new SidebarEventBridge({
+      getSidebarTarget: () => this.sidebarView?.webContents ?? null,
+      providerLoadingEventName: PROVIDER_LOADING_EVENT,
+    });
+    this.promptDispatchService = new PromptDispatchService({
+      getPaneTargets: () => this.paneViews.map((pane) => ({
+        paneIndex: pane.paneIndex,
+        executeJavaScript: (script: string, userGesture?: boolean) => {
+          return pane.view.webContents.executeJavaScript(script, userGesture);
+        },
+      })),
+      getInjectRuntimeScript: () => this.getInjectRuntimeScript(),
+      onPaneExecutionError: (paneIndex, error) => {
+        console.error(`[ViewManager] Failed to send prompt to pane ${paneIndex}:`, error);
+      },
+    });
     this.paneLoadMonitor = new PaneLoadMonitor({
       maxRetries: PANE_LOAD_MAX_RETRIES,
       retryBaseDelayMs: PANE_LOAD_RETRY_BASE_DELAY_MS,
@@ -167,53 +184,13 @@ export class ViewManager {
     });
   }
 
-  /**
-   * Get drawable content size (exclude native window frame/title/menu areas)
-   */
-  private getContentSize(): { width: number; height: number } {
-    const contentBounds = this.window.getContentBounds();
-    return {
-      width: Math.max(1, contentBounds.width),
-      height: Math.max(1, contentBounds.height),
-    };
-  }
-
-  private getPaneAreaFallbackBounds(contentSize: { width: number; height: number }): ViewRect {
-    const paneAreaX = Math.max(0, Math.min(this.currentSidebarWidth, contentSize.width - 1));
-    return {
-      x: paneAreaX,
-      y: 0,
-      width: Math.max(1, contentSize.width - paneAreaX),
-      height: contentSize.height,
-    };
-  }
-
-  private getQuickPromptAnchorBounds(contentSize: { width: number; height: number }): ViewRect {
-    if (!this.lastLayout || this.lastLayout.panes.length === 0) {
-      return this.getPaneAreaFallbackBounds(contentSize);
-    }
-
-    const paneIndex = Math.max(
-      0,
-      Math.min(this.quickPromptAnchorPaneIndex, this.lastLayout.panes.length - 1)
-    );
-    return this.lastLayout.panes[paneIndex] ?? this.lastLayout.panes[0];
-  }
-
   private getQuickPromptBounds(): { x: number; y: number; width: number; height: number } {
-    const contentSize = this.getContentSize();
-    const anchor = this.getQuickPromptAnchorBounds(contentSize);
-
-    return calculateQuickPromptBounds({
-      viewport: contentSize,
-      anchor,
+    return this.layoutService.computeQuickPromptBounds({
+      contentBounds: this.window.getContentBounds(),
+      sidebarWidth: this.currentSidebarWidth,
+      lastLayout: this.lastLayout,
+      anchorPaneIndex: this.quickPromptAnchorPaneIndex,
       requestedHeight: this.quickPromptHeight,
-      passthroughMode: QUICK_PROMPT_PASSTHROUGH_MODE,
-      minWidth: QUICK_PROMPT_MIN_WIDTH,
-      maxWidth: QUICK_PROMPT_MAX_WIDTH,
-      minHeight: QUICK_PROMPT_MIN_HEIGHT,
-      maxHeight: QUICK_PROMPT_MAX_HEIGHT,
-      viewportPadding: QUICK_PROMPT_VIEWPORT_PADDING,
     });
   }
 
@@ -260,30 +237,31 @@ export class ViewManager {
   }
 
   private handleGlobalShortcut(event: Event, input: Input, sourceWebContents: WebContents): void {
-    const isKeyDownLike = input.type === 'keyDown' || input.type === 'rawKeyDown';
-    if (!isKeyDownLike || input.isAutoRepeat) {
+    const action = resolveShortcutAction({
+      type: input.type,
+      isAutoRepeat: input.isAutoRepeat,
+      key: input.key,
+      control: input.control,
+      meta: input.meta,
+      alt: input.alt,
+      shift: input.shift,
+    });
+
+    if (action === 'noop') {
       return;
     }
 
-    const key = typeof input.key === 'string' ? input.key.toLowerCase() : '';
-    const isShortcutModifier = Boolean(input.control || input.meta);
-    const isBaseShortcut = isShortcutModifier && !input.alt && !input.shift;
-
-    if (isBaseShortcut && key === 'j') {
-      event.preventDefault();
+    event.preventDefault();
+    if (action === 'toggleQuickPrompt') {
       this.updateQuickPromptAnchorFromSource(sourceWebContents);
       this.toggleQuickPrompt();
       return;
     }
-
-    if (isBaseShortcut && key === 'b') {
-      event.preventDefault();
+    if (action === 'notifySidebarToggle') {
       this.notifySidebarToggleShortcut();
       return;
     }
-
-    if (isBaseShortcut && key === 'r') {
-      event.preventDefault();
+    if (action === 'resetAllPanes') {
       this.resetAllPanesToProviderHome();
     }
   }
@@ -513,81 +491,15 @@ export class ViewManager {
   }
 
   private notifySidebarToggleShortcut(): void {
-    if (!this.sidebarView) {
-      return;
-    }
-    this.sidebarView.webContents.executeJavaScript(
-      `window.dispatchEvent(new Event('${SIDEBAR_TOGGLE_SHORTCUT_EVENT}'));`,
-      true
-    ).catch((error) => {
-      console.error('[ViewManager] Failed to dispatch sidebar toggle shortcut event:', error);
-    });
-  }
-
-  private dispatchSidebarCustomEvent(eventName: string, detail: unknown): void {
-    if (!this.sidebarView) {
-      return;
-    }
-
-    const serializedEventName = JSON.stringify(eventName);
-    const serializedDetail = JSON.stringify(detail);
-    this.sidebarView.webContents.executeJavaScript(
-      `window.dispatchEvent(new CustomEvent(${serializedEventName}, { detail: ${serializedDetail} }));`,
-      true
-    ).catch((error) => {
-      console.error(`[ViewManager] Failed to dispatch sidebar event ${eventName}:`, error);
-    });
-  }
-
-  private notifyProviderLoadingState(paneIndex: number, loading: boolean): void {
-    this.dispatchSidebarCustomEvent(PROVIDER_LOADING_EVENT, {
-      paneIndex,
-      loading,
-    });
+    this.sidebarEventBridge.dispatchEvent(SIDEBAR_TOGGLE_SHORTCUT_EVENT);
   }
 
   private clearProviderLoadingTracking(paneIndex: number): void {
-    if (!this.providerSwitchLoadTokens.has(paneIndex)) {
-      return;
-    }
-
-    this.providerSwitchLoadTokens.delete(paneIndex);
-    this.notifyProviderLoadingState(paneIndex, false);
+    this.sidebarEventBridge.clearProviderLoadingTracking(paneIndex);
   }
 
   private beginProviderLoadingTracking(paneIndex: number, webContents: WebContents): void {
-    const token = `${paneIndex}:${Date.now()}:${Math.random()}`;
-    this.providerSwitchLoadTokens.set(paneIndex, token);
-    this.notifyProviderLoadingState(paneIndex, true);
-
-    const complete = () => {
-      if (webContents.isLoadingMainFrame()) {
-        return;
-      }
-      cleanup();
-      if (this.providerSwitchLoadTokens.get(paneIndex) !== token) {
-        return;
-      }
-      this.providerSwitchLoadTokens.delete(paneIndex);
-      this.notifyProviderLoadingState(paneIndex, false);
-    };
-
-    const fail = () => {
-      cleanup();
-      if (this.providerSwitchLoadTokens.get(paneIndex) !== token) {
-        return;
-      }
-      this.providerSwitchLoadTokens.delete(paneIndex);
-      this.notifyProviderLoadingState(paneIndex, false);
-    };
-
-    const cleanup = () => {
-      webContents.removeListener('did-stop-loading', complete);
-      webContents.removeListener('did-fail-load', fail);
-    };
-
-    webContents.on('did-stop-loading', complete);
-    webContents.on('did-fail-load', fail);
+    this.sidebarEventBridge.beginProviderLoadingTracking(paneIndex, webContents);
   }
 
   private loadPaneUrl(
@@ -826,10 +738,8 @@ export class ViewManager {
       this.currentSidebarWidth = sidebarWidth;
     }
 
-    const contentSize = this.getContentSize();
-    const layout = calculateLayout({
-      windowWidth: contentSize.width,
-      windowHeight: contentSize.height,
+    const { layout } = this.layoutService.computeLayout({
+      contentBounds: this.window.getContentBounds(),
       sidebarWidth: this.currentSidebarWidth,
       paneCount: this.currentPaneCount,
     });
@@ -857,72 +767,14 @@ export class ViewManager {
    * Send prompt to all panes
    */
   async sendPromptToAll(text: string): Promise<{ success: boolean; failures: string[] }> {
-    let promptEvalScript: string;
-
-    try {
-      promptEvalScript = buildPromptInjectionEvalScript(text);
-    } catch (error) {
-      return {
-        success: false,
-        failures: [`invalid-prompt: ${toFailureReason(error)}`],
-      };
-    }
-
-    return this.executePromptEvalScriptOnAllPanes(promptEvalScript);
+    return this.promptDispatchService.sendPromptToAll(text);
   }
 
   /**
    * Sync prompt draft text to all panes without submitting
    */
   async syncPromptDraftToAll(text: string): Promise<{ success: boolean; failures: string[] }> {
-    let draftSyncEvalScript: string;
-
-    try {
-      draftSyncEvalScript = buildPromptDraftSyncEvalScript(text);
-    } catch (error) {
-      return {
-        success: false,
-        failures: [`invalid-prompt-draft: ${toFailureReason(error)}`],
-      };
-    }
-
-    return this.executePromptEvalScriptOnAllPanes(draftSyncEvalScript);
-  }
-
-  private async executePromptEvalScriptOnAllPanes(
-    promptEvalScript: string
-  ): Promise<{ success: boolean; failures: string[] }> {
-    const failures: string[] = [];
-    const injectRuntimeScript = this.getInjectRuntimeScript();
-    if (!injectRuntimeScript) {
-      return {
-        success: false,
-        failures: this.paneViews.map((pane) => `pane-${pane.paneIndex}: inject runtime not available`),
-      };
-    }
-
-    for (const pane of this.paneViews) {
-      try {
-        await pane.view.webContents.executeJavaScript(injectRuntimeScript, true);
-        const result = await pane.view.webContents.executeJavaScript(
-          promptEvalScript,
-          true
-        ) as PromptInjectionResult | undefined;
-
-        if (!result?.success) {
-          const reason = result?.reason ?? 'prompt injection failed';
-          failures.push(`pane-${pane.paneIndex}: ${reason}`);
-        }
-      } catch (error) {
-        console.error(`[ViewManager] Failed to send prompt to pane ${pane.paneIndex}:`, error);
-        failures.push(`pane-${pane.paneIndex}: ${toFailureReason(error)}`);
-      }
-    }
-
-    return {
-      success: failures.length === 0,
-      failures,
-    };
+    return this.promptDispatchService.syncPromptDraftToAll(text);
   }
 
   private getInjectRuntimeScript(): string | null {
