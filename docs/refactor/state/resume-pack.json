@@ -1,0 +1,21 @@
+{
+  "clip": "CLIP-2",
+  "phase": "TBD",
+  "active_task_ids": [],
+  "completed_task_ids": [],
+  "blocked_task_ids": [],
+  "open_decisions": [],
+  "invariants": [
+    "No cross-layer forbidden imports",
+    "No behavior change without explicit CLIP scope adjustment"
+  ],
+  "next_actions": [],
+  "verification": {
+    "required_commands": [
+      "just check",
+      "just test"
+    ],
+    "last_green_commit": "TBD"
+  },
+  "risk_watchlist": []
+}
