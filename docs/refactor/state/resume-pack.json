@@ -1,21 +1,45 @@
 {
   "clip": "CLIP-2",
-  "phase": "TBD",
-  "active_task_ids": [],
-  "completed_task_ids": [],
+  "phase": "Phase 2",
+  "active_task_ids": [
+    "2.B.06"
+  ],
+  "completed_task_ids": [
+    "0.A.02",
+    "0.A.03",
+    "0.A.04",
+    "1.A.01",
+    "1.A.02",
+    "1.A.03",
+    "1.A.05",
+    "2.B.01",
+    "2.B.02",
+    "2.B.03",
+    "2.B.04",
+    "2.B.05"
+  ],
   "blocked_task_ids": [],
-  "open_decisions": [],
+  "open_decisions": [
+    "Whether PaneLifecycleService should become state-owning in Phase 2 completion or remain callback-based."
+  ],
   "invariants": [
     "No cross-layer forbidden imports",
     "No behavior change without explicit CLIP scope adjustment"
   ],
-  "next_actions": [],
+  "next_actions": [
+    "Complete task 2.B.06 by removing remaining direct orchestration branches in manager.ts.",
+    "Add manager integration tests for service wiring paths.",
+    "Refresh refactor state artifacts after each commit slice."
+  ],
   "verification": {
     "required_commands": [
       "just check",
       "just test"
     ],
-    "last_green_commit": "TBD"
+    "last_green_commit": "3de5c9966d624d1bfbaf94ca1508f9837edcc072"
   },
-  "risk_watchlist": []
+  "risk_watchlist": [
+    "ViewManager still contains pane WebContents lifecycle details while task 2.B.06 remains open.",
+    "Phase 1 import migration (1.A.04) is not complete and may hide residual boundary debt."
+  ]
 }

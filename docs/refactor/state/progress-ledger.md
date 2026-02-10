@@ -3,25 +3,25 @@
 ## Phase 0
 
 - [ ] 0.A.01 baseline test inventory and report
-- [ ] 0.A.02 import-boundary check script
-- [ ] 0.A.03 state artifact scaffold
-- [ ] 0.A.04 first resume-pack generation
+- [x] 0.A.02 import-boundary check script
+- [x] 0.A.03 state artifact scaffold
+- [x] 0.A.04 first resume-pack generation
 
 ## Phase 1
 
-- [ ] 1.A.01 shared IPC contracts package
-- [ ] 1.A.02 compatibility re-exports
-- [ ] 1.A.03 shared config extraction
+- [x] 1.A.01 shared IPC contracts package
+- [x] 1.A.02 compatibility re-exports
+- [x] 1.A.03 shared config extraction
 - [ ] 1.A.04 import migration
-- [ ] 1.A.05 boundary check enforcement
+- [x] 1.A.05 boundary check enforcement
 
 ## Phase 2
 
-- [ ] 2.B.01 pane load monitor hardening
-- [ ] 2.B.02 layout service extraction
-- [ ] 2.B.03 shortcut dispatcher extraction
-- [ ] 2.B.04 sidebar event bridge extraction
-- [ ] 2.B.05 prompt dispatch service extraction
+- [x] 2.B.01 pane load monitor hardening
+- [x] 2.B.02 layout service extraction
+- [x] 2.B.03 shortcut dispatcher extraction
+- [x] 2.B.04 sidebar event bridge extraction
+- [x] 2.B.05 prompt dispatch service extraction
 - [ ] 2.B.06 manager coordinator finalization
 
 ## Phase 3
