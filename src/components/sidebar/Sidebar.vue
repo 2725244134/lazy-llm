@@ -221,6 +221,14 @@ const setPaneCount = async (count: number) => {
   }
 }
 
+const newAll = async () => {
+  try {
+    await runtime.resetAllPanes()
+  } catch (e) {
+    console.error('[Sidebar] newAll error:', e)
+  }
+}
+
 const setProvider = async (paneIndex: number, providerKey: string) => {
   if (activeProviders.value[paneIndex] === providerKey) return
 
@@ -256,6 +264,7 @@ const sidebarContext: SidebarContext = {
   activeProviders,
   providerLoadingByPane,
   setPaneCount,
+  newAll,
   setProvider,
   syncPromptDraft,
   sendPrompt,

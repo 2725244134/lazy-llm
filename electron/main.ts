@@ -134,6 +134,16 @@ function registerIPCHandlers() {
     return { success: true };
   });
 
+  // Reset all panes to each provider's home page
+  ipcMain.handle(IPC_CHANNELS.PANE_RESET_ALL, () => {
+    if (!viewManager) {
+      return { success: false };
+    }
+    const success = viewManager.resetAllPanesToProviderHome();
+    console.log('[IPC] pane:resetAll', { success });
+    return { success };
+  });
+
   // Update provider for pane
   ipcMain.handle(IPC_CHANNELS.PANE_UPDATE_PROVIDER, (_event, request: PaneUpdateRequest) => {
     if (!viewManager) {

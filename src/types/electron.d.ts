@@ -3,6 +3,7 @@ import type {
   AppConfig,
   PaneCountRequest,
   PaneCountResponse,
+  PaneResetAllResponse,
   PaneUpdateRequest,
   PaneUpdateResponse,
   PromptRequest,
@@ -23,6 +24,7 @@ export interface CouncilAPI {
   healthCheck: () => Promise<HealthResponse>;
   getConfig: () => Promise<AppConfig>;
   setPaneCount: (request: PaneCountRequest) => Promise<PaneCountResponse>;
+  resetAllPanes: () => Promise<PaneResetAllResponse>;
   updateProvider: (request: PaneUpdateRequest) => Promise<PaneUpdateResponse>;
   sendPrompt: (request: PromptRequest) => Promise<PromptResponse>;
   syncPromptDraft: (request: PromptSyncRequest) => Promise<PromptSyncResponse>;

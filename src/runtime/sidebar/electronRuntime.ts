@@ -19,6 +19,13 @@ export function createElectronRuntime(): SidebarRuntime {
       }
     },
 
+    async resetAllPanes(): Promise<void> {
+      const result = await council.resetAllPanes();
+      if (!result.success) {
+        throw new Error('Failed to reset all panes');
+      }
+    },
+
     async updateProvider(paneIndex: number, providerKey: string): Promise<void> {
       const result = await council.updateProvider({ paneIndex, providerKey });
       if (!result.success) {

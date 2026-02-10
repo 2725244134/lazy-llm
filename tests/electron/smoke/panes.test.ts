@@ -23,4 +23,11 @@ test.describe('Smoke / Panes', () => {
 
     await expect(firstProvider.locator('.trigger-label')).toHaveText(/grok/i);
   });
+
+  test('new all button is visible and clickable', async ({ appWindow }) => {
+    const newAllButton = appWindow.locator(selectors.paneNewAllButton);
+    await expect(newAllButton).toBeVisible();
+    await newAllButton.click();
+    await expect(appWindow.locator('.provider-list .provider-item')).toHaveCount(3);
+  });
 });

@@ -10,6 +10,7 @@ function stubWindowCouncil(overrides: Partial<Window['council']> = {}) {
       quick_prompt: { default_height: 74 },
     }),
     setPaneCount: vi.fn().mockResolvedValue({ success: true }),
+    resetAllPanes: vi.fn().mockResolvedValue({ success: true }),
     updateProvider: vi.fn().mockResolvedValue({ success: true, paneIndex: 0 }),
     sendPrompt: vi.fn().mockResolvedValue({ success: true }),
     syncPromptDraft: vi.fn().mockResolvedValue({ success: true }),
@@ -61,6 +62,25 @@ describe('createElectronRuntime', () => {
     const runtime = createElectronRuntime();
 
     await expect(runtime.setPaneCount(2)).rejects.toThrow('Failed to set pane count');
+  });
+
+  it('forwards reset-all requests to Electron bridge', async () => {
+    const resetAllPanes = vi.fn().mockResolvedValue({ success: true });
+    stubWindowCouncil({ resetAllPanes });
+    const runtime = createElectronRuntime();
+
+    await runtime.resetAllPanes();
+
+    expect(resetAllPanes).toHaveBeenCalled();
+  });
+
+  it('throws when resetAllPanes returns unsuccessful result', async () => {
+    stubWindowCouncil({
+      resetAllPanes: vi.fn().mockResolvedValue({ success: false }),
+    });
+    const runtime = createElectronRuntime();
+
+    await expect(runtime.resetAllPanes()).rejects.toThrow('Failed to reset all panes');
   });
 
   it('throws with failure details when sendPrompt fails', async () => {

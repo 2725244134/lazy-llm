@@ -19,6 +19,13 @@ const sidebar = inject(SIDEBAR_KEY)!
         {{ n }}
       </button>
     </div>
+    <button
+      class="new-all-btn"
+      title="Open provider home in all panes (Ctrl/Cmd+R)"
+      @click="void sidebar.newAll()"
+    >
+      NEW ALL
+    </button>
   </SidebarSection>
 </template>
 
@@ -55,5 +62,26 @@ const sidebar = inject(SIDEBAR_KEY)!
   color: var(--bg);
   font-weight: 700;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.new-all-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border: 1.5px dashed var(--border);
+  background: transparent;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease-out;
+}
+
+.new-all-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--select-item-hover-bg);
 }
 </style>

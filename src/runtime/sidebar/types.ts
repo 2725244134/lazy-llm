@@ -5,6 +5,7 @@ export type PaneCount = 1 | 2 | 3 | 4;
 export interface SidebarRuntime {
   getConfig(): Promise<AppConfig>;
   setPaneCount(count: PaneCount): Promise<void>;
+  resetAllPanes(): Promise<void>;
   updateProvider(paneIndex: number, providerKey: string): Promise<void>;
   updateSidebarWidth(width: number): Promise<void>;
   updateLayout(args: {

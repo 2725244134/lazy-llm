@@ -7,4 +7,5 @@ export const selectors = {
   promptSendButton: 'button.composer-send-btn',
   paneChip1: '.pane-toggle .chip:nth-child(1)',
   paneChip3: '.pane-toggle .chip:nth-child(3)',
+  paneNewAllButton: '.new-all-btn',
 } as const;

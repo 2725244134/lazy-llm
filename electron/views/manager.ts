@@ -2,7 +2,15 @@
  * ViewManager - manages sidebar and pane WebContentsViews
  */
 
-import { BaseWindow, type Event, type Input, WebContents, WebContentsView } from 'electron';
+import {
+  BaseWindow,
+  Menu,
+  type ContextMenuParams,
+  type Event,
+  type Input,
+  WebContents,
+  WebContentsView,
+} from 'electron';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -210,6 +218,12 @@ export class ViewManager {
     if (isBaseShortcut && key === 'b') {
       event.preventDefault();
       this.notifySidebarToggleShortcut();
+      return;
+    }
+
+    if (isBaseShortcut && key === 'r') {
+      event.preventDefault();
+      this.resetAllPanesToProviderHome();
     }
   }
 
@@ -232,6 +246,70 @@ export class ViewManager {
   private attachSidebarRuntimePreferenceHooks(webContents: WebContents): void {
     webContents.on('did-finish-load', () => {
       this.applySidebarRuntimePreferences(webContents);
+    });
+  }
+
+  private buildPaneContextMenu(
+    webContents: WebContents,
+    params: ContextMenuParams
+  ): Menu {
+    const canGoBack = webContents.navigationHistory.canGoBack();
+    const canGoForward = webContents.navigationHistory.canGoForward();
+    const inspectX = Math.floor(params.x);
+    const inspectY = Math.floor(params.y);
+
+    return Menu.buildFromTemplate([
+      {
+        label: 'Back',
+        enabled: canGoBack,
+        click: () => {
+          if (!webContents.isDestroyed() && webContents.navigationHistory.canGoBack()) {
+            webContents.navigationHistory.goBack();
+          }
+        },
+      },
+      {
+        label: 'Forward',
+        enabled: canGoForward,
+        click: () => {
+          if (!webContents.isDestroyed() && webContents.navigationHistory.canGoForward()) {
+            webContents.navigationHistory.goForward();
+          }
+        },
+      },
+      {
+        label: 'Reload',
+        click: () => {
+          if (!webContents.isDestroyed()) {
+            webContents.reload();
+          }
+        },
+      },
+      { type: 'separator' },
+      {
+        label: 'Inspect',
+        click: () => {
+          if (!webContents.isDestroyed()) {
+            webContents.inspectElement(inspectX, inspectY);
+          }
+        },
+      },
+    ]);
+  }
+
+  private attachPaneContextMenuHooks(webContents: WebContents): void {
+    webContents.on('context-menu', (_event: Event, params: ContextMenuParams) => {
+      if (webContents.isDestroyed()) {
+        return;
+      }
+      const menu = this.buildPaneContextMenu(webContents, params);
+      menu.popup({
+        window: this.window,
+        frame: params.frame ?? undefined,
+        x: Math.floor(params.x),
+        y: Math.floor(params.y),
+        sourceType: params.menuSourceType,
+      });
     });
   }
 
@@ -461,6 +539,7 @@ export class ViewManager {
       },
     });
     this.attachGlobalShortcutHooks(view.webContents);
+    this.attachPaneContextMenuHooks(view.webContents);
     this.attachPaneRuntimePreferenceHooks(view.webContents);
     this.applyPaneRuntimePreferences(view.webContents);
     return view;
@@ -596,6 +675,51 @@ export class ViewManager {
     this.updateLayout();
 
     return true;
+  }
+
+  /**
+   * Reload all panes to each pane's active provider home page.
+   */
+  resetAllPanesToProviderHome(): boolean {
+    let success = true;
+
+    for (const pane of this.paneViews) {
+      const provider = this.providers.get(pane.providerKey);
+      if (!provider) {
+        success = false;
+        this.clearProviderLoadingTracking(pane.paneIndex);
+        console.error(`[ViewManager] Cannot reset pane ${pane.paneIndex}: unknown provider ${pane.providerKey}`);
+        continue;
+      }
+
+      const providerUrl = provider.url;
+      const cachedViewEntry = pane.cachedViews.get(pane.providerKey);
+
+      if (cachedViewEntry) {
+        cachedViewEntry.url = providerUrl;
+        if (pane.view !== cachedViewEntry.view) {
+          this.removePaneViewFromContent(pane.view);
+          this.window.contentView.addChildView(cachedViewEntry.view);
+        }
+        pane.view = cachedViewEntry.view;
+      } else {
+        const nextView = this.createPaneWebContentsView(pane.paneIndex);
+        this.window.contentView.addChildView(nextView);
+        pane.cachedViews.set(pane.providerKey, { view: nextView, url: providerUrl });
+        this.removePaneViewFromContent(pane.view);
+        pane.view = nextView;
+      }
+
+      this.applyPaneRuntimePreferences(pane.view.webContents);
+      this.beginProviderLoadingTracking(pane.paneIndex, pane.view.webContents);
+      pane.view.webContents.loadURL(providerUrl);
+      pane.url = providerUrl;
+      this.defaultProviders[pane.paneIndex] = pane.providerKey;
+    }
+
+    this.keepQuickPromptOnTop();
+    this.updateLayout();
+    return success;
   }
 
   /**

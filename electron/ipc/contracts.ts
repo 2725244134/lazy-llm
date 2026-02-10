@@ -8,6 +8,7 @@ export const IPC_CHANNELS = {
   APP_HEALTH: 'app:health',
   CONFIG_GET: 'config:get',
   PANE_SET_COUNT: 'pane:setCount',
+  PANE_RESET_ALL: 'pane:resetAll',
   PANE_UPDATE_PROVIDER: 'pane:updateProvider',
   PROMPT_SEND: 'prompt:send',
   PROMPT_SYNC_DRAFT: 'prompt:syncDraft',
@@ -56,6 +57,10 @@ export interface PaneCountRequest {
 }
 
 export interface PaneCountResponse {
+  success: boolean;
+}
+
+export interface PaneResetAllResponse {
   success: boolean;
 }
 
@@ -164,6 +169,10 @@ export interface IPCContract {
   [IPC_CHANNELS.PANE_SET_COUNT]: {
     request: PaneCountRequest;
     response: PaneCountResponse;
+  };
+  [IPC_CHANNELS.PANE_RESET_ALL]: {
+    request: void;
+    response: PaneResetAllResponse;
   };
   [IPC_CHANNELS.PANE_UPDATE_PROVIDER]: {
     request: PaneUpdateRequest;

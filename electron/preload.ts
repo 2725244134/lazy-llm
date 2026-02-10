@@ -5,6 +5,7 @@ import type {
   AppConfig,
   PaneCountRequest,
   PaneCountResponse,
+  PaneResetAllResponse,
   PaneUpdateRequest,
   PaneUpdateResponse,
   PromptRequest,
@@ -36,6 +37,11 @@ const councilAPI = {
   // Set pane count
   setPaneCount: (request: PaneCountRequest): Promise<PaneCountResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PANE_SET_COUNT, request);
+  },
+
+  // Reset all panes to each provider home page
+  resetAllPanes: (): Promise<PaneResetAllResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.PANE_RESET_ALL);
   },
 
   // Update provider for a pane

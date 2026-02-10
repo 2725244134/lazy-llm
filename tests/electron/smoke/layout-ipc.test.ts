@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/electronApp';
-import { getHealthCheck } from '../helpers/council';
+import { getHealthCheck, resetAllPanes } from '../helpers/council';
 
 test.describe('Smoke / IPC', () => {
   test('IPC health check works', async ({ appWindow }) => {
@@ -15,6 +15,11 @@ test.describe('Smoke / IPC', () => {
       return window.council.updateLayout({ paneCount: 3, sidebarWidth: 320 });
     });
 
+    expect(result.success).toBe(true);
+  });
+
+  test('reset-all IPC succeeds', async ({ appWindow }) => {
+    const result = await resetAllPanes(appWindow);
     expect(result.success).toBe(true);
   });
 });

@@ -1,6 +1,7 @@
 import { expect, type Page } from '@playwright/test';
 import type {
   HealthResponse,
+  PaneResetAllResponse,
   PaneUpdateRequest,
   PaneUpdateResponse,
   QuickPromptHideResponse,
@@ -11,6 +12,7 @@ import type {
 
 type CouncilApi = {
   healthCheck: () => Promise<HealthResponse>;
+  resetAllPanes: () => Promise<PaneResetAllResponse>;
   toggleQuickPrompt: () => Promise<QuickPromptToggleResponse>;
   hideQuickPrompt: () => Promise<QuickPromptHideResponse>;
   resizeQuickPrompt: (request: QuickPromptResizeRequest) => Promise<QuickPromptResizeResponse>;
@@ -39,6 +41,13 @@ export async function getHealthCheck(page: Page): Promise<HealthResponse> {
   await ensureCouncilReady(page);
   return page.evaluate(() => {
     return (window as unknown as BrowserWindowWithCouncil).council.healthCheck();
+  });
+}
+
+export async function resetAllPanes(page: Page): Promise<PaneResetAllResponse> {
+  await ensureCouncilReady(page);
+  return page.evaluate(() => {
+    return (window as unknown as BrowserWindowWithCouncil).council.resetAllPanes();
   });
 }
 

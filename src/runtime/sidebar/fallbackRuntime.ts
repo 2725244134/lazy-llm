@@ -30,6 +30,9 @@ export function createFallbackRuntime(): SidebarRuntime {
     async setPaneCount(_count: PaneCount): Promise<void> {
       // No-op in fallback mode
     },
+    async resetAllPanes(): Promise<void> {
+      // No-op in fallback mode
+    },
     async updateProvider(_paneIndex: number, _providerKey: string): Promise<void> {
       // No-op in fallback mode
     },
