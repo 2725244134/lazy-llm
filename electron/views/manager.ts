@@ -19,6 +19,12 @@ import { APP_CONFIG } from '../../src/config/app.js';
 import { type LayoutResult } from './geometry.js';
 import { LayoutService } from './layoutService.js';
 import { PaneLoadMonitor, areUrlsEquivalent } from './paneLoadMonitor.js';
+import {
+  type PaneViewState,
+  resetAllPanesToProviderHomeWithLifecycle,
+  setPaneCountWithLifecycle,
+  updatePaneProviderWithLifecycle,
+} from './paneLifecycleService.js';
 import { PromptDispatchService } from './promptDispatchService.js';
 import { buildQuickPromptDataUrl } from './quick-prompt/index.js';
 import { resolveShortcutAction } from './shortcutDispatcher.js';
@@ -102,14 +108,6 @@ const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingE
 const PANE_LOAD_MAX_RETRIES = 2;
 const PANE_LOAD_RETRY_BASE_DELAY_MS = 450;
 
-interface PaneView {
-  view: WebContentsView;
-  paneIndex: number;
-  providerKey: string;
-  url: string;
-  cachedViews: Map<string, { view: WebContentsView; url: string }>;
-}
-
 interface ViewManagerOptions {
   config: AppConfig;
   runtimePreferences: RuntimePreferences;
@@ -119,7 +117,7 @@ export class ViewManager {
   private window: BaseWindow;
   private sidebarView: WebContentsView | null = null;
   private quickPromptView: WebContentsView | null = null;
-  private paneViews: PaneView[] = [];
+  private paneViews: PaneViewState[] = [];
   private currentPaneCount: PaneCount = 1;
   private currentSidebarWidth: number;
   private quickPromptVisible = false;
@@ -546,7 +544,7 @@ export class ViewManager {
     }
   }
 
-  private closePane(pane: PaneView): void {
+  private closePane(pane: PaneViewState): void {
     const uniqueViews = new Set<WebContentsView>();
     for (const cached of pane.cachedViews.values()) {
       uniqueViews.add(cached.view);
@@ -575,151 +573,79 @@ export class ViewManager {
    */
   setPaneCount(count: PaneCount): void {
     this.defaultProviders = padProviderSequence(this.defaultProviders, count);
-
-    // Remove excess panes
-    while (this.paneViews.length > count) {
-      const pane = this.paneViews.pop()!;
-      this.clearProviderLoadingTracking(pane.paneIndex);
-      this.closePane(pane);
-    }
-
-    // Add missing panes
-    while (this.paneViews.length < count) {
-      const paneIndex = this.paneViews.length;
-      const providerKey = this.defaultProviders[paneIndex] ?? 'chatgpt';
-      const provider = this.providers.get(providerKey);
-      const url = provider?.url || 'about:blank';
-      const view = this.createPaneWebContentsView(paneIndex);
-
-      this.window.contentView.addChildView(view);
-      this.loadPaneUrl(paneIndex, view, url, false);
-
-      this.paneViews.push({
-        view,
-        paneIndex,
-        providerKey,
-        url,
-        cachedViews: new Map([[providerKey, { view, url }]]),
-      });
-    }
-
-    this.currentPaneCount = count;
-    this.quickPromptAnchorPaneIndex = Math.max(
-      0,
-      Math.min(this.quickPromptAnchorPaneIndex, this.paneViews.length - 1)
-    );
-    this.keepQuickPromptOnTop();
-    this.updateLayout();
+    const result = setPaneCountWithLifecycle({
+      count,
+      paneViews: this.paneViews,
+      defaultProviders: this.defaultProviders,
+      providers: this.providers,
+      quickPromptAnchorPaneIndex: this.quickPromptAnchorPaneIndex,
+      callbacks: {
+        createPaneWebContentsView: (paneIndex) => this.createPaneWebContentsView(paneIndex),
+        addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
+        removePaneViewFromContent: (view) => this.removePaneViewFromContent(view),
+        loadPaneUrl: (paneIndex, view, targetUrl, trackLoading) =>
+          this.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
+        applyPaneRuntimePreferences: (webContents) => this.applyPaneRuntimePreferences(webContents),
+        clearProviderLoadingTracking: (paneIndex) => this.clearProviderLoadingTracking(paneIndex),
+        closePane: (pane) => this.closePane(pane),
+        keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
+        updateLayout: () => this.updateLayout(),
+        setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
+      },
+    });
+    this.currentPaneCount = result.currentPaneCount;
+    this.quickPromptAnchorPaneIndex = result.quickPromptAnchorPaneIndex;
   }
 
   /**
    * Update provider for a specific pane
    */
   updatePaneProvider(paneIndex: number, providerKey: string): boolean {
-    if (paneIndex < 0 || paneIndex >= this.paneViews.length) {
-      console.error(`[ViewManager] Invalid pane index: ${paneIndex}`);
-      return false;
-    }
-
-    const provider = this.providers.get(providerKey);
-    if (!provider) {
-      console.error(`[ViewManager] Unknown provider: ${providerKey}`);
-      return false;
-    }
-
-    const pane = this.paneViews[paneIndex];
-    if (pane.providerKey === providerKey) {
-      return true;
-    }
-    this.setQuickPromptAnchorPaneIndex(paneIndex);
-
-    const cachedViewEntry = pane.cachedViews.get(providerKey);
-    if (cachedViewEntry) {
-      const cachedCurrentUrl = cachedViewEntry.view.webContents.getURL();
-      const shouldReload = !areUrlsEquivalent(cachedViewEntry.url, provider.url)
-        || !areUrlsEquivalent(cachedCurrentUrl, provider.url);
-
-      if (shouldReload) {
-        cachedViewEntry.url = provider.url;
-        this.applyPaneRuntimePreferences(cachedViewEntry.view.webContents);
-        this.loadPaneUrl(paneIndex, cachedViewEntry.view, provider.url, true);
-      } else {
-        this.clearProviderLoadingTracking(paneIndex);
-      }
-
-      if (pane.view !== cachedViewEntry.view) {
-        this.removePaneViewFromContent(pane.view);
-        this.window.contentView.addChildView(cachedViewEntry.view);
-      }
-
-      pane.view = cachedViewEntry.view;
-      pane.providerKey = providerKey;
-      pane.url = cachedViewEntry.url;
-      this.defaultProviders[paneIndex] = providerKey;
-      this.applyPaneRuntimePreferences(pane.view.webContents);
-      this.keepQuickPromptOnTop();
-      this.updateLayout();
-      return true;
-    }
-
-    const nextView = this.createPaneWebContentsView(paneIndex);
-    this.window.contentView.addChildView(nextView);
-    this.loadPaneUrl(paneIndex, nextView, provider.url, true);
-    pane.cachedViews.set(providerKey, { view: nextView, url: provider.url });
-
-    this.removePaneViewFromContent(pane.view);
-    pane.view = nextView;
-    pane.providerKey = providerKey;
-    pane.url = provider.url;
-    this.defaultProviders[paneIndex] = providerKey;
-    this.keepQuickPromptOnTop();
-    this.updateLayout();
-
-    return true;
+    return updatePaneProviderWithLifecycle({
+      paneIndex,
+      providerKey,
+      paneViews: this.paneViews,
+      defaultProviders: this.defaultProviders,
+      providers: this.providers,
+      areUrlsEquivalent,
+      callbacks: {
+        createPaneWebContentsView: (nextPaneIndex) => this.createPaneWebContentsView(nextPaneIndex),
+        addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
+        removePaneViewFromContent: (view) => this.removePaneViewFromContent(view),
+        loadPaneUrl: (nextPaneIndex, view, targetUrl, trackLoading) =>
+          this.loadPaneUrl(nextPaneIndex, view, targetUrl, trackLoading),
+        applyPaneRuntimePreferences: (webContents) => this.applyPaneRuntimePreferences(webContents),
+        clearProviderLoadingTracking: (nextPaneIndex) => this.clearProviderLoadingTracking(nextPaneIndex),
+        closePane: (pane) => this.closePane(pane),
+        keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
+        updateLayout: () => this.updateLayout(),
+        setQuickPromptAnchorPaneIndex: (nextPaneIndex) => this.setQuickPromptAnchorPaneIndex(nextPaneIndex),
+      },
+    });
   }
 
   /**
    * Reload all panes to each pane's active provider home page.
    */
   resetAllPanesToProviderHome(): boolean {
-    let success = true;
-
-    for (const pane of this.paneViews) {
-      const provider = this.providers.get(pane.providerKey);
-      if (!provider) {
-        success = false;
-        this.clearProviderLoadingTracking(pane.paneIndex);
-        console.error(`[ViewManager] Cannot reset pane ${pane.paneIndex}: unknown provider ${pane.providerKey}`);
-        continue;
-      }
-
-      const providerUrl = provider.url;
-      const cachedViewEntry = pane.cachedViews.get(pane.providerKey);
-
-      if (cachedViewEntry) {
-        cachedViewEntry.url = providerUrl;
-        if (pane.view !== cachedViewEntry.view) {
-          this.removePaneViewFromContent(pane.view);
-          this.window.contentView.addChildView(cachedViewEntry.view);
-        }
-        pane.view = cachedViewEntry.view;
-      } else {
-        const nextView = this.createPaneWebContentsView(pane.paneIndex);
-        this.window.contentView.addChildView(nextView);
-        pane.cachedViews.set(pane.providerKey, { view: nextView, url: providerUrl });
-        this.removePaneViewFromContent(pane.view);
-        pane.view = nextView;
-      }
-
-      this.applyPaneRuntimePreferences(pane.view.webContents);
-      this.loadPaneUrl(pane.paneIndex, pane.view, providerUrl, true);
-      pane.url = providerUrl;
-      this.defaultProviders[pane.paneIndex] = pane.providerKey;
-    }
-
-    this.keepQuickPromptOnTop();
-    this.updateLayout();
-    return success;
+    return resetAllPanesToProviderHomeWithLifecycle({
+      paneViews: this.paneViews,
+      defaultProviders: this.defaultProviders,
+      providers: this.providers,
+      callbacks: {
+        createPaneWebContentsView: (paneIndex) => this.createPaneWebContentsView(paneIndex),
+        addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
+        removePaneViewFromContent: (view) => this.removePaneViewFromContent(view),
+        loadPaneUrl: (paneIndex, view, targetUrl, trackLoading) =>
+          this.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
+        applyPaneRuntimePreferences: (webContents) => this.applyPaneRuntimePreferences(webContents),
+        clearProviderLoadingTracking: (paneIndex) => this.clearProviderLoadingTracking(paneIndex),
+        closePane: (pane) => this.closePane(pane),
+        keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
+        updateLayout: () => this.updateLayout(),
+        setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
+      },
+    });
   }
 
   /**
