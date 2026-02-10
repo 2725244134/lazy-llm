@@ -30,6 +30,11 @@ check:
   @echo "==> Type-checking (vue-tsc)"
   @bun run typecheck
 
+# Check architecture import boundaries with baseline tolerance.
+arch-check *args:
+  @echo "==> Checking architecture import boundaries"
+  @bun scripts/check_import_boundaries.ts {{args}}
+
 # Run all test suites (unit + electron smoke).
 test:
   @echo "==> Running unit tests"
