@@ -89,6 +89,16 @@ Before merging:
 1. `just check` passes
 2. `just test` passes
 
+### Smoke Test Prerequisite
+
+- Ensure no existing LazyLLM/Electron instance is running before `just test`.
+- In this environment, Playwright Electron smoke tests can exit immediately with
+  `electron.launch: Target page, context or browser has been closed` if another
+  LazyLLM instance is already active.
+- Recommended pre-check/cleanup:
+  - `pgrep -af "LazyLLM|lazy-llm|electron.*lazy-llm"`
+  - `pkill -f "LazyLLM|lazy-llm|electron.*lazy-llm"` (only when stale instances exist)
+
 ## Version Contract
 
 - Keep release tag and app version aligned (validated on tag push):
