@@ -28,9 +28,9 @@
     "No behavior change without explicit CLIP scope adjustment"
   ],
   "next_actions": [
-    "Complete task 2.B.06 by removing remaining direct orchestration branches in manager.ts.",
-    "Add manager integration tests for service wiring paths.",
-    "Eliminate the remaining import-boundary violation in quick prompt styling."
+    "Complete task 2.B.06 by removing remaining direct pane orchestration branches in manager.ts.",
+    "Add manager integration tests for quick prompt and pane view service wiring.",
+    "Prepare Phase 3 handoff once 2.B.06 is complete."
   ],
   "verification": {
     "required_commands": [
@@ -41,6 +41,6 @@
   },
   "risk_watchlist": [
     "ViewManager still contains pane WebContents lifecycle details while task 2.B.06 remains open.",
-    "electron/views/quick-prompt/styles.ts still imports src/theme/palette."
+    "Electron smoke runs can fail when another LazyLLM instance keeps the single-instance lock."
   ]
 }

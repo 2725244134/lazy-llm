@@ -4,7 +4,7 @@
 
 - CLIP: `CLIP-1`
 - Active phase: `Phase 2 — View manager decomposition`
-- Completion: `~46%` (Phase 1 completed, Phase 2 in progress)
+- Completion: `~46%` (Phase 1 completed, Phase 2 in progress with pane view service extraction)
 
 ## Invariants
 
@@ -17,9 +17,9 @@
 
 ## Next actions
 
-1. Complete `2.B.06` by finishing the manager-to-services split.
-2. Add manager integration tests for lifecycle + shortcut + prompt wiring.
-3. Eliminate the final import-boundary violation in quick prompt styling.
+1. Complete `2.B.06` by removing remaining pane-specific orchestration details from `manager.ts`.
+2. Add manager integration tests for quick prompt + pane view service wiring.
+3. Prepare Phase 3 handoff once `2.B.06` is closed.
 
 ## Verification plan
 
@@ -29,7 +29,7 @@
 ## Risk watchlist
 
 - `ViewManager` still includes some lifecycle responsibilities while `2.B.06` is open.
-- `electron/views/quick-prompt/styles.ts` still imports `src/theme/palette`.
+- Smoke tests can be noisy if another LazyLLM instance holds the single-instance lock.
 
 ## Task continuity
 

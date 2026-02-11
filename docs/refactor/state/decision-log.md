@@ -35,3 +35,15 @@
 - Impact:
   - Reduces `manager.ts` state surface and advances task `2.B.06`.
   - Keeps behavior parity while making lifecycle transitions unit-testable via the dedicated service.
+
+## D-004
+
+- Date: 2026-02-11
+- Context: `ViewManager` still owned pane view creation/loading/close mechanics after quick prompt extraction.
+- Decision: Introduce `PaneViewService` and delegate pane WebContents lifecycle operations to it, while keeping `PaneLifecycleService` as orchestration policy layer.
+- Alternatives considered:
+  - Keep pane view lifecycle methods inside `manager.ts` until `2.B.06` final pass.
+  - Fold pane view responsibilities into `PaneLifecycleService` directly.
+- Impact:
+  - Shrinks `manager.ts` low-level pane responsibilities and improves testability with `paneViewService.test.ts`.
+  - Keeps migration incremental and behavior-preserving by preserving existing callback contracts.
