@@ -1,24 +1,41 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { WebContents, WebContentsView } from 'electron';
+import type { BaseWindow, WebContents, WebContentsView } from 'electron';
 import type { PaneViewState } from './paneLifecycleService';
 import { PaneViewService } from './paneViewService';
 
 type PaneHookEvent =
   | 'did-finish-load'
-  | 'focus';
+  | 'focus'
+  | 'before-input-event'
+  | 'context-menu';
+
+type PaneHookListeners = {
+  [event in PaneHookEvent]: Array<(...args: unknown[]) => void>;
+};
 
 type FakePaneWebContents = WebContents & {
-  __emit(event: PaneHookEvent): void;
+  __emit(event: PaneHookEvent, ...args: unknown[]): void;
 };
 
 function createFakePaneWebContents(id: number): FakePaneWebContents {
-  const listeners = new Map<PaneHookEvent, Array<() => void>>();
+  const listeners: PaneHookListeners = {
+    'did-finish-load': [],
+    focus: [],
+    'before-input-event': [],
+    'context-menu': [],
+  };
   const getUserAgent = vi.fn(() => 'fake-user-agent');
   const setUserAgent = vi.fn();
   const setZoomFactor = vi.fn();
   const loadURL = vi.fn(() => Promise.resolve(undefined));
   const close = vi.fn();
   const isDestroyed = vi.fn(() => false);
+  const canGoBack = vi.fn(() => false);
+  const canGoForward = vi.fn(() => false);
+  const goBack = vi.fn();
+  const goForward = vi.fn();
+  const reload = vi.fn();
+  const inspectElement = vi.fn();
 
   const webContents = {
     id,
@@ -29,15 +46,21 @@ function createFakePaneWebContents(id: number): FakePaneWebContents {
     setZoomFactor,
     loadURL,
     close,
+    reload,
+    inspectElement,
     isDestroyed,
-    on: vi.fn((event: PaneHookEvent, listener: () => void) => {
-      const eventListeners = listeners.get(event) ?? [];
-      eventListeners.push(listener);
-      listeners.set(event, eventListeners);
+    navigationHistory: {
+      canGoBack,
+      canGoForward,
+      goBack,
+      goForward,
+    },
+    on: vi.fn((event: PaneHookEvent, listener: (...args: unknown[]) => void) => {
+      listeners[event].push(listener);
     }),
-    __emit(event: PaneHookEvent) {
-      for (const listener of listeners.get(event) ?? []) {
-        listener();
+    __emit(event: PaneHookEvent, ...args: unknown[]) {
+      for (const listener of listeners[event]) {
+        listener(...args);
       }
     },
   };
@@ -59,26 +82,31 @@ function createHarness() {
     clear: vi.fn<(webContentsId: number) => void>(),
     clearAll: vi.fn<() => void>(),
   };
-  const attachGlobalShortcutHooks = vi.fn<(webContents: WebContents) => void>();
-  const attachPaneContextMenuHooks = vi.fn<(webContents: WebContents) => void>();
+  const hostWindow = {} as BaseWindow;
+  const onPaneShortcutAction = vi.fn<(action: 'toggleQuickPrompt' | 'notifySidebarToggle' | 'resetAllPanes', sourceWebContents: WebContents) => void>();
   const setQuickPromptAnchorPaneIndex = vi.fn<(paneIndex: number) => void>();
   const beginProviderLoadingTracking = vi.fn<(paneIndex: number, webContents: WebContents) => void>();
   const removePaneViewFromContent = vi.fn<(view: WebContentsView) => void>();
+  const contextMenuPopup = vi.fn();
+  const createPaneContextMenu = vi.fn<(webContents: WebContents, params: unknown) => { popup: typeof contextMenuPopup }>(
+    () => ({ popup: contextMenuPopup })
+  );
   const onPaneLoadUrlError = vi.fn<(paneIndex: number, targetUrl: string, error: unknown) => void>();
   const viewFactory = vi.fn<(paneIndex: number) => WebContentsView>((paneIndex) => {
     return createFakePaneView(100 + paneIndex);
   });
 
   const service = new PaneViewService({
+    hostWindow,
     panePreloadPath: '/tmp/pane-preload.cjs',
     paneAcceptLanguages: 'en-US,en',
     paneZoomFactor: 1.1,
     paneLoadMonitor: monitor,
-    attachGlobalShortcutHooks,
-    attachPaneContextMenuHooks,
+    onPaneShortcutAction,
     setQuickPromptAnchorPaneIndex,
     beginProviderLoadingTracking,
     removePaneViewFromContent,
+    createPaneContextMenu,
     onPaneLoadUrlError,
     createPaneView: viewFactory,
   });
@@ -86,11 +114,13 @@ function createHarness() {
   return {
     service,
     monitor,
-    attachGlobalShortcutHooks,
-    attachPaneContextMenuHooks,
+    hostWindow,
+    onPaneShortcutAction,
     setQuickPromptAnchorPaneIndex,
     beginProviderLoadingTracking,
     removePaneViewFromContent,
+    createPaneContextMenu,
+    contextMenuPopup,
     onPaneLoadUrlError,
     viewFactory,
   };
@@ -101,8 +131,6 @@ describe('PaneViewService', () => {
     const {
       service,
       monitor,
-      attachGlobalShortcutHooks,
-      attachPaneContextMenuHooks,
       setQuickPromptAnchorPaneIndex,
       viewFactory,
     } = createHarness();
@@ -111,8 +139,6 @@ describe('PaneViewService', () => {
     const paneContents = view.webContents as FakePaneWebContents;
 
     expect(viewFactory).toHaveBeenCalledWith(2);
-    expect(attachGlobalShortcutHooks).toHaveBeenCalledWith(paneContents);
-    expect(attachPaneContextMenuHooks).toHaveBeenCalledWith(paneContents);
     expect(monitor.attachPane).toHaveBeenCalledWith(2, paneContents);
     expect(paneContents.session.setUserAgent).toHaveBeenCalledWith('fake-user-agent', 'en-US,en');
     expect(paneContents.setZoomFactor).toHaveBeenCalledWith(1.1);
@@ -122,6 +148,53 @@ describe('PaneViewService', () => {
 
     paneContents.__emit('did-finish-load');
     expect(paneContents.setZoomFactor).toHaveBeenCalledTimes(2);
+  });
+
+  it('dispatches pane shortcut actions with preventDefault', () => {
+    const { service, onPaneShortcutAction } = createHarness();
+    const view = service.createPaneWebContentsView(1);
+    const paneContents = view.webContents as FakePaneWebContents;
+    const preventDefault = vi.fn();
+
+    paneContents.__emit(
+      'before-input-event',
+      { preventDefault },
+      {
+        type: 'keyDown',
+        key: 'j',
+        control: true,
+        meta: false,
+        alt: false,
+        shift: false,
+        isAutoRepeat: false,
+      }
+    );
+
+    expect(preventDefault).toHaveBeenCalledTimes(1);
+    expect(onPaneShortcutAction).toHaveBeenCalledWith('toggleQuickPrompt', paneContents);
+  });
+
+  it('builds and pops pane context menu with rounded coordinates', () => {
+    const { service, createPaneContextMenu, contextMenuPopup, hostWindow } = createHarness();
+    const view = service.createPaneWebContentsView(0);
+    const paneContents = view.webContents as FakePaneWebContents;
+    const params = {
+      x: 12.9,
+      y: 44.1,
+      frame: null,
+      menuSourceType: 'mouse',
+    };
+
+    paneContents.__emit('context-menu', {}, params);
+
+    expect(createPaneContextMenu).toHaveBeenCalledWith(paneContents, params);
+    expect(contextMenuPopup).toHaveBeenCalledWith({
+      window: hostWindow,
+      frame: undefined,
+      x: 12,
+      y: 44,
+      sourceType: 'mouse',
+    });
   });
 
   it('marks target and starts provider loading tracking when loading pane URL', async () => {

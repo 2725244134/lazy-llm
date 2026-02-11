@@ -4,8 +4,6 @@
 
 import {
   BaseWindow,
-  Menu,
-  type ContextMenuParams,
   type Event,
   type Input,
   type WebContents,
@@ -29,7 +27,7 @@ import {
 import { PromptDispatchService } from './promptDispatchService.js';
 import { QuickPromptLifecycleService } from './quickPromptLifecycleService.js';
 import { buildQuickPromptDataUrl } from './quick-prompt/index.js';
-import { resolveShortcutAction } from './shortcutDispatcher.js';
+import { resolveShortcutAction, type ShortcutAction } from './shortcutDispatcher.js';
 import { SidebarEventBridge } from './sidebarEventBridge.js';
 import { PANE_ACCEPT_LANGUAGES } from './paneRuntimePreferences.js';
 import type { RuntimePreferences } from '../ipc-handlers/externalConfig.js';
@@ -107,6 +105,7 @@ const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarTo
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
 const PANE_LOAD_MAX_RETRIES = 2;
 const PANE_LOAD_RETRY_BASE_DELAY_MS = 450;
+type ManagedShortcutAction = Exclude<ShortcutAction, 'noop'>;
 
 interface ViewManagerOptions {
   config: AppConfig;
@@ -194,12 +193,13 @@ export class ViewManager {
       },
     });
     this.paneViewService = new PaneViewService({
+      hostWindow: this.window,
       panePreloadPath,
       paneAcceptLanguages: PANE_ACCEPT_LANGUAGES,
       paneZoomFactor: this.paneZoomFactor,
       paneLoadMonitor,
-      attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
-      attachPaneContextMenuHooks: (webContents) => this.attachPaneContextMenuHooks(webContents),
+      onPaneShortcutAction: (action, sourceWebContents) =>
+        this.handleShortcutAction(action, sourceWebContents),
       setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
       beginProviderLoadingTracking: (paneIndex, webContents) =>
         this.beginProviderLoadingTracking(paneIndex, webContents),
@@ -258,26 +258,26 @@ export class ViewManager {
 
   private attachGlobalShortcutHooks(webContents: WebContents): void {
     webContents.on('before-input-event', (event: Event, input: Input) => {
-      this.handleGlobalShortcut(event, input, webContents);
+      const action = resolveShortcutAction({
+        type: input.type,
+        isAutoRepeat: input.isAutoRepeat,
+        key: input.key,
+        control: input.control,
+        meta: input.meta,
+        alt: input.alt,
+        shift: input.shift,
+      });
+
+      if (action === 'noop') {
+        return;
+      }
+
+      event.preventDefault();
+      this.handleShortcutAction(action, webContents);
     });
   }
 
-  private handleGlobalShortcut(event: Event, input: Input, sourceWebContents: WebContents): void {
-    const action = resolveShortcutAction({
-      type: input.type,
-      isAutoRepeat: input.isAutoRepeat,
-      key: input.key,
-      control: input.control,
-      meta: input.meta,
-      alt: input.alt,
-      shift: input.shift,
-    });
-
-    if (action === 'noop') {
-      return;
-    }
-
-    event.preventDefault();
+  private handleShortcutAction(action: ManagedShortcutAction, sourceWebContents: WebContents): void {
     if (action === 'toggleQuickPrompt') {
       this.updateQuickPromptAnchorFromSource(sourceWebContents);
       this.toggleQuickPrompt();
@@ -299,70 +299,6 @@ export class ViewManager {
   private attachSidebarRuntimePreferenceHooks(webContents: WebContents): void {
     webContents.on('did-finish-load', () => {
       this.applySidebarRuntimePreferences(webContents);
-    });
-  }
-
-  private buildPaneContextMenu(
-    webContents: WebContents,
-    params: ContextMenuParams
-  ): Menu {
-    const canGoBack = webContents.navigationHistory.canGoBack();
-    const canGoForward = webContents.navigationHistory.canGoForward();
-    const inspectX = Math.floor(params.x);
-    const inspectY = Math.floor(params.y);
-
-    return Menu.buildFromTemplate([
-      {
-        label: 'Back',
-        enabled: canGoBack,
-        click: () => {
-          if (!webContents.isDestroyed() && webContents.navigationHistory.canGoBack()) {
-            webContents.navigationHistory.goBack();
-          }
-        },
-      },
-      {
-        label: 'Forward',
-        enabled: canGoForward,
-        click: () => {
-          if (!webContents.isDestroyed() && webContents.navigationHistory.canGoForward()) {
-            webContents.navigationHistory.goForward();
-          }
-        },
-      },
-      {
-        label: 'Reload',
-        click: () => {
-          if (!webContents.isDestroyed()) {
-            webContents.reload();
-          }
-        },
-      },
-      { type: 'separator' },
-      {
-        label: 'Inspect',
-        click: () => {
-          if (!webContents.isDestroyed()) {
-            webContents.inspectElement(inspectX, inspectY);
-          }
-        },
-      },
-    ]);
-  }
-
-  private attachPaneContextMenuHooks(webContents: WebContents): void {
-    webContents.on('context-menu', (_event: Event, params: ContextMenuParams) => {
-      if (webContents.isDestroyed()) {
-        return;
-      }
-      const menu = this.buildPaneContextMenu(webContents, params);
-      menu.popup({
-        window: this.window,
-        frame: params.frame ?? undefined,
-        x: Math.floor(params.x),
-        y: Math.floor(params.y),
-        sourceType: params.menuSourceType,
-      });
     });
   }
 
