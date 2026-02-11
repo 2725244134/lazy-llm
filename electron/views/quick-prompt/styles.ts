@@ -6,7 +6,7 @@ import {
   ACTIVE_THEME_PRESET,
   getQuickPromptThemeVars,
   renderCssVariableBlock,
-} from '../../../src/theme/palette.js';
+} from '../../../packages/shared-config/src/theme.js';
 
 const QUICK_PROMPT_CSS_VARS = renderCssVariableBlock(
   getQuickPromptThemeVars(ACTIVE_THEME_PRESET)

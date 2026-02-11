@@ -19,6 +19,7 @@ import { APP_CONFIG } from '../../packages/shared-config/src/app.js';
 import { type LayoutResult } from './geometry.js';
 import { LayoutService } from './layoutService.js';
 import { PaneLoadMonitor, areUrlsEquivalent } from './paneLoadMonitor.js';
+import { PaneViewService } from './paneViewService.js';
 import {
   type PaneViewState,
   resetAllPanesToProviderHomeWithLifecycle,
@@ -30,9 +31,7 @@ import { QuickPromptLifecycleService } from './quickPromptLifecycleService.js';
 import { buildQuickPromptDataUrl } from './quick-prompt/index.js';
 import { resolveShortcutAction } from './shortcutDispatcher.js';
 import { SidebarEventBridge } from './sidebarEventBridge.js';
-import {
-  PANE_ACCEPT_LANGUAGES,
-} from './paneRuntimePreferences.js';
+import { PANE_ACCEPT_LANGUAGES } from './paneRuntimePreferences.js';
 import type { RuntimePreferences } from '../ipc-handlers/externalConfig.js';
 import { padProviderSequence } from '../ipc-handlers/providerConfig.js';
 import type {
@@ -127,7 +126,7 @@ export class ViewManager {
   private defaultProviders: string[];
   private quickPromptAnchorPaneIndex = 0;
   private lastLayout: LayoutResult | null = null;
-  private paneLoadMonitor: PaneLoadMonitor;
+  private paneViewService: PaneViewService;
   private layoutService: LayoutService;
   private quickPromptLifecycleService: QuickPromptLifecycleService;
   private sidebarEventBridge: SidebarEventBridge;
@@ -179,7 +178,7 @@ export class ViewManager {
         console.error(`[ViewManager] Failed to send prompt to pane ${paneIndex}:`, error);
       },
     });
-    this.paneLoadMonitor = new PaneLoadMonitor({
+    const paneLoadMonitor = new PaneLoadMonitor({
       maxRetries: PANE_LOAD_MAX_RETRIES,
       retryBaseDelayMs: PANE_LOAD_RETRY_BASE_DELAY_MS,
       getTargetUrlForPane: (paneIndex, failedUrl) => {
@@ -192,6 +191,21 @@ export class ViewManager {
       },
       getProviderNameForKey: (providerKey) => {
         return this.providers.get(providerKey)?.name ?? providerKey;
+      },
+    });
+    this.paneViewService = new PaneViewService({
+      panePreloadPath,
+      paneAcceptLanguages: PANE_ACCEPT_LANGUAGES,
+      paneZoomFactor: this.paneZoomFactor,
+      paneLoadMonitor,
+      attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
+      attachPaneContextMenuHooks: (webContents) => this.attachPaneContextMenuHooks(webContents),
+      setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
+      beginProviderLoadingTracking: (paneIndex, webContents) =>
+        this.beginProviderLoadingTracking(paneIndex, webContents),
+      removePaneViewFromContent: (view) => this.window.contentView.removeChildView(view),
+      onPaneLoadUrlError: (paneIndex, targetUrl, error) => {
+        console.error(`[ViewManager] Failed to load URL for pane ${paneIndex}: ${targetUrl}`, error);
       },
     });
   }
@@ -278,20 +292,8 @@ export class ViewManager {
     }
   }
 
-  private applyPaneRuntimePreferences(webContents: WebContents): void {
-    const rawUserAgent = webContents.getUserAgent();
-    webContents.session.setUserAgent(rawUserAgent, PANE_ACCEPT_LANGUAGES);
-    webContents.setZoomFactor(this.paneZoomFactor);
-  }
-
   private applySidebarRuntimePreferences(webContents: WebContents): void {
     webContents.setZoomFactor(this.sidebarZoomFactor);
-  }
-
-  private attachPaneRuntimePreferenceHooks(webContents: WebContents): void {
-    webContents.on('did-finish-load', () => {
-      this.applyPaneRuntimePreferences(webContents);
-    });
   }
 
   private attachSidebarRuntimePreferenceHooks(webContents: WebContents): void {
@@ -469,66 +471,6 @@ export class ViewManager {
     this.sidebarEventBridge.beginProviderLoadingTracking(paneIndex, webContents);
   }
 
-  private loadPaneUrl(
-    paneIndex: number,
-    view: WebContentsView,
-    targetUrl: string,
-    trackLoading: boolean
-  ): void {
-    this.paneLoadMonitor.markTarget(view.webContents.id, targetUrl);
-    if (trackLoading) {
-      this.beginProviderLoadingTracking(paneIndex, view.webContents);
-    }
-    view.webContents.loadURL(targetUrl).catch((error) => {
-      console.error(`[ViewManager] Failed to load URL for pane ${paneIndex}: ${targetUrl}`, error);
-    });
-  }
-
-  private createPaneWebContentsView(paneIndex: number): WebContentsView {
-    const view = new WebContentsView({
-      webPreferences: {
-        preload: panePreloadPath,
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-        additionalArguments: [`--pane-index=${paneIndex}`],
-      },
-    });
-    this.attachGlobalShortcutHooks(view.webContents);
-    this.attachPaneContextMenuHooks(view.webContents);
-    this.attachPaneRuntimePreferenceHooks(view.webContents);
-    this.paneLoadMonitor.attachPane(paneIndex, view.webContents);
-    view.webContents.on('focus', () => {
-      this.setQuickPromptAnchorPaneIndex(paneIndex);
-    });
-    this.applyPaneRuntimePreferences(view.webContents);
-    return view;
-  }
-
-  private removePaneViewFromContent(view: WebContentsView): void {
-    try {
-      this.window.contentView.removeChildView(view);
-    } catch {
-      // The view may be detached already when it is only kept in cache.
-    }
-  }
-
-  private closePane(pane: PaneViewState): void {
-    const uniqueViews = new Set<WebContentsView>();
-    for (const cached of pane.cachedViews.values()) {
-      uniqueViews.add(cached.view);
-    }
-    uniqueViews.add(pane.view);
-
-    for (const view of uniqueViews) {
-      this.removePaneViewFromContent(view);
-      if (!view.webContents.isDestroyed()) {
-        this.paneLoadMonitor.clear(view.webContents.id);
-        view.webContents.close();
-      }
-    }
-  }
-
   private keepQuickPromptOnTop(): void {
     const quickPromptView = this.quickPromptLifecycleService.getView();
     if (!quickPromptView || !this.quickPromptLifecycleService.isVisible()) {
@@ -550,14 +492,14 @@ export class ViewManager {
       providers: this.providers,
       quickPromptAnchorPaneIndex: this.quickPromptAnchorPaneIndex,
       callbacks: {
-        createPaneWebContentsView: (paneIndex) => this.createPaneWebContentsView(paneIndex),
+        createPaneWebContentsView: (paneIndex) => this.paneViewService.createPaneWebContentsView(paneIndex),
         addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
-        removePaneViewFromContent: (view) => this.removePaneViewFromContent(view),
+        removePaneViewFromContent: (view) => this.paneViewService.removePaneViewFromContent(view),
         loadPaneUrl: (paneIndex, view, targetUrl, trackLoading) =>
-          this.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
-        applyPaneRuntimePreferences: (webContents) => this.applyPaneRuntimePreferences(webContents),
+          this.paneViewService.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
+        applyPaneRuntimePreferences: (webContents) => this.paneViewService.applyPaneRuntimePreferences(webContents),
         clearProviderLoadingTracking: (paneIndex) => this.clearProviderLoadingTracking(paneIndex),
-        closePane: (pane) => this.closePane(pane),
+        closePane: (pane) => this.paneViewService.closePane(pane),
         keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
         updateLayout: () => this.updateLayout(),
         setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
@@ -579,14 +521,15 @@ export class ViewManager {
       providers: this.providers,
       areUrlsEquivalent,
       callbacks: {
-        createPaneWebContentsView: (nextPaneIndex) => this.createPaneWebContentsView(nextPaneIndex),
+        createPaneWebContentsView: (nextPaneIndex) =>
+          this.paneViewService.createPaneWebContentsView(nextPaneIndex),
         addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
-        removePaneViewFromContent: (view) => this.removePaneViewFromContent(view),
+        removePaneViewFromContent: (view) => this.paneViewService.removePaneViewFromContent(view),
         loadPaneUrl: (nextPaneIndex, view, targetUrl, trackLoading) =>
-          this.loadPaneUrl(nextPaneIndex, view, targetUrl, trackLoading),
-        applyPaneRuntimePreferences: (webContents) => this.applyPaneRuntimePreferences(webContents),
+          this.paneViewService.loadPaneUrl(nextPaneIndex, view, targetUrl, trackLoading),
+        applyPaneRuntimePreferences: (webContents) => this.paneViewService.applyPaneRuntimePreferences(webContents),
         clearProviderLoadingTracking: (nextPaneIndex) => this.clearProviderLoadingTracking(nextPaneIndex),
-        closePane: (pane) => this.closePane(pane),
+        closePane: (pane) => this.paneViewService.closePane(pane),
         keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
         updateLayout: () => this.updateLayout(),
         setQuickPromptAnchorPaneIndex: (nextPaneIndex) => this.setQuickPromptAnchorPaneIndex(nextPaneIndex),
@@ -603,14 +546,14 @@ export class ViewManager {
       defaultProviders: this.defaultProviders,
       providers: this.providers,
       callbacks: {
-        createPaneWebContentsView: (paneIndex) => this.createPaneWebContentsView(paneIndex),
+        createPaneWebContentsView: (paneIndex) => this.paneViewService.createPaneWebContentsView(paneIndex),
         addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
-        removePaneViewFromContent: (view) => this.removePaneViewFromContent(view),
+        removePaneViewFromContent: (view) => this.paneViewService.removePaneViewFromContent(view),
         loadPaneUrl: (paneIndex, view, targetUrl, trackLoading) =>
-          this.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
-        applyPaneRuntimePreferences: (webContents) => this.applyPaneRuntimePreferences(webContents),
+          this.paneViewService.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
+        applyPaneRuntimePreferences: (webContents) => this.paneViewService.applyPaneRuntimePreferences(webContents),
         clearProviderLoadingTracking: (paneIndex) => this.clearProviderLoadingTracking(paneIndex),
-        closePane: (pane) => this.closePane(pane),
+        closePane: (pane) => this.paneViewService.closePane(pane),
         keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
         updateLayout: () => this.updateLayout(),
         setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
@@ -713,13 +656,13 @@ export class ViewManager {
     for (const pane of this.paneViews) {
       try {
         this.clearProviderLoadingTracking(pane.paneIndex);
-        this.closePane(pane);
+        this.paneViewService.closePane(pane);
       } catch (e) {
         console.error(`[ViewManager] Error closing pane ${pane.paneIndex}:`, e);
       }
     }
     this.paneViews = [];
-    this.paneLoadMonitor.clearAll();
+    this.paneViewService.clearAllPaneLoadState();
     this.lastLayout = null;
 
     // Close quick prompt webContents

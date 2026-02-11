@@ -7,7 +7,5 @@
       "electron/ipc/contracts"
     ]
   },
-  "violations": [
-    "electron_to_src|electron/views/quick-prompt/styles.ts|src/theme/palette"
-  ]
+  "violations": []
 }
