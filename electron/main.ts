@@ -1,6 +1,6 @@
 import { app, BaseWindow, ipcMain } from 'electron';
 import { IPC_CHANNELS } from './ipc/contracts.js';
-import { APP_CONFIG } from '../src/config/app.js';
+import { APP_CONFIG } from '../packages/shared-config/src/app.js';
 import type {
   PaneCountRequest,
   PaneUpdateRequest,

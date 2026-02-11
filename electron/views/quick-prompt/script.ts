@@ -2,7 +2,7 @@
  * Quick Prompt client-side JavaScript
  */
 
-import { APP_CONFIG } from '../../../src/config/app.js';
+import { APP_CONFIG } from '../../../packages/shared-config/src/app.js';
 
 const quickPromptConfig = APP_CONFIG.layout.quickPrompt;
 const interactionConfig = APP_CONFIG.interaction;

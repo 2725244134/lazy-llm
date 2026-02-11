@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 import type { AppConfig } from '../ipc/contracts.js';
-import { APP_CONFIG } from '../../src/config/app.js';
+import { APP_CONFIG } from '../../packages/shared-config/src/app.js';
 import { buildDefaultPaneProviders } from './providerConfig.js';
 
 export interface ExternalConfigFile {

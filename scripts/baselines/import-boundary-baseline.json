@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "policy": {
+    "electronMustNotImportSrc": true,
+    "srcMustNotImportElectron": true,
+    "allowedCrossBoundaryTargets": [
+      "electron/ipc/contracts"
+    ]
+  },
+  "violations": []
+}

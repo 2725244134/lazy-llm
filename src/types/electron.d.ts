@@ -18,7 +18,7 @@ import type {
   QuickPromptHideResponse,
   QuickPromptResizeRequest,
   QuickPromptResizeResponse,
-} from '../../electron/ipc/contracts';
+} from '../../packages/shared-contracts/ipc/contracts';
 
 export interface CouncilAPI {
   healthCheck: () => Promise<HealthResponse>;

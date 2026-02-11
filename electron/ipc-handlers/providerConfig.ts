@@ -1,5 +1,5 @@
 import type { AppConfig } from '../ipc/contracts.js';
-import { APP_CONFIG } from '../../src/config/app.js';
+import { APP_CONFIG } from '../../packages/shared-config/src/app.js';
 
 export const CANONICAL_PROVIDERS: AppConfig['provider']['catalog'] = [
   ...APP_CONFIG.providers.catalog.map((provider) => ({ ...provider })),
