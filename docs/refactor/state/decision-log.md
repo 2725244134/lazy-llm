@@ -23,3 +23,15 @@
 - Impact:
   - Improves testability and decomposition while preserving runtime behavior.
   - Leaves `2.B.06` open until remaining coordination logic is fully split.
+
+## D-003
+
+- Date: 2026-02-11
+- Context: `QuickPromptLifecycleService` existed with tests but `ViewManager` still owned quick prompt lifecycle state and transitions.
+- Decision: Wire `ViewManager` to delegate quick prompt show/hide/resize/relayout/destroy flows to `QuickPromptLifecycleService`.
+- Alternatives considered:
+  - Keep quick prompt lifecycle in `manager.ts` until later phase.
+  - Move only resize logic and leave show/hide in `manager.ts`.
+- Impact:
+  - Reduces `manager.ts` state surface and advances task `2.B.06`.
+  - Keeps behavior parity while making lifecycle transitions unit-testable via the dedicated service.

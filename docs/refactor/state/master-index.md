@@ -1,6 +1,6 @@
 # Refactor State Index
 
-- Program CLIP: `clips/clip-2-full-project-refactor-master-plan.md`
+- Program CLIP: `clips/clip-1-full-project-refactor-master-plan.md`
 - Active phase log: `docs/refactor/state/current-phase.md`
 - Decision log: `docs/refactor/state/decision-log.md`
 - Progress ledger: `docs/refactor/state/progress-ledger.md`

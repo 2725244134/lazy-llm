@@ -1,5 +1,5 @@
 import type { AppConfig } from '../ipc/contracts.js';
-import { APP_CONFIG } from '../../src/config/app.js';
+import { APP_CONFIG } from '../../packages/shared-config/src/app.js';
 import {
   CANONICAL_PROVIDERS,
   buildDefaultPaneProviders,

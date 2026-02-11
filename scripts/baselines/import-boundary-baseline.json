@@ -8,14 +8,6 @@
     ]
   },
   "violations": [
-    "electron_to_src|electron/ipc-handlers/configNormalization.ts|src/config/app",
-    "electron_to_src|electron/ipc-handlers/externalConfig.ts|src/config/app",
-    "electron_to_src|electron/ipc-handlers/providerConfig.ts|src/config/app",
-    "electron_to_src|electron/ipc-handlers/store.ts|src/config/app",
-    "electron_to_src|electron/main.ts|src/config/app",
-    "electron_to_src|electron/views/manager.ts|src/config/app",
-    "electron_to_src|electron/views/paneRuntimePreferences.ts|src/config/app",
-    "electron_to_src|electron/views/quick-prompt/script.ts|src/config/app",
     "electron_to_src|electron/views/quick-prompt/styles.ts|src/theme/palette"
   ]
 }

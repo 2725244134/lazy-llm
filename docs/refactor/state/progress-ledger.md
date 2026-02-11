@@ -12,7 +12,7 @@
 - [x] 1.A.01 shared IPC contracts package
 - [x] 1.A.02 compatibility re-exports
 - [x] 1.A.03 shared config extraction
-- [ ] 1.A.04 import migration
+- [x] 1.A.04 import migration
 - [x] 1.A.05 boundary check enforcement
 
 ## Phase 2

@@ -1,5 +1,5 @@
 {
-  "clip": "CLIP-2",
+  "clip": "CLIP-1",
   "phase": "Phase 2",
   "active_task_ids": [
     "2.B.06"
@@ -11,6 +11,7 @@
     "1.A.01",
     "1.A.02",
     "1.A.03",
+    "1.A.04",
     "1.A.05",
     "2.B.01",
     "2.B.02",
@@ -29,7 +30,7 @@
   "next_actions": [
     "Complete task 2.B.06 by removing remaining direct orchestration branches in manager.ts.",
     "Add manager integration tests for service wiring paths.",
-    "Refresh refactor state artifacts after each commit slice."
+    "Eliminate the remaining import-boundary violation in quick prompt styling."
   ],
   "verification": {
     "required_commands": [
@@ -40,6 +41,6 @@
   },
   "risk_watchlist": [
     "ViewManager still contains pane WebContents lifecycle details while task 2.B.06 remains open.",
-    "Phase 1 import migration (1.A.04) is not complete and may hide residual boundary debt."
+    "electron/views/quick-prompt/styles.ts still imports src/theme/palette."
   ]
 }
