@@ -22,7 +22,7 @@
 - [x] 2.B.03 shortcut dispatcher extraction
 - [x] 2.B.04 sidebar event bridge extraction
 - [x] 2.B.05 prompt dispatch service extraction
-- [ ] 2.B.06 manager coordinator finalization
+- [x] 2.B.06 manager coordinator finalization
 
 ## Phase 3
 

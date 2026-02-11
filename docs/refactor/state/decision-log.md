@@ -47,3 +47,15 @@
 - Impact:
   - Shrinks `manager.ts` low-level pane responsibilities and improves testability with `paneViewService.test.ts`.
   - Keeps migration incremental and behavior-preserving by preserving existing callback contracts.
+
+## D-005
+
+- Date: 2026-02-11
+- Context: `ViewManager` still owned pane-specific shortcut routing and pane context-menu construction after introducing `PaneViewService`.
+- Decision: Move pane shortcut/context-menu wiring into `PaneViewService` and expose a narrow `onPaneShortcutAction` callback so manager only handles cross-view coordination actions.
+- Alternatives considered:
+  - Keep pane shortcut/context-menu details in `manager.ts` until Phase 3.
+  - Split shortcut and context-menu into two additional micro-services immediately.
+- Impact:
+  - Closes `2.B.06` by reducing `manager.ts` further to coordinator responsibilities.
+  - Preserves runtime behavior with service-level tests for pane shortcut dispatch and context-menu popup wiring.
