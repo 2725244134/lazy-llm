@@ -12,6 +12,7 @@ export const LAYOUT_CONFIG = {
     minCollapsedWidth: 24,
     compactUiMaxWidth: 220,
     tightUiMaxWidth: 180,
+    transitionDurationMs: 220,
   },
   quickPrompt: {
     passthroughMode: true,

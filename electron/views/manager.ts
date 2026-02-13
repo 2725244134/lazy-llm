@@ -103,6 +103,8 @@ const QUICK_PROMPT_LAYOUT_CONFIG = {
 } as const;
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
+const SIDEBAR_TRANSITION_DURATION_MS = APP_CONFIG.layout.sidebar.transitionDurationMs;
+const SIDEBAR_TRANSITION_TICK_MS = 16;
 const PANE_LOAD_MAX_RETRIES = 2;
 const PANE_LOAD_RETRY_BASE_DELAY_MS = 450;
 type ManagedShortcutAction = Exclude<ShortcutAction, 'noop'>;
@@ -130,6 +132,9 @@ export class ViewManager {
   private quickPromptLifecycleService: QuickPromptLifecycleService;
   private sidebarEventBridge: SidebarEventBridge;
   private promptDispatchService: PromptDispatchService;
+  private sidebarWidthAnimationTimer: ReturnType<typeof setTimeout> | null = null;
+  private sidebarWidthAnimationToken = 0;
+  private sidebarWidthAnimationTarget: number | null = null;
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -345,6 +350,9 @@ export class ViewManager {
     quickPromptView.webContents.on('did-finish-load', () => {
       this.quickPromptLifecycleService.markReady();
     });
+    quickPromptView.webContents.on('blur', () => {
+      this.quickPromptLifecycleService.hide({ restoreFocus: false });
+    });
     quickPromptView.webContents.loadURL(buildQuickPromptDataUrl());
 
     return quickPromptView;
@@ -501,21 +509,80 @@ export class ViewManager {
    * Update sidebar width and recalculate layout
    */
   setSidebarWidth(width: number): void {
-    this.currentSidebarWidth = width;
-    this.updateLayout();
+    this.updateLayout(width);
   }
 
-  /**
-   * Recalculate and apply all view bounds
-   */
-  updateLayout(sidebarWidth?: number): void {
-    if (sidebarWidth !== undefined) {
-      this.currentSidebarWidth = sidebarWidth;
+  private stopSidebarWidthAnimation(): void {
+    this.sidebarWidthAnimationToken += 1;
+    this.sidebarWidthAnimationTarget = null;
+    if (this.sidebarWidthAnimationTimer !== null) {
+      clearTimeout(this.sidebarWidthAnimationTimer);
+      this.sidebarWidthAnimationTimer = null;
     }
+  }
+
+  private easeOutCubic(progress: number): number {
+    const clampedProgress = Math.max(0, Math.min(1, progress));
+    return 1 - Math.pow(1 - clampedProgress, 3);
+  }
+
+  private animateSidebarWidthTo(targetSidebarWidth: number): void {
+    const fromSidebarWidth = this.currentSidebarWidth;
+    if (
+      targetSidebarWidth === fromSidebarWidth ||
+      SIDEBAR_TRANSITION_DURATION_MS <= 0
+    ) {
+      this.stopSidebarWidthAnimation();
+      this.currentSidebarWidth = targetSidebarWidth;
+      this.applyLayout();
+      return;
+    }
+
+    this.stopSidebarWidthAnimation();
+    this.sidebarWidthAnimationTarget = targetSidebarWidth;
+    const animationToken = ++this.sidebarWidthAnimationToken;
+    const startedAtMs = Date.now();
+
+    const tick = (): void => {
+      if (animationToken !== this.sidebarWidthAnimationToken) {
+        return;
+      }
+
+      const elapsedMs = Date.now() - startedAtMs;
+      const progress = Math.min(1, elapsedMs / SIDEBAR_TRANSITION_DURATION_MS);
+      const easedProgress = this.easeOutCubic(progress);
+      const nextSidebarWidth = Math.round(
+        fromSidebarWidth + (targetSidebarWidth - fromSidebarWidth) * easedProgress
+      );
+
+      if (nextSidebarWidth !== this.currentSidebarWidth) {
+        this.currentSidebarWidth = nextSidebarWidth;
+      }
+      this.applyLayout();
+
+      if (progress >= 1) {
+        this.sidebarWidthAnimationTimer = null;
+        this.sidebarWidthAnimationTarget = null;
+        if (this.currentSidebarWidth !== targetSidebarWidth) {
+          this.currentSidebarWidth = targetSidebarWidth;
+          this.applyLayout();
+        }
+        return;
+      }
+
+      this.sidebarWidthAnimationTimer = setTimeout(tick, SIDEBAR_TRANSITION_TICK_MS);
+    };
+
+    tick();
+  }
+
+  private applyLayout(): void {
+    const normalizedSidebarWidth = Math.max(1, Math.floor(this.currentSidebarWidth));
+    this.currentSidebarWidth = normalizedSidebarWidth;
 
     const { layout } = this.layoutService.computeLayout({
       contentBounds: this.window.getContentBounds(),
-      sidebarWidth: this.currentSidebarWidth,
+      sidebarWidth: normalizedSidebarWidth,
       paneCount: this.currentPaneCount,
     });
     this.lastLayout = layout;
@@ -534,6 +601,31 @@ export class ViewManager {
 
     // Keep quick prompt pinned to its computed bounds.
     this.quickPromptLifecycleService.relayout();
+  }
+
+  /**
+   * Recalculate and apply all view bounds
+   */
+  updateLayout(sidebarWidth?: number): void {
+    if (sidebarWidth === undefined) {
+      this.applyLayout();
+      return;
+    }
+
+    const normalizedSidebarWidth = Math.max(1, Math.floor(sidebarWidth));
+    if (
+      this.sidebarWidthAnimationTimer !== null &&
+      this.sidebarWidthAnimationTarget === normalizedSidebarWidth
+    ) {
+      return;
+    }
+    if (normalizedSidebarWidth === this.currentSidebarWidth) {
+      this.stopSidebarWidthAnimation();
+      this.applyLayout();
+      return;
+    }
+
+    this.animateSidebarWidthTo(normalizedSidebarWidth);
   }
 
   /**
@@ -588,6 +680,8 @@ export class ViewManager {
    * Call this before window closes
    */
   destroy(): void {
+    this.stopSidebarWidthAnimation();
+
     // Close all pane webContents
     for (const pane of this.paneViews) {
       try {

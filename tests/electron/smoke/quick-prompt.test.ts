@@ -21,7 +21,11 @@ test.describe('Smoke / Quick Prompt', () => {
     await paneButton3.click();
     await expect(paneButton3).toHaveClass(/active/);
 
-    const closeResult = await toggleQuickPrompt(appWindow);
+    const reopenAfterBlurResult = await toggleQuickPrompt(appWindow);
+    expect(reopenAfterBlurResult.success).toBe(true);
+    expect(reopenAfterBlurResult.visible).toBe(true);
+
+    const closeResult = await hideQuickPrompt(appWindow);
     expect(closeResult.success).toBe(true);
     expect(closeResult.visible).toBe(false);
   });

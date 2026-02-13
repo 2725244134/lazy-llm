@@ -118,6 +118,23 @@ describe('QuickPromptLifecycleService', () => {
     expect(focusSidebarIfAvailable).toHaveBeenCalledTimes(1);
   });
 
+  it('hides quick prompt without restoring sidebar focus when requested', () => {
+    const {
+      service,
+      view,
+      removeQuickPromptViewFromContent,
+      focusSidebarIfAvailable,
+    } = createHarness();
+
+    service.show();
+    const visible = service.hide({ restoreFocus: false });
+
+    expect(visible).toBe(false);
+    expect(service.isVisible()).toBe(false);
+    expect(removeQuickPromptViewFromContent).toHaveBeenCalledWith(view);
+    expect(focusSidebarIfAvailable).not.toHaveBeenCalled();
+  });
+
   it('resizes with clamp behavior and relayout only when visible', () => {
     const { service, view, getQuickPromptBounds } = createHarness();
 
