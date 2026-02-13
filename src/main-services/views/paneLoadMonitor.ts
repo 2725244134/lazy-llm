@@ -7,6 +7,7 @@ export interface PaneLoadMonitorOptions {
   getTargetUrlForPane: (paneIndex: number, failedUrl: string) => string;
   getProviderKeyForPane: (paneIndex: number) => string | null;
   getProviderNameForKey: (providerKey: string) => string;
+  onPaneLoadFailure?: (record: PaneLoadFailureRecord) => void;
 }
 
 export interface PaneRenderProcessGoneDetails {
@@ -33,6 +34,17 @@ export interface RecoverableWebContents {
     event: 'render-process-gone',
     listener: (_event: unknown, details: PaneRenderProcessGoneDetails) => void
   ): void;
+}
+
+export interface PaneLoadFailureRecord {
+  paneIndex: number;
+  failedUrl: string;
+  targetUrl: string;
+  errorCode: number;
+  errorDescription: string;
+  isMainFrame: boolean;
+  action: 'ignore' | 'retry' | 'show-error';
+  attemptCount: number;
 }
 
 const RENDERER_PROCESS_GONE_ERROR_CODE = -1000;
@@ -158,6 +170,20 @@ export class PaneLoadMonitor {
       targetUrl,
       maxRetries: this.options.maxRetries,
       previousState,
+    });
+    const attemptCount =
+      decision.action === 'ignore'
+        ? previousState?.attemptCount ?? 0
+        : decision.state.attemptCount;
+    this.options.onPaneLoadFailure?.({
+      paneIndex,
+      failedUrl,
+      targetUrl,
+      errorCode,
+      errorDescription,
+      isMainFrame,
+      action: decision.action,
+      attemptCount,
     });
 
     if (decision.action === 'ignore') {

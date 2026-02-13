@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { BaseWindow, WebContents, WebContentsView } from 'electron';
 import type { PaneViewState } from './paneLifecycleService';
-import { PaneViewService } from './paneViewService';
+import { buildPaneUserAgent, PaneViewService } from './paneViewService';
 
 type PaneHookEvent =
   | 'did-finish-load'
@@ -99,6 +99,8 @@ function createHarness() {
   const service = new PaneViewService({
     hostWindow,
     panePreloadPath: '/tmp/pane-preload.cjs',
+    paneSessionPartition: 'persist:test-panes',
+    paneUserAgentStrategy: 'default',
     paneAcceptLanguages: 'en-US,en',
     paneZoomFactor: 1.1,
     paneLoadMonitor: monitor,
@@ -240,5 +242,19 @@ describe('PaneViewService', () => {
     expect(monitor.clear).toHaveBeenCalledTimes(2);
     expect((primaryView.webContents as FakePaneWebContents).close).toHaveBeenCalledTimes(1);
     expect((secondaryView.webContents as FakePaneWebContents).close).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('buildPaneUserAgent', () => {
+  it('returns original user agent for default strategy', () => {
+    const raw = 'Mozilla/5.0 Chrome/132.0.0.0 Electron/38.0.0 Safari/537.36';
+    expect(buildPaneUserAgent('default', raw)).toBe(raw);
+  });
+
+  it('strips Electron marker for chrome strategy', () => {
+    const raw = 'Mozilla/5.0 Chrome/132.0.0.0 Electron/38.0.0 Safari/537.36';
+    const result = buildPaneUserAgent('chrome', raw);
+    expect(result).not.toContain('Electron/');
+    expect(result).toContain('Chrome/');
   });
 });

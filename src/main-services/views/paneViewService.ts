@@ -12,10 +12,15 @@ import type { PaneLoadMonitor } from './paneLoadMonitor.js';
 import { resolveShortcutAction, type ShortcutAction } from './shortcutDispatcher.js';
 
 type PaneShortcutAction = Exclude<ShortcutAction, 'noop'>;
+export type PaneUserAgentStrategy = 'default' | 'chrome';
+const ELECTRON_USER_AGENT_SEGMENT = /\sElectron\/[^\s]+/g;
+const CHROME_FALLBACK_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36';
 
 interface PaneViewServiceOptions {
   hostWindow: BaseWindow;
   panePreloadPath: string;
+  paneSessionPartition: string;
+  paneUserAgentStrategy: PaneUserAgentStrategy;
   paneAcceptLanguages: string;
   paneZoomFactor: number;
   paneLoadMonitor: Pick<PaneLoadMonitor, 'attachPane' | 'markTarget' | 'clear' | 'clearAll'>;
@@ -40,6 +45,7 @@ export class PaneViewService {
       : new WebContentsView({
           webPreferences: {
             preload: this.options.panePreloadPath,
+            partition: this.options.paneSessionPartition,
             contextIsolation: true,
             nodeIntegration: false,
             sandbox: true,
@@ -61,7 +67,8 @@ export class PaneViewService {
 
   applyPaneRuntimePreferences(webContents: WebContents): void {
     const rawUserAgent = webContents.getUserAgent();
-    webContents.session.setUserAgent(rawUserAgent, this.options.paneAcceptLanguages);
+    const paneUserAgent = buildPaneUserAgent(this.options.paneUserAgentStrategy, rawUserAgent);
+    webContents.session.setUserAgent(paneUserAgent, this.options.paneAcceptLanguages);
     webContents.setZoomFactor(this.options.paneZoomFactor);
   }
 
@@ -202,4 +209,19 @@ export class PaneViewService {
       },
     ]);
   }
+}
+
+export function buildPaneUserAgent(
+  strategy: PaneUserAgentStrategy,
+  rawUserAgent: string
+): string {
+  if (strategy === 'default') {
+    return rawUserAgent;
+  }
+
+  const normalized = rawUserAgent.trim().replace(ELECTRON_USER_AGENT_SEGMENT, '').trim();
+  if (normalized.includes('Chrome/')) {
+    return normalized;
+  }
+  return CHROME_FALLBACK_USER_AGENT;
 }

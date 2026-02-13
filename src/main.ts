@@ -3,11 +3,17 @@ import { join } from 'node:path';
 import { app, BaseWindow } from 'electron';
 import type { PaneCount } from '@shared-contracts/ipc/contracts';
 import { getConfig, getResolvedSettings, setDefaultPaneCount, setDefaultProvider } from './main-services/ipc-handlers/store.js';
+import {
+  attachPaneNetworkDiagnostics,
+  PANE_SESSION_PARTITION,
+  resolvePaneSessionProxy,
+} from './main-services/network/paneSession.js';
 import { registerIpcHandlers } from './main-services/ipc/register.js';
 import { ViewManager } from './main-services/views/manager.js';
 
 const shouldSkipSingleInstanceLock = process.env.LAZYLLM_SKIP_SINGLE_INSTANCE_LOCK === '1';
 const overrideUserDataDir = process.env.LAZYLLM_USER_DATA_DIR;
+const paneUserAgentStrategy = 'default' as const;
 
 if (typeof overrideUserDataDir === 'string' && overrideUserDataDir.trim().length > 0) {
   app.setPath('userData', overrideUserDataDir);
@@ -44,6 +50,8 @@ function createWindow(): void {
     config: settings.config,
     runtimePreferences: settings.runtimePreferences,
     rendererDevServerUrl,
+    paneSessionPartition: PANE_SESSION_PARTITION,
+    paneUserAgentStrategy,
   });
 
   viewManager.initSidebar();
@@ -64,6 +72,20 @@ function createWindow(): void {
 }
 
 app.whenReady().then(() => {
+  attachPaneNetworkDiagnostics((record) => {
+    if (record.resourceType !== 'mainFrame' && record.resourceType !== 'subFrame') {
+      return;
+    }
+    console.warn('[PaneSession] Request failed', record);
+  });
+  resolvePaneSessionProxy('https://chatgpt.com')
+    .then((proxy) => {
+      console.info(`[PaneSession] resolveProxy(chatgpt.com) => ${proxy}`);
+    })
+    .catch((error) => {
+      console.warn('[PaneSession] Failed to resolve proxy for chatgpt.com', error);
+    });
+
   registerIpcHandlers({
     getViewManager: () => viewManager,
     getConfig: () => getConfig(),

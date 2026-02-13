@@ -17,7 +17,7 @@ import { APP_CONFIG } from '@shared-config/src/app.js';
 import { type LayoutResult } from './geometry.js';
 import { LayoutService } from './layoutService.js';
 import { PaneLoadMonitor, areUrlsEquivalent } from './paneLoadMonitor.js';
-import { PaneViewService } from './paneViewService.js';
+import { PaneViewService, type PaneUserAgentStrategy } from './paneViewService.js';
 import {
   type PaneViewState,
   resetAllPanesToProviderHomeWithLifecycle,
@@ -138,6 +138,8 @@ interface ViewManagerOptions {
   config: AppConfig;
   runtimePreferences: RuntimePreferences;
   rendererDevServerUrl?: string | null;
+  paneSessionPartition: string;
+  paneUserAgentStrategy: PaneUserAgentStrategy;
 }
 
 export class ViewManager {
@@ -224,10 +226,18 @@ export class ViewManager {
       getProviderNameForKey: (providerKey) => {
         return this.providers.get(providerKey)?.name ?? providerKey;
       },
+      onPaneLoadFailure: (failure) => {
+        if (failure.action !== 'show-error') {
+          return;
+        }
+        console.error('[PaneLoadMonitor] Pane load failed after retry budget', failure);
+      },
     });
     this.paneViewService = new PaneViewService({
       hostWindow: this.window,
       panePreloadPath,
+      paneSessionPartition: options.paneSessionPartition,
+      paneUserAgentStrategy: options.paneUserAgentStrategy,
       paneAcceptLanguages: PANE_ACCEPT_LANGUAGES,
       paneZoomFactor: this.paneZoomFactor,
       paneLoadMonitor,
