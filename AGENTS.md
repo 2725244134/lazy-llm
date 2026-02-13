@@ -4,7 +4,7 @@ LazyLLM is a multi-LLM interface built with Electron + Vue + TypeScript. It allo
 
 ## Tech Stack
 
-- **Runtime**: Electron 33+
+- **Runtime**: Electron 38
 - **Frontend**: Vue 3 + TypeScript + Vite
 - **Package Manager**: Bun (enforced, no npm/yarn/pnpm)
 - **Testing**: Vitest (unit) + Playwright (Electron smoke)
