@@ -57,7 +57,7 @@ describe('getPaneAreaFallbackBounds', () => {
 });
 
 describe('getQuickPromptAnchorBounds', () => {
-  it('selects anchor pane by index and clamps out-of-range indices', () => {
+  it('always anchors to the full content viewport', () => {
     const layout = calculateLayout({
       windowWidth: 1400,
       windowHeight: 900,
@@ -70,33 +70,48 @@ describe('getQuickPromptAnchorBounds', () => {
       sidebarWidth: 280,
       lastLayout: layout,
       anchorPaneIndex: 1,
-    })).toEqual(layout.panes[1]);
+    })).toEqual({
+      x: 0,
+      y: 0,
+      width: 1400,
+      height: 900,
+    });
 
     expect(getQuickPromptAnchorBounds({
       contentSize: { width: 1400, height: 900 },
       sidebarWidth: 280,
       lastLayout: layout,
       anchorPaneIndex: -1,
-    })).toEqual(layout.panes[0]);
+    })).toEqual({
+      x: 0,
+      y: 0,
+      width: 1400,
+      height: 900,
+    });
 
     expect(getQuickPromptAnchorBounds({
       contentSize: { width: 1400, height: 900 },
       sidebarWidth: 280,
       lastLayout: layout,
       anchorPaneIndex: 99,
-    })).toEqual(layout.panes[2]);
-  });
-
-  it('falls back to pane area when no previous layout exists', () => {
-    const contentSize = { width: 900, height: 700 };
-    const fallback = getPaneAreaFallbackBounds({ contentSize, sidebarWidth: 1000 });
+    })).toEqual({
+      x: 0,
+      y: 0,
+      width: 1400,
+      height: 900,
+    });
 
     expect(getQuickPromptAnchorBounds({
-      contentSize,
+      contentSize: { width: 0, height: -2 },
       sidebarWidth: 1000,
       lastLayout: null,
       anchorPaneIndex: 0,
-    })).toEqual(fallback);
+    })).toEqual({
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+    });
   });
 });
 
@@ -119,7 +134,7 @@ describe('calculateLayoutFromContentBounds', () => {
 });
 
 describe('calculateQuickPromptBoundsForState', () => {
-  it('uses selected anchor pane and quick prompt config to compute bounds', () => {
+  it('uses full content viewport as anchor for quick prompt bounds', () => {
     const contentBounds = { width: 1400, height: 900 };
     const layout = calculateLayout({
       windowWidth: 1400,
@@ -139,7 +154,12 @@ describe('calculateQuickPromptBoundsForState', () => {
 
     const expected = calculateQuickPromptBounds({
       viewport: contentBounds,
-      anchor: layout.panes[1],
+      anchor: {
+        x: 0,
+        y: 0,
+        width: 1400,
+        height: 900,
+      },
       requestedHeight: 74,
       passthroughMode: QUICK_PROMPT_CONFIG.passthroughMode,
       minWidth: QUICK_PROMPT_CONFIG.minWidth,
@@ -152,13 +172,9 @@ describe('calculateQuickPromptBoundsForState', () => {
     expect(actual).toEqual(expected);
   });
 
-  it('falls back to pane area and sanitized content size when layout is missing', () => {
+  it('uses sanitized viewport as anchor when layout is missing', () => {
     const contentBounds = { width: 0, height: -2 };
     const viewport = sanitizeContentSize(contentBounds);
-    const fallbackAnchor = getPaneAreaFallbackBounds({
-      contentSize: viewport,
-      sidebarWidth: 999,
-    });
 
     const actual = calculateQuickPromptBoundsForState({
       contentBounds,
@@ -171,7 +187,12 @@ describe('calculateQuickPromptBoundsForState', () => {
 
     const expected = calculateQuickPromptBounds({
       viewport,
-      anchor: fallbackAnchor,
+      anchor: {
+        x: 0,
+        y: 0,
+        width: viewport.width,
+        height: viewport.height,
+      },
       requestedHeight: 300,
       passthroughMode: QUICK_PROMPT_CONFIG.passthroughMode,
       minWidth: QUICK_PROMPT_CONFIG.minWidth,
