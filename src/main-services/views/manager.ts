@@ -352,7 +352,6 @@ export class ViewManager {
 
     // Load sidebar content
     if (
-      process.env.NODE_ENV === 'development' &&
       typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string' &&
       MAIN_WINDOW_VITE_DEV_SERVER_URL.length > 0
     ) {
