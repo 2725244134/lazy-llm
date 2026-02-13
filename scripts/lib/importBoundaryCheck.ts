@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, type Dirent } from 'node:fs';
 import { dirname, relative, resolve } from 'node:path';
 
-export type BoundaryDirection = 'electron_to_src' | 'src_to_electron';
+export type BoundaryDirection = 'main_services_to_renderer' | 'renderer_to_main_services';
 
 export interface ImportSpecifierMatch {
   specifier: string;
@@ -23,7 +23,7 @@ export interface BaselineDiff {
   staleKeys: string[];
 }
 
-const SOURCE_ROOTS = ['electron', 'src'] as const;
+const SOURCE_ROOTS = ['src'] as const;
 const SOURCE_FILE_SUFFIXES = ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.vue'] as const;
 const TEST_FILE_PATTERN = /\.(test|spec)\.[^/]+$/;
 const DECLARATION_FILE_SUFFIX = '.d.ts';
@@ -36,7 +36,13 @@ const IMPORT_PATTERNS = [
   /\brequire\s*\(\s*["']([^"']+)["']\s*\)/g,
 ];
 
-export const ALLOWED_CROSS_BOUNDARY_TARGETS = ['electron/ipc/contracts'] as const;
+export const ALLOWED_CROSS_BOUNDARY_TARGETS = [] as const;
+const MAIN_SIDE_ROOT_FILES = new Set([
+  'src/main',
+  'src/preload',
+  'src/pane-preload',
+  'src/quick-prompt-preload',
+]);
 
 function normalizePathLike(pathLike: string): string {
   return pathLike.replace(/\\/g, '/').replace(/^\.\//, '');
@@ -49,7 +55,7 @@ function compareAscii(left: string, right: string): number {
 }
 
 function isSupportedSourceFile(relativePath: string): boolean {
-  if (!relativePath.startsWith('electron/') && !relativePath.startsWith('src/')) {
+  if (!relativePath.startsWith('src/')) {
     return false;
   }
 
@@ -164,7 +170,7 @@ function resolveImportPath(specifier: string, importerPath: string, rootDir: str
     return normalizeImportedPath(`src/${sanitizedSpecifier.slice(2)}`);
   }
 
-  if (sanitizedSpecifier.startsWith('src/') || sanitizedSpecifier.startsWith('electron/')) {
+  if (sanitizedSpecifier.startsWith('src/')) {
     return normalizeImportedPath(sanitizedSpecifier);
   }
 
@@ -187,12 +193,21 @@ function resolveImportPath(specifier: string, importerPath: string, rootDir: str
 }
 
 function classifyBoundary(importerPath: string, importedPath: string): BoundaryDirection | null {
-  if (importerPath.startsWith('electron/') && importedPath.startsWith('src/')) {
-    return 'electron_to_src';
+  const normalizedImporterPath = normalizeImportedPath(importerPath);
+  const normalizedImportedPath = normalizeImportedPath(importedPath);
+  const importerIsMainSide = normalizedImporterPath.startsWith('src/main-services/')
+    || MAIN_SIDE_ROOT_FILES.has(normalizedImporterPath);
+  const importedIsMainSide = normalizedImportedPath.startsWith('src/main-services/')
+    || MAIN_SIDE_ROOT_FILES.has(normalizedImportedPath);
+  const importerIsRenderer = normalizedImporterPath.startsWith('src/') && !importerIsMainSide;
+  const importedIsRenderer = normalizedImportedPath.startsWith('src/') && !importedIsMainSide;
+
+  if (importerIsMainSide && importedIsRenderer) {
+    return 'main_services_to_renderer';
   }
 
-  if (importerPath.startsWith('src/') && importedPath.startsWith('electron/')) {
-    return 'src_to_electron';
+  if (importerIsRenderer && importedIsMainSide) {
+    return 'renderer_to_main_services';
   }
 
   return null;

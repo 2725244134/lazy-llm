@@ -1,11 +1,9 @@
 {
   "version": 1,
   "policy": {
-    "electronMustNotImportSrc": true,
-    "srcMustNotImportElectron": true,
-    "allowedCrossBoundaryTargets": [
-      "electron/ipc/contracts"
-    ]
+    "mainServicesMustNotImportRenderer": true,
+    "rendererMustNotImportMainServices": true,
+    "allowedCrossBoundaryTargets": []
   },
   "violations": []
 }

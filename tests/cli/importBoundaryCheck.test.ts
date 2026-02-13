@@ -44,7 +44,7 @@ describe('importBoundaryCheck', () => {
       import thing from './a';
       export { value } from "../b";
       const lazy = import('@/config/app');
-      const helper = require('../../electron/views/manager');
+      const helper = require('../../src/main-services/views/manager');
     `;
 
     const imports = extractImportSpecifiers(source);
@@ -53,18 +53,20 @@ describe('importBoundaryCheck', () => {
       './a',
       '../b',
       '@/config/app',
-      '../../electron/views/manager',
+      '../../src/main-services/views/manager',
     ]);
   });
 
-  it('flags cross-boundary imports while allowing electron IPC contracts', () => {
+  it('flags cross-boundary imports between main-services and renderer code', () => {
     const rootDir = createTempProject({
-      'electron/main.ts': "import { APP_CONFIG } from '../src/config/app';\n",
-      'src/runtime/sidebar.ts': "import { createView } from '../../electron/views/manager';\n",
-      'src/runtime/types.ts': "import type { ViewRect } from '../../electron/ipc/contracts';\n",
+      'src/main.ts': "import { buildAppState } from './main-services/state';\n",
+      'src/main-services/state.ts': 'export const buildAppState = () => ({ ready: true });\n',
+      'src/main-services/main.ts': "import { APP_CONFIG } from '../config/app';\n",
+      'src/runtime/sidebar.ts': "import { createView } from '../main-services/views/manager';\n",
+      'src/runtime/types.ts': "import type { ViewRect } from '../../packages/shared-contracts/ipc/contracts';\n",
       'src/config/app.ts': 'export const APP_CONFIG = { panes: 4 };\n',
-      'electron/views/manager.ts': 'export const createView = () => null;\n',
-      'electron/ipc/contracts.ts': 'export type ViewRect = { x: number };\n',
+      'src/main-services/views/manager.ts': 'export const createView = () => null;\n',
+      'packages/shared-contracts/ipc/contracts.ts': 'export type ViewRect = { x: number };\n',
     });
 
     try {
@@ -72,14 +74,14 @@ describe('importBoundaryCheck', () => {
 
       expect(summarizeViolations(violations)).toEqual([
         {
-          boundary: 'electron_to_src',
-          importerPath: 'electron/main.ts',
+          boundary: 'main_services_to_renderer',
+          importerPath: 'src/main-services/main.ts',
           importedPath: 'src/config/app',
         },
         {
-          boundary: 'src_to_electron',
+          boundary: 'renderer_to_main_services',
           importerPath: 'src/runtime/sidebar.ts',
-          importedPath: 'electron/views/manager',
+          importedPath: 'src/main-services/views/manager',
         },
       ]);
     } finally {
@@ -89,11 +91,11 @@ describe('importBoundaryCheck', () => {
 
   it('computes new and stale baseline keys deterministically', () => {
     const diff = diffViolationKeys(
-      ['electron_to_src|electron/main.ts|src/config/app', 'src_to_electron|src/runtime/sidebar.ts|electron/views/manager'],
-      ['electron_to_src|electron/main.ts|src/config/app', 'src_to_electron|src/runtime/old.ts|electron/views/legacy'],
+      ['main_services_to_renderer|src/main-services/main.ts|src/config/app', 'renderer_to_main_services|src/runtime/sidebar.ts|src/main-services/views/manager'],
+      ['main_services_to_renderer|src/main-services/main.ts|src/config/app', 'renderer_to_main_services|src/runtime/old.ts|src/main-services/views/legacy'],
     );
 
-    expect(diff.newKeys).toEqual(['src_to_electron|src/runtime/sidebar.ts|electron/views/manager']);
-    expect(diff.staleKeys).toEqual(['src_to_electron|src/runtime/old.ts|electron/views/legacy']);
+    expect(diff.newKeys).toEqual(['renderer_to_main_services|src/runtime/sidebar.ts|src/main-services/views/manager']);
+    expect(diff.staleKeys).toEqual(['renderer_to_main_services|src/runtime/old.ts|src/main-services/views/legacy']);
   });
 });
