@@ -1,6 +1,6 @@
 # LazyLLM
 
-Multi-LLM interface built with Electron + Vue + TypeScript.
+Multi-LLM interface built with Electron + React + TypeScript.
 
 ## Quick Start
 
@@ -26,22 +26,28 @@ just package
 
 ## Project Structure
 
-```
+```text
 lazy-llm/
-├── electron/           # Electron main process
-│   ├── main.ts         # Main process entry
-│   ├── preload.ts      # Preload script (contextBridge)
-│   ├── ipc/            # IPC contracts
-│   └── ipc-handlers/   # IPC handler implementations
-├── src/                # Vue renderer app
-│   ├── App.vue
-│   ├── main.ts
-│   ├── components/
-│   ├── types/
-│   └── styles/
-├── tests/              # Test files
-│   └── electron/       # Electron smoke tests
-└── dist-electron/      # Built electron files
+├── electron/               # Electron main process and view orchestration
+│   ├── main.ts             # Main process entry
+│   ├── ipc/                # IPC contracts and modular handler registration
+│   ├── ipc-handlers/       # Main-side runtime state/config handlers
+│   ├── preload.ts          # Renderer preload bridge (window.council)
+│   ├── pane-preload.ts     # Pane preload bridge
+│   └── quick-prompt-preload.ts
+├── src/
+│   ├── renderer/           # React renderer features (sidebar/providers/prompt)
+│   ├── runtime/            # Renderer runtime adapters
+│   ├── providers/          # Provider metadata and injection configs
+│   ├── inject/             # Prompt injection runtime
+│   ├── styles/
+│   └── main.tsx            # React renderer entrypoint
+├── packages/
+│   ├── shared-config
+│   └── shared-contracts
+├── tests/
+│   └── electron/           # Electron smoke tests
+└── dist-electron/          # Built electron files
 ```
 
 ## IPC Channels
@@ -53,44 +59,18 @@ lazy-llm/
 | `pane:setCount` | `{ count }` | `{ success }` |
 | `pane:updateProvider` | `{ paneIndex, providerKey }` | `{ success, paneIndex }` |
 | `prompt:send` | `{ text }` | `{ success, failures? }` |
+| `prompt:syncDraft` | `{ text }` | `{ success, failures? }` |
+| `layout:update` | `{ paneCount, sidebarWidth }` | `{ success }` |
+| `quickPrompt:toggle` | void | `{ success, visible }` |
 
-## User Config Files
+## Runtime Settings
 
-LazyLLM auto-creates plaintext config files at:
+Renderer settings are persisted in localStorage under `lazyllm.settings.v1`.
 
-- Linux: `~/.config/lazy-llm/config.default.json` and `~/.config/lazy-llm/config.json`
-- Or `$XDG_CONFIG_HOME/lazy-llm/config.default.json` and `$XDG_CONFIG_HOME/lazy-llm/config.json` when `XDG_CONFIG_HOME` is set
+Stored fields include:
 
-`config.default.json` contains concrete baseline values generated from code defaults.
+- `layout.paneCount`
+- `layout.sidebarWidth`
+- `providers.paneKeys`
 
-`config.json` is your override file. Use `"default"` to inherit lower-priority values:
-
-```json
-{
-  "provider": {
-    "pane_count": "default",
-    "panes": "default"
-  },
-  "sidebar": {
-    "expanded_width": "default"
-  },
-  "quick_prompt": {
-    "default_height": "default"
-  },
-  "webview": {
-    "zoom": {
-      "pane_factor": "default",
-      "sidebar_factor": "default"
-    }
-  }
-}
-```
-
-Notes:
-
-- Resolution priority is strict: external file (`3`) > encrypted store (`2`) > code defaults (`1`).
-- In `config.json`, both omitted fields and `"default"` are treated as "no override".
-- `provider.pane_count` and `provider.panes` define startup pane count/providers.
-- Sidebar exposes one effective width value: `sidebar.expanded_width`.
-- `quick_prompt.default_height` controls initial quick prompt height.
-- `webview.zoom.pane_factor` and `webview.zoom.sidebar_factor` control default zoom.
+Main process config now serves runtime defaults and no longer relies on external user config files.
