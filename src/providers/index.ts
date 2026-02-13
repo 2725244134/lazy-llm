@@ -1,37 +1,28 @@
-import * as chatgpt from './chatgpt'
-import * as claude from './claude'
-import * as gemini from './gemini'
-import * as grok from './grok'
-import * as perplexity from './perplexity'
-import * as aistudio from './aistudio'
-import { APP_CONFIG } from '@/config'
+import * as chatgpt from './chatgpt';
+import * as claude from './claude';
+import * as gemini from './gemini';
+import * as grok from './grok';
+import * as perplexity from './perplexity';
+import * as aistudio from './aistudio';
+import { APP_CONFIG } from '@/config';
 
-import type { ProviderMeta, ProviderInject, Provider } from './types'
-export type { ProviderMeta, ProviderInject, Provider }
+import type { ProviderMeta, ProviderInject, Provider } from './types';
+export type { ProviderMeta, ProviderInject, Provider };
 
-// List of all providers
-export const providers = [chatgpt, claude, gemini, grok, perplexity, aistudio]
+export const providers = [chatgpt, claude, gemini, grok, perplexity, aistudio];
 
-// Index by key
-export const providersByKey = Object.fromEntries(
-  providers.map((p) => [p.meta.key, p])
-)
+export const providersByKey = Object.fromEntries(providers.map((provider) => [provider.meta.key, provider]));
 
-// Export meta list (for the sidebar)
-export const providerMetas = providers.map((p) => p.meta)
+export const providerMetas = providers.map((provider) => provider.meta);
 
-// Export inject configs (for inject.ts)
 export const providerInjects = Object.fromEntries(
-  providers.map((p) => [p.meta.key, p.inject])
-)
+  providers.map((provider) => [provider.meta.key, provider.inject]),
+);
 
-// Export Icon components
 export const providerIcons = Object.fromEntries(
-  providers.map((p) => [p.meta.key, p.Icon])
-)
+  providers.map((provider) => [provider.meta.key, provider.Icon]),
+) as Record<string, string>;
 
-// Default active providers
-export const DEFAULT_ACTIVE_PROVIDERS = [...APP_CONFIG.providers.defaultActiveKeys]
+export const DEFAULT_ACTIVE_PROVIDERS = [...APP_CONFIG.providers.defaultActiveKeys];
 
-// Re-export each provider
-export { chatgpt, claude, gemini, grok, perplexity, aistudio }
+export { chatgpt, claude, gemini, grok, perplexity, aistudio };
