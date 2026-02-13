@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createElectronRuntime } from './electronRuntime';
 
-function stubWindowCouncil(overrides: Partial<Window['council']> = {}) {
-  const council: Window['council'] = {
+function stubWindowLazyllm(overrides: Partial<Window['lazyllm']> = {}) {
+  const lazyllm: Window['lazyllm'] = {
     healthCheck: vi.fn(),
     getConfig: vi.fn().mockResolvedValue({
       provider: { pane_count: 2, panes: ['chatgpt', 'claude'], catalog: [] },
@@ -22,8 +22,8 @@ function stubWindowCouncil(overrides: Partial<Window['council']> = {}) {
     ...overrides,
   };
 
-  vi.stubGlobal('window', { council });
-  return council;
+  vi.stubGlobal('window', { lazyllm });
+  return lazyllm;
 }
 
 describe('createElectronRuntime', () => {
@@ -34,12 +34,12 @@ describe('createElectronRuntime', () => {
   it('throws when Electron bridge is missing', () => {
     vi.stubGlobal('window', {});
 
-    expect(() => createElectronRuntime()).toThrow('Electron bridge (window.council) is not available');
+    expect(() => createElectronRuntime()).toThrow('Electron bridge (window.lazyllm) is not available');
   });
 
   it('forwards layout updates with sidebar width and pane count', async () => {
     const updateLayout = vi.fn().mockResolvedValue({ success: true });
-    stubWindowCouncil({ updateLayout });
+    stubWindowLazyllm({ updateLayout });
     const runtime = createElectronRuntime();
 
     await runtime.updateLayout({
@@ -56,7 +56,7 @@ describe('createElectronRuntime', () => {
   });
 
   it('throws when setPaneCount returns unsuccessful result', async () => {
-    stubWindowCouncil({
+    stubWindowLazyllm({
       setPaneCount: vi.fn().mockResolvedValue({ success: false }),
     });
     const runtime = createElectronRuntime();
@@ -66,7 +66,7 @@ describe('createElectronRuntime', () => {
 
   it('forwards reset-all requests to Electron bridge', async () => {
     const resetAllPanes = vi.fn().mockResolvedValue({ success: true });
-    stubWindowCouncil({ resetAllPanes });
+    stubWindowLazyllm({ resetAllPanes });
     const runtime = createElectronRuntime();
 
     await runtime.resetAllPanes();
@@ -75,7 +75,7 @@ describe('createElectronRuntime', () => {
   });
 
   it('throws when resetAllPanes returns unsuccessful result', async () => {
-    stubWindowCouncil({
+    stubWindowLazyllm({
       resetAllPanes: vi.fn().mockResolvedValue({ success: false }),
     });
     const runtime = createElectronRuntime();
@@ -84,7 +84,7 @@ describe('createElectronRuntime', () => {
   });
 
   it('throws with failure details when sendPrompt fails', async () => {
-    stubWindowCouncil({
+    stubWindowLazyllm({
       sendPrompt: vi.fn().mockResolvedValue({ success: false, failures: ['pane-1', 'pane-2'] }),
     });
     const runtime = createElectronRuntime();
@@ -94,7 +94,7 @@ describe('createElectronRuntime', () => {
 
   it('forwards prompt draft sync requests', async () => {
     const syncPromptDraft = vi.fn().mockResolvedValue({ success: true });
-    stubWindowCouncil({ syncPromptDraft });
+    stubWindowLazyllm({ syncPromptDraft });
     const runtime = createElectronRuntime();
 
     await runtime.syncPromptDraft('draft value');

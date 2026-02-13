@@ -1,4 +1,4 @@
-import type { AppConfig } from '../../../packages/shared-contracts/ipc/contracts';
+import type { AppConfig } from '@shared-contracts/ipc/contracts';
 
 export type PaneCount = 1 | 2 | 3 | 4;
 

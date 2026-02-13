@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/electronApp';
-import { getHealthCheck, resetAllPanes } from '../helpers/council';
+import { getHealthCheck, resetAllPanes } from '../helpers/lazyllm';
 
 test.describe('Smoke / IPC', () => {
   test('IPC health check works', async ({ appWindow }) => {
@@ -12,7 +12,7 @@ test.describe('Smoke / IPC', () => {
 
   test('layout update IPC accepts pane count and sidebar width', async ({ appWindow }) => {
     const result = await appWindow.evaluate(() => {
-      return window.council.updateLayout({ paneCount: 3, sidebarWidth: 320 });
+      return window.lazyllm.updateLayout({ paneCount: 3, sidebarWidth: 320 });
     });
 
     expect(result.success).toBe(true);

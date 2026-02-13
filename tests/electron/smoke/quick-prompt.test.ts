@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/electronApp';
-import { hideQuickPrompt, resizeQuickPrompt, toggleQuickPrompt } from '../helpers/council';
+import { hideQuickPrompt, resizeQuickPrompt, toggleQuickPrompt } from '../helpers/lazyllm';
 import { selectors } from '../helpers/selectors';
 
 test.describe('Smoke / Quick Prompt', () => {

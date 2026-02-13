@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import {
   expect,
   test as base,
@@ -16,13 +19,18 @@ function createLaunchEnv(): Record<string, string> {
   const envEntries = Object.entries(process.env).filter(
     (entry): entry is [string, string] => typeof entry[1] === 'string',
   );
+
+  const userDataDir = mkdtempSync(join(tmpdir(), 'lazy-llm-e2e-'));
+
   return {
     ...Object.fromEntries(envEntries),
     NODE_ENV: 'production',
+    LAZYLLM_SKIP_SINGLE_INSTANCE_LOCK: '1',
+    LAZYLLM_USER_DATA_DIR: userDataDir,
   };
 }
 
-async function hasCouncilBridge(page: Page): Promise<boolean> {
+async function hasLazyllmBridge(page: Page): Promise<boolean> {
   if (page.isClosed()) {
     return false;
   }
@@ -30,9 +38,9 @@ async function hasCouncilBridge(page: Page): Promise<boolean> {
   try {
     return await page.evaluate(() => {
       const bridge = globalThis as unknown as {
-        council?: { healthCheck?: unknown };
+        lazyllm?: { healthCheck?: unknown };
       };
-      return typeof bridge.council?.healthCheck === 'function';
+      return typeof bridge.lazyllm?.healthCheck === 'function';
     });
   } catch {
     return false;
@@ -51,7 +59,7 @@ async function resolveAppWindow(electronApp: ElectronApplication): Promise<Page>
     const windows = electronApp.windows();
 
     for (const window of windows) {
-      if (!(await hasCouncilBridge(window))) {
+      if (!(await hasLazyllmBridge(window))) {
         continue;
       }
 
@@ -67,7 +75,7 @@ async function resolveAppWindow(electronApp: ElectronApplication): Promise<Page>
   }
 
   throw new Error(
-    `Unable to locate app window with council bridge within ${timeoutMs}ms. Windows: ${lastObservedWindows}`,
+    `Unable to locate app window with lazyllm bridge within ${timeoutMs}ms. Windows: ${lastObservedWindows}`,
   );
 }
 

@@ -15,5 +15,10 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  "include": [
+    "forge.config.ts",
+    "vite.main.config.mts",
+    "vite.preload.config.mts",
+    "vite.renderer.config.mts"
+  ]
 }

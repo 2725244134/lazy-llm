@@ -15,6 +15,8 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      '@shared-config': resolve(__dirname, 'packages/shared-config'),
+      '@shared-contracts': resolve(__dirname, 'packages/shared-contracts'),
     },
   },
 });

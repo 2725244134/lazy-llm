@@ -9,17 +9,17 @@ export default function App() {
     let active = true;
 
     const run = async () => {
-      if (!window.council) {
+      if (!window.lazyllm) {
         if (!active) {
           return;
         }
-        setHealthStatus('web-only');
-        setRuntimeInfo('Running in browser (no Electron bridge)');
+        setHealthStatus('error');
+        setRuntimeInfo('Electron bridge (window.lazyllm) is not available');
         return;
       }
 
       try {
-        const health = await window.council.healthCheck();
+        const health = await window.lazyllm.healthCheck();
         if (!active) {
           return;
         }

@@ -1,8 +1,8 @@
-import type { ViewRect } from '../../electron/ipc/contracts.js';
+import type { ViewRect } from '../../packages/shared-contracts/ipc/contracts.js';
 import {
   calculateQuickPromptBounds,
   type QuickPromptGeometryInput,
-} from '../../electron/views/quickPromptGeometry.js';
+} from '../../src/main-services/views/quickPromptGeometry.js';
 import {
   expectRecord,
   readBoolean,

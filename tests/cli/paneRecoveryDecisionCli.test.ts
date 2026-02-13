@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decidePaneLoadRecovery } from '../../electron/views/paneRecovery';
+import { decidePaneLoadRecovery } from '../../src/main-services/views/paneRecovery';
 import { runCliScript } from './cliTestUtils';
 
 const SCRIPT_PATH = 'scripts/lib/paneRecoveryDecisionCli.ts';

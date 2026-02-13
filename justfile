@@ -13,14 +13,14 @@ prepare:
 # Run Electron app in development mode.
 dev:
   @echo "==> Starting Electron dev"
-  @bun run dev:electron
+  @bun run dev
 
-# Build for production (renderer + electron).
+# Build for production (typecheck + Electron Forge package).
 build:
   @echo "==> Building production bundle"
   @bun run build
 
-# Package desktop app with electron-builder.
+# Package desktop app with Electron Forge.
 package:
   @echo "==> Packaging desktop app"
   @bun run package
@@ -39,8 +39,6 @@ arch-check *args:
 test:
   @echo "==> Running unit tests"
   @bun run test:unit
-  @echo "==> Building artifacts for Electron smoke tests"
-  @bun run build
   @echo "==> Running Electron smoke tests"
   @bun run test:electron:smoke
 
@@ -53,4 +51,4 @@ release-verify-tag:
 # Remove build artifacts.
 clean:
   @echo "==> Cleaning build artifacts"
-  @rm -rf dist dist-electron release
+  @rm -rf dist dist-electron release .vite out
