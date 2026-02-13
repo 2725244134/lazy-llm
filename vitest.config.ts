@@ -1,15 +1,14 @@
 import { defineConfig } from 'vitest/config';
-import vue from '@vitejs/plugin-vue';
+import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [react()],
   test: {
     exclude: [
       '**/node_modules/**',
       '**/dist/**',
       '**/dist-electron/**',
-      // Exclude Playwright tests
       '**/tests/electron/**',
     ],
   },

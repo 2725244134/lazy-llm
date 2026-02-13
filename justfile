@@ -27,7 +27,7 @@ package:
 
 # Run type checking.
 check:
-  @echo "==> Type-checking (vue-tsc)"
+  @echo "==> Type-checking (tsc)"
   @bun run typecheck
 
 # Check architecture import boundaries with baseline tolerance.
