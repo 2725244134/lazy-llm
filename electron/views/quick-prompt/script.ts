@@ -207,7 +207,6 @@ window.addEventListener('keydown', (event) => {
 window.addEventListener('quick-prompt:open', () => {
   if (!input) return;
   resetDraftSyncState();
-  input.value = '';
   input.disabled = false;
   isSending = false;
   syncInputHeight();

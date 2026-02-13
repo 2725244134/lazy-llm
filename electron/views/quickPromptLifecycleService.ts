@@ -24,6 +24,10 @@ export interface QuickPromptResizeResult {
   height: number;
 }
 
+export interface QuickPromptHideOptions {
+  restoreFocus?: boolean;
+}
+
 export class QuickPromptLifecycleService {
   private quickPromptView: WebContentsView | null = null;
   private quickPromptVisible = false;
@@ -81,15 +85,18 @@ export class QuickPromptLifecycleService {
     return this.quickPromptVisible;
   }
 
-  hide(): boolean {
+  hide(options: QuickPromptHideOptions = {}): boolean {
     if (!this.quickPromptView || !this.quickPromptVisible) {
       return false;
     }
 
+    const { restoreFocus = true } = options;
     this.callbacks.removeQuickPromptViewFromContent(this.quickPromptView);
     this.quickPromptVisible = false;
     this.quickPromptHeight = this.config.defaultHeight;
-    this.callbacks.focusSidebarIfAvailable();
+    if (restoreFocus) {
+      this.callbacks.focusSidebarIfAvailable();
+    }
     return this.quickPromptVisible;
   }
 

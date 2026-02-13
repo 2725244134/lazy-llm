@@ -22,13 +22,16 @@ const providerLoadingByPane = ref<Record<number, boolean>>({})
 // Sidebar width from config (loaded on mount)
 const expandedWidth = ref<number>(APP_CONFIG.layout.sidebar.defaultExpandedWidth)
 const collapsedWidth = APP_CONFIG.layout.sidebar.defaultCollapsedWidth
+const sidebarTransitionDurationMs = APP_CONFIG.layout.sidebar.transitionDurationMs
+const isElectronRuntime = typeof window !== 'undefined' && typeof window.council !== 'undefined'
 
 const configuredSidebarWidth = computed(() =>
   collapsed.value ? collapsedWidth : expandedWidth.value
 )
 const sidebarWidth = computed(() => `${configuredSidebarWidth.value}px`)
 const sidebarStyle = computed(() => ({
-  width: sidebarWidth.value,
+  width: isElectronRuntime ? '100%' : sidebarWidth.value,
+  '--sidebar-transition-duration': `${sidebarTransitionDurationMs}ms`,
   ...getSidebarThemeVars(ACTIVE_THEME_PRESET),
 }))
 const sidebarUiDensity = computed(() => {
@@ -52,12 +55,7 @@ const normalizePaneCount = (count: number): PaneCount => {
 let layoutSyncQueue: Promise<void> = Promise.resolve()
 let lastLayoutSignature: string | null = null
 
-const buildLayoutSignature = (
-  viewportWidth: number,
-  viewportHeight: number,
-  panes: PaneCount,
-  sidebarW: number
-): string => `${viewportWidth}x${viewportHeight}:${panes}:${sidebarW}`
+const buildLayoutSignature = (panes: PaneCount, sidebarW: number): string => `${panes}:${sidebarW}`
 
 const invalidateLayoutSignature = () => {
   lastLayoutSignature = null
@@ -67,7 +65,7 @@ const syncLayout = async () => {
   const viewportWidth = Math.max(1, Math.floor(window.innerWidth))
   const viewportHeight = Math.max(1, Math.floor(window.innerHeight))
   const sidebarW = configuredSidebarWidth.value
-  const signature = buildLayoutSignature(viewportWidth, viewportHeight, paneCount.value, sidebarW)
+  const signature = buildLayoutSignature(paneCount.value, sidebarW)
 
   if (signature === lastLayoutSignature) return
 
@@ -327,6 +325,9 @@ provide(SIDEBAR_KEY, sidebarContext)
   flex-shrink: 0;
   position: relative;
   z-index: 10;
+  transition:
+    width var(--sidebar-transition-duration) cubic-bezier(0.25, 0.8, 0.25, 1),
+    padding calc(var(--sidebar-transition-duration) * 0.8) ease-out;
 }
 
 .sidebar.is-compact {
@@ -351,6 +352,10 @@ provide(SIDEBAR_KEY, sidebarContext)
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
   -webkit-app-region: drag;
+  transition:
+    border-color calc(var(--sidebar-transition-duration) * 0.6) ease-out,
+    margin-bottom calc(var(--sidebar-transition-duration) * 0.7) ease-out,
+    padding-bottom calc(var(--sidebar-transition-duration) * 0.7) ease-out;
 }
 
 .sidebar.is-compact .sidebar-header {
@@ -378,9 +383,16 @@ provide(SIDEBAR_KEY, sidebarContext)
   font-weight: 700;
   letter-spacing: 0.5px;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity calc(var(--sidebar-transition-duration) * 0.55) ease-out,
+    transform calc(var(--sidebar-transition-duration) * 0.55) ease-out,
+    max-width calc(var(--sidebar-transition-duration) * 0.55) ease-out;
 }
 
 .sidebar.is-compact .sidebar-title {
@@ -394,7 +406,10 @@ provide(SIDEBAR_KEY, sidebarContext)
 }
 
 .sidebar.collapsed .sidebar-title {
-  display: none;
+  opacity: 0;
+  transform: translateX(-8px);
+  max-width: 0;
+  pointer-events: none;
 }
 
 .collapse-btn {
@@ -447,6 +462,13 @@ provide(SIDEBAR_KEY, sidebarContext)
   flex-direction: column;
   flex: 1;
   min-height: 0;
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition:
+    opacity calc(var(--sidebar-transition-duration) * 0.45) ease-out,
+    transform calc(var(--sidebar-transition-duration) * 0.45) ease-out,
+    visibility 0s linear 0s;
 }
 
 .sidebar-scroll {
@@ -481,7 +503,14 @@ provide(SIDEBAR_KEY, sidebarContext)
 }
 
 .sidebar.collapsed .sidebar-content {
-  display: none;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition:
+    opacity calc(var(--sidebar-transition-duration) * 0.35) ease-out,
+    transform calc(var(--sidebar-transition-duration) * 0.35) ease-out,
+    visibility 0s linear calc(var(--sidebar-transition-duration) * 0.35);
 }
 
 .sidebar.is-compact :deep(.section) {
