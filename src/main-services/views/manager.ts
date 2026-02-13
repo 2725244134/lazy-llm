@@ -3,7 +3,6 @@
  */
 
 import {
-  app,
   BaseWindow,
   type Event,
   type Input,
@@ -103,7 +102,6 @@ const rendererIndexPath = resolveFirstExistingPath([
   join(runtimeDir, '..', '..', 'dist', 'index.html'),
   join(process.cwd(), 'dist', 'index.html'),
 ]);
-const FALLBACK_DEV_SERVER_URL = 'http://localhost:5173';
 
 const injectRuntimePath = resolveFirstExistingPath([
   join(runtimeDir, 'inject.js'),
@@ -139,28 +137,7 @@ type ManagedShortcutAction = Exclude<ShortcutAction, 'noop'>;
 interface ViewManagerOptions {
   config: AppConfig;
   runtimePreferences: RuntimePreferences;
-}
-
-function resolveRendererDevServerUrl(): string | null {
-  const candidates = [
-    typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string' ? MAIN_WINDOW_VITE_DEV_SERVER_URL : '',
-    process.env.MAIN_WINDOW_VITE_DEV_SERVER_URL ?? '',
-    process.env.VITE_DEV_SERVER_URL ?? '',
-    process.env.ELECTRON_RENDERER_URL ?? '',
-  ];
-
-  for (const candidate of candidates) {
-    const trimmed = candidate.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
-    }
-  }
-
-  if (!app.isPackaged && process.env.LAZYLLM_SKIP_SINGLE_INSTANCE_LOCK !== '1') {
-    return FALLBACK_DEV_SERVER_URL;
-  }
-
-  return null;
+  rendererDevServerUrl?: string | null;
 }
 
 export class ViewManager {
@@ -184,9 +161,11 @@ export class ViewManager {
   private sidebarWidthAnimationTimer: ReturnType<typeof setTimeout> | null = null;
   private sidebarWidthAnimationToken = 0;
   private sidebarWidthAnimationTarget: number | null = null;
+  private rendererDevServerUrl: string | null;
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
+    this.rendererDevServerUrl = normalizeRendererDevServerUrl(options.rendererDevServerUrl);
     this.currentSidebarWidth = options.config.sidebar.expanded_width;
     this.providers = new Map(options.config.provider.catalog.map(p => [p.key, p]));
     this.paneZoomFactor = options.runtimePreferences.paneZoomFactor;
@@ -375,9 +354,8 @@ export class ViewManager {
     this.applySidebarRuntimePreferences(this.sidebarView.webContents);
 
     // Load sidebar content
-    const rendererDevServerUrl = resolveRendererDevServerUrl();
-    if (rendererDevServerUrl) {
-      this.sidebarView.webContents.loadURL(rendererDevServerUrl);
+    if (this.rendererDevServerUrl) {
+      this.sidebarView.webContents.loadURL(this.rendererDevServerUrl);
     } else {
       this.sidebarView.webContents.loadFile(rendererIndexPath);
     }
@@ -773,4 +751,15 @@ export class ViewManager {
       this.sidebarView = null;
     }
   }
+}
+
+function normalizeRendererDevServerUrl(url?: string | null): string | null {
+  if (typeof url !== 'string') {
+    return null;
+  }
+  const normalized = url.trim();
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    return normalized;
+  }
+  return null;
 }

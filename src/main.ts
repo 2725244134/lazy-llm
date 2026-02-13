@@ -27,6 +27,7 @@ let viewManager: ViewManager | null = null;
 
 function createWindow(): void {
   const settings = getResolvedSettings();
+  const rendererDevServerUrl = MAIN_WINDOW_VITE_DEV_SERVER_URL;
 
   mainWindow = new BaseWindow({
     width: 1400,
@@ -42,6 +43,7 @@ function createWindow(): void {
   viewManager = new ViewManager(mainWindow, {
     config: settings.config,
     runtimePreferences: settings.runtimePreferences,
+    rendererDevServerUrl,
   });
 
   viewManager.initSidebar();
