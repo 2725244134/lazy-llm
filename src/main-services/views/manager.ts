@@ -3,6 +3,7 @@
  */
 
 import {
+  app,
   BaseWindow,
   type Event,
   type Input,
@@ -102,6 +103,7 @@ const rendererIndexPath = resolveFirstExistingPath([
   join(runtimeDir, '..', '..', 'dist', 'index.html'),
   join(process.cwd(), 'dist', 'index.html'),
 ]);
+const FALLBACK_DEV_SERVER_URL = 'http://localhost:5173';
 
 const injectRuntimePath = resolveFirstExistingPath([
   join(runtimeDir, 'inject.js'),
@@ -137,6 +139,28 @@ type ManagedShortcutAction = Exclude<ShortcutAction, 'noop'>;
 interface ViewManagerOptions {
   config: AppConfig;
   runtimePreferences: RuntimePreferences;
+}
+
+function resolveRendererDevServerUrl(): string | null {
+  const candidates = [
+    typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string' ? MAIN_WINDOW_VITE_DEV_SERVER_URL : '',
+    process.env.MAIN_WINDOW_VITE_DEV_SERVER_URL ?? '',
+    process.env.VITE_DEV_SERVER_URL ?? '',
+    process.env.ELECTRON_RENDERER_URL ?? '',
+  ];
+
+  for (const candidate of candidates) {
+    const trimmed = candidate.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+  }
+
+  if (!app.isPackaged && process.env.LAZYLLM_SKIP_SINGLE_INSTANCE_LOCK !== '1') {
+    return FALLBACK_DEV_SERVER_URL;
+  }
+
+  return null;
 }
 
 export class ViewManager {
@@ -351,11 +375,9 @@ export class ViewManager {
     this.applySidebarRuntimePreferences(this.sidebarView.webContents);
 
     // Load sidebar content
-    if (
-      typeof MAIN_WINDOW_VITE_DEV_SERVER_URL === 'string' &&
-      MAIN_WINDOW_VITE_DEV_SERVER_URL.length > 0
-    ) {
-      this.sidebarView.webContents.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
+    const rendererDevServerUrl = resolveRendererDevServerUrl();
+    if (rendererDevServerUrl) {
+      this.sidebarView.webContents.loadURL(rendererDevServerUrl);
     } else {
       this.sidebarView.webContents.loadFile(rendererIndexPath);
     }
