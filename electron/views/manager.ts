@@ -30,7 +30,7 @@ import { buildQuickPromptDataUrl } from './quick-prompt/index.js';
 import { resolveShortcutAction, type ShortcutAction } from './shortcutDispatcher.js';
 import { SidebarEventBridge } from './sidebarEventBridge.js';
 import { PANE_ACCEPT_LANGUAGES } from './paneRuntimePreferences.js';
-import type { RuntimePreferences } from '../ipc-handlers/externalConfig.js';
+import type { RuntimePreferences } from '../ipc-handlers/store.js';
 import { padProviderSequence } from '../ipc-handlers/providerConfig.js';
 import type {
   AppConfig,

@@ -1,21 +1,12 @@
-import Store from 'electron-store';
-import pkg from 'node-machine-id';
-const { machineIdSync } = pkg;
 import type { AppConfig } from '../ipc/contracts.js';
 import { APP_CONFIG } from '../../packages/shared-config/src/app.js';
 import { DEFAULT_CONFIG, normalizeConfig } from './configNormalization.js';
-import { buildDefaultPaneProviders, padProviderSequence } from './providerConfig.js';
-import {
-  DEFAULT_RUNTIME_PREFERENCES,
-  mergeRuntimePreferencesWithExternal,
-  mergeAppConfigWithExternal,
-  normalizeRuntimePreferences,
-  readExternalConfigFile,
-  type RuntimePreferences,
-} from './externalConfig.js';
+import { padProviderSequence } from './providerConfig.js';
 
-// Machine-derived encryption key (not hardcoded)
-const encryptionKey = machineIdSync();
+export interface RuntimePreferences {
+  paneZoomFactor: number;
+  sidebarZoomFactor: number;
+}
 
 interface StoreSchema {
   config: AppConfig;
@@ -26,20 +17,33 @@ interface StoreSchema {
   };
 }
 
-const defaults: StoreSchema = {
-  config: DEFAULT_CONFIG,
-  runtimePreferences: DEFAULT_RUNTIME_PREFERENCES,
+const defaultRuntimePreferences: RuntimePreferences = {
+  paneZoomFactor: APP_CONFIG.runtime.zoom.paneDefaultFactor,
+  sidebarZoomFactor: APP_CONFIG.runtime.zoom.sidebarDefaultFactor,
+};
+
+const defaultState: StoreSchema = {
+  config: normalizeConfig(DEFAULT_CONFIG),
+  runtimePreferences: { ...defaultRuntimePreferences },
   session: {
     lastPaneCount: APP_CONFIG.layout.pane.defaultCount,
-    lastProviders: buildDefaultPaneProviders(APP_CONFIG.layout.pane.defaultCount),
+    lastProviders: [...DEFAULT_CONFIG.provider.panes],
   },
 };
 
-export const store = new Store<StoreSchema>({
-  name: 'lazy-llm-config',
-  encryptionKey,
-  defaults,
-});
+let state: StoreSchema = structuredClone(defaultState);
+
+export const store = {
+  get<K extends keyof StoreSchema>(key: K): StoreSchema[K] {
+    return structuredClone(state[key]);
+  },
+  set<K extends keyof StoreSchema>(key: K, value: StoreSchema[K]): void {
+    state = {
+      ...state,
+      [key]: structuredClone(value),
+    };
+  },
+};
 
 export interface ResolvedSettings {
   config: AppConfig;
@@ -59,35 +63,33 @@ function getStoredNormalizedConfig(): AppConfig {
 
 function getStoredRuntimePreferences(): RuntimePreferences {
   const current = store.get('runtimePreferences');
-  const normalized = normalizeRuntimePreferences(current, DEFAULT_RUNTIME_PREFERENCES);
 
-  if (JSON.stringify(current) !== JSON.stringify(normalized)) {
-    store.set('runtimePreferences', normalized);
-  }
-
-  return normalized;
+  return {
+    paneZoomFactor: Number.isFinite(current.paneZoomFactor)
+      ? current.paneZoomFactor
+      : defaultRuntimePreferences.paneZoomFactor,
+    sidebarZoomFactor: Number.isFinite(current.sidebarZoomFactor)
+      ? current.sidebarZoomFactor
+      : defaultRuntimePreferences.sidebarZoomFactor,
+  };
 }
 
 export function getResolvedSettings(): ResolvedSettings {
-  const storedConfig = getStoredNormalizedConfig();
-  const storedRuntimePreferences = getStoredRuntimePreferences();
-  const externalConfig = readExternalConfigFile();
-
   return {
-    config: normalizeConfig(mergeAppConfigWithExternal(storedConfig, externalConfig)),
-    runtimePreferences: mergeRuntimePreferencesWithExternal(storedRuntimePreferences, externalConfig),
+    config: getStoredNormalizedConfig(),
+    runtimePreferences: getStoredRuntimePreferences(),
   };
 }
 
 export function getConfig(): AppConfig {
-  return getResolvedSettings().config;
+  return getStoredNormalizedConfig();
 }
 
-export function getSession() {
+export function getSession(): StoreSchema['session'] {
   return store.get('session');
 }
 
-export function setSession(session: Partial<StoreSchema['session']>) {
+export function setSession(session: Partial<StoreSchema['session']>): void {
   const current = store.get('session');
   store.set('session', { ...current, ...session });
 }
@@ -106,6 +108,10 @@ export function setDefaultPaneCount(paneCount: number): AppConfig {
   });
 
   store.set('config', nextConfig);
+  setSession({
+    lastPaneCount: nextConfig.provider.pane_count,
+    lastProviders: [...nextConfig.provider.panes],
+  });
   return nextConfig;
 }
 
@@ -126,5 +132,13 @@ export function setDefaultProvider(paneIndex: number, providerKey: string): AppC
   });
 
   store.set('config', nextConfig);
+  setSession({
+    lastPaneCount: nextConfig.provider.pane_count,
+    lastProviders: [...nextConfig.provider.panes],
+  });
   return nextConfig;
+}
+
+export function resetStoreStateForTests(): void {
+  state = structuredClone(defaultState);
 }
