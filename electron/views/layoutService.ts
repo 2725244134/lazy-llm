@@ -72,16 +72,12 @@ export function getPaneAreaFallbackBounds(input: PaneAreaFallbackInput): ViewRec
 
 export function getQuickPromptAnchorBounds(input: QuickPromptAnchorInput): ViewRect {
   const contentSize = sanitizeContentSize(input.contentSize);
-
-  if (!input.lastLayout || input.lastLayout.panes.length === 0) {
-    return getPaneAreaFallbackBounds({
-      contentSize,
-      sidebarWidth: input.sidebarWidth,
-    });
-  }
-
-  const paneIndex = Math.max(0, Math.min(input.anchorPaneIndex, input.lastLayout.panes.length - 1));
-  return input.lastLayout.panes[paneIndex] ?? input.lastLayout.panes[0];
+  return {
+    x: 0,
+    y: 0,
+    width: contentSize.width,
+    height: contentSize.height,
+  };
 }
 
 export function calculateLayoutFromContentBounds(
