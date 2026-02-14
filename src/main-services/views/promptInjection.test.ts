@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'vitest';
-import { buildPromptDraftSyncEvalScript, buildPromptInjectionEvalScript } from './promptInjection';
+import {
+  buildPromptDraftSyncEvalScript,
+  buildPromptInjectionEvalScript,
+  buildPromptStatusEvalScript,
+} from './promptInjection';
 
 describe('buildPromptInjectionEvalScript', () => {
   test('rejects empty prompt text', () => {
@@ -25,5 +29,22 @@ describe('buildPromptDraftSyncEvalScript', () => {
     const script = buildPromptDraftSyncEvalScript('draft');
     expect(script).toContain('bridge.injectPrompt');
     expect(script).toContain(', false)');
+  });
+});
+
+describe('buildPromptStatusEvalScript', () => {
+  test('checks bridge.getStatus availability', () => {
+    const script = buildPromptStatusEvalScript();
+
+    expect(script).toContain('bridge.getStatus');
+    expect(script).toContain('window.__llmBridge.getStatus is unavailable');
+  });
+
+  test('validates status payload shape', () => {
+    const script = buildPromptStatusEvalScript();
+
+    expect(script).toContain('getStatus returned an invalid payload');
+    expect(script).toContain('typeof status.isStreaming === "boolean"');
+    expect(script).toContain('typeof status.isComplete === "boolean"');
   });
 });

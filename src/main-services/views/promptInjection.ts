@@ -3,6 +3,14 @@ export interface PromptInjectionResult {
   reason?: string;
 }
 
+export interface PromptStatusEvalResult {
+  success: boolean;
+  isStreaming?: boolean;
+  isComplete?: boolean;
+  provider?: string;
+  reason?: string;
+}
+
 function normalizePromptText(text: string): string {
   const prompt = text.trim();
   if (!prompt) {
@@ -62,6 +70,45 @@ export function buildPromptDraftSyncEvalScript(text: string): string {
   }
 
   return { success: true };
+})();
+`;
+}
+
+export function buildPromptStatusEvalScript(): string {
+  return `
+(() => {
+  const bridge = window.__llmBridge;
+  if (!bridge || typeof bridge.getStatus !== "function") {
+    return { success: false, reason: "window.__llmBridge.getStatus is unavailable" };
+  }
+
+  try {
+    const status = bridge.getStatus();
+    const isStreaming = status && typeof status.isStreaming === "boolean"
+      ? status.isStreaming
+      : null;
+    const isComplete = status && typeof status.isComplete === "boolean"
+      ? status.isComplete
+      : null;
+
+    if (isStreaming === null || isComplete === null) {
+      return { success: false, reason: "getStatus returned an invalid payload" };
+    }
+
+    const provider = status && typeof status.provider === "string"
+      ? status.provider
+      : "unknown";
+
+    return {
+      success: true,
+      provider,
+      isStreaming,
+      isComplete,
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    return { success: false, reason };
+  }
 })();
 `;
 }
