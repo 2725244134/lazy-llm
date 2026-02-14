@@ -21,6 +21,7 @@ export interface PromptDispatchServiceOptions {
   getInjectRuntimeScript: () => string | null;
   onPaneExecutionError?: (paneIndex: number, error: unknown) => void;
   postSubmitGuardMs?: number;
+  responseStabilityWindowMs?: number;
   queuePollIntervalMs?: number;
   queueMaxWaitMs?: number;
   queueIdleConfirmations?: number;
@@ -35,6 +36,7 @@ const DEFAULT_QUEUE_POLL_INTERVAL_MS = 350;
 const DEFAULT_QUEUE_MAX_WAIT_MS = 90_000;
 const DEFAULT_QUEUE_IDLE_CONFIRMATIONS = 2;
 const DEFAULT_POST_SUBMIT_GUARD_MS = 2_000;
+const DEFAULT_RESPONSE_STABILITY_WINDOW_MS = 4_500;
 
 type PaneBusyState = 'busy' | 'idle' | 'unknown';
 
@@ -56,6 +58,13 @@ interface PaneScriptExecutionResult {
   reason?: string;
 }
 
+interface PaneResponseStabilityState {
+  responseCount: number;
+  lastResponseTextLength: number;
+  lastObservedAtMs: number;
+  lastChangedAtMs: number;
+}
+
 function toFailureReason(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -68,6 +77,7 @@ export class PromptDispatchService {
   private readonly getInjectRuntimeScript: () => string | null;
   private readonly onPaneExecutionError: (paneIndex: number, error: unknown) => void;
   private readonly postSubmitGuardMs: number;
+  private readonly responseStabilityWindowMs: number;
   private readonly queuePollIntervalMs: number;
   private readonly queueMaxWaitMs: number;
   private readonly queueIdleConfirmations: number;
@@ -79,6 +89,7 @@ export class PromptDispatchService {
 
   private readonly paneQueueStates = new Map<number, PaneQueueState>();
   private readonly panePostSubmitGuardUntilMs = new Map<number, number>();
+  private readonly paneResponseStabilityStates = new Map<number, PaneResponseStabilityState>();
 
   constructor(options: PromptDispatchServiceOptions) {
     this.getPaneTargets = options.getPaneTargets;
@@ -89,6 +100,10 @@ export class PromptDispatchService {
     this.postSubmitGuardMs = Math.max(
       0,
       options.postSubmitGuardMs ?? DEFAULT_POST_SUBMIT_GUARD_MS
+    );
+    this.responseStabilityWindowMs = Math.max(
+      0,
+      options.responseStabilityWindowMs ?? DEFAULT_RESPONSE_STABILITY_WINDOW_MS
     );
     this.queuePollIntervalMs = Math.max(
       20,
@@ -335,7 +350,11 @@ export class PromptDispatchService {
         statusEvalScript,
         true
       ) as PromptStatusEvalResult | undefined;
-      return this.resolvePaneBusyState(statusResult);
+      const busyState = this.resolvePaneBusyState(statusResult);
+      if (this.shouldHoldPaneBusyForResponseStability(pane.paneIndex, statusResult, busyState)) {
+        return 'busy';
+      }
+      return busyState;
     } catch (error) {
       this.onPaneExecutionError(pane.paneIndex, error);
       return 'unknown';
@@ -393,6 +412,63 @@ export class PromptDispatchService {
 
     this.panePostSubmitGuardUntilMs.delete(paneIndex);
     return false;
+  }
+
+  private shouldHoldPaneBusyForResponseStability(
+    paneIndex: number,
+    statusResult: PromptStatusEvalResult | undefined,
+    busyState: PaneBusyState
+  ): boolean {
+    if (this.responseStabilityWindowMs <= 0 || !statusResult || statusResult.success !== true) {
+      return false;
+    }
+
+    if (statusResult.provider !== 'gemini') {
+      return false;
+    }
+
+    const responseCount = typeof statusResult.responseCount === 'number'
+      ? statusResult.responseCount
+      : null;
+    const lastResponseTextLength = typeof statusResult.lastResponseTextLength === 'number'
+      ? statusResult.lastResponseTextLength
+      : null;
+    if (responseCount === null || lastResponseTextLength === null) {
+      return false;
+    }
+
+    if (responseCount <= 0) {
+      this.paneResponseStabilityStates.delete(paneIndex);
+      return false;
+    }
+
+    const nowMs = this.now();
+    const previousState = this.paneResponseStabilityStates.get(paneIndex);
+    if (!previousState) {
+      this.paneResponseStabilityStates.set(paneIndex, {
+        responseCount,
+        lastResponseTextLength,
+        lastObservedAtMs: nowMs,
+        lastChangedAtMs: nowMs,
+      });
+      return false;
+    }
+
+    const isChanged = previousState.responseCount !== responseCount
+      || previousState.lastResponseTextLength !== lastResponseTextLength;
+
+    previousState.responseCount = responseCount;
+    previousState.lastResponseTextLength = lastResponseTextLength;
+    previousState.lastObservedAtMs = nowMs;
+    if (isChanged) {
+      previousState.lastChangedAtMs = nowMs;
+    }
+
+    if (busyState === 'busy') {
+      return true;
+    }
+
+    return nowMs - previousState.lastChangedAtMs < this.responseStabilityWindowMs;
   }
 
   private queueLatestPromptForPane(paneIndex: number, promptText: string): void {

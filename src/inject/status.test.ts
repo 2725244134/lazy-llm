@@ -57,6 +57,8 @@ describe('resolveStatus', () => {
       isStreaming: false,
       isComplete: false,
       hasResponse: false,
+      responseCount: 0,
+      lastResponseTextLength: 0,
       provider: 'unknown',
     });
     expect(resolveBusyState(status)).toBe('idle');
