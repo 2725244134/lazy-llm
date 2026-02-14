@@ -29,6 +29,9 @@ declare global {
 }
 
 function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
+  // IMPORTANT: this function body is serialized with Function#toString().
+  // Do not reference identifiers outside this function scope, otherwise the
+  // injected runtime will fail at execution time in the quick prompt view.
   const input = document.getElementById('quickPromptInput') as HTMLTextAreaElement | null;
   const panel = document.querySelector('.panel') as HTMLElement | null;
   const attachmentRow = document.getElementById('quickPromptAttachmentRow') as HTMLElement | null;
