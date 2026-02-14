@@ -81,12 +81,12 @@ async function main(): Promise<void> {
   const { provider, storageState } = parseArgs();
 
   if (!provider) {
-    output({ success: false, error: 'Missing --provider argument' });
+    return output({ success: false, error: 'Missing --provider argument' });
   }
 
   const profile = MOCK_PROFILES[provider];
   if (!profile) {
-    output({
+    return output({
       success: false,
       error: `Unknown provider: ${provider}. Supported: ${Object.keys(MOCK_PROFILES).join(', ')}`,
     });
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
   if (storageState) {
     const stateFile = resolve(storageState);
     if (!existsSync(stateFile)) {
-      output({ success: false, error: `Storage state file not found: ${stateFile}` });
+      return output({ success: false, error: `Storage state file not found: ${stateFile}` });
     }
     contextOptions.storageState = stateFile;
   }

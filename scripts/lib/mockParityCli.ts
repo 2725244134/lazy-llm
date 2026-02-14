@@ -116,20 +116,20 @@ async function main(): Promise<void> {
   const { manifest, mockDir } = parseArgs();
 
   if (!manifest) {
-    output({ success: false, error: 'Missing --manifest argument' });
+    return output({ success: false, error: 'Missing --manifest argument' });
   }
   if (!mockDir) {
-    output({ success: false, error: 'Missing --mock-dir argument' });
+    return output({ success: false, error: 'Missing --mock-dir argument' });
   }
 
   const manifestPath = resolve(manifest);
   if (!existsSync(manifestPath)) {
-    output({ success: false, error: `Manifest file not found: ${manifestPath}` });
+    return output({ success: false, error: `Manifest file not found: ${manifestPath}` });
   }
 
   const mockDirPath = resolve(mockDir);
   if (!existsSync(mockDirPath)) {
-    output({ success: false, error: `Mock directory not found: ${mockDirPath}` });
+    return output({ success: false, error: `Mock directory not found: ${mockDirPath}` });
   }
 
   let entries: ParityManifestEntry[];

@@ -206,9 +206,18 @@ async function waitForComplete(
 }
 
 (() => {
-  // Merge extra (mock) provider configs into the providers map
+  // Merge extra (mock) provider configs into the providers map.
+  // Per-key spread ensures mock config only needs to specify overrides
+  // (e.g. url + urlPattern) while real selectors from providers/*/inject.ts
+  // are preserved for any field not explicitly overridden.
   if (window.__lazyllm_extra_config) {
-    Object.assign(providersConfig, window.__lazyllm_extra_config);
+    for (const [key, extraConfig] of Object.entries(window.__lazyllm_extra_config)) {
+      if (providersConfig[key]) {
+        providersConfig[key] = { ...providersConfig[key], ...extraConfig };
+      } else {
+        providersConfig[key] = extraConfig;
+      }
+    }
   }
 
   const provider = detectProvider();

@@ -7,58 +7,92 @@
   <style>
     body { font-family: sans-serif; background-color: #343541; color: #ececf1; margin: 0; display: flex; flex-direction: column; height: 100vh; }
     .chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    .message-row { display: flex; padding: 16px; border-radius: 8px; }
-    .message-row.user { background-color: #343541; }
-    .message-row.assistant { background-color: #444654; }
+    [data-message-author-role] { display: flex; padding: 16px; border-radius: 8px; }
+    [data-message-author-role="user"] { background-color: #343541; }
+    [data-message-author-role="assistant"] { background-color: #444654; }
     .avatar { width: 28px; height: 28px; border-radius: 50%; margin-right: 16px; flex-shrink: 0; }
-    .user .avatar { background-color: #5436da; }
-    .assistant .avatar { background-color: #19c37d; }
-    .content { line-height: 1.6; white-space: pre-wrap; flex: 1; }
+    [data-message-author-role="user"] .avatar { background-color: #5436da; }
+    [data-message-author-role="assistant"] .avatar { background-color: #19c37d; }
+    .markdown { line-height: 1.6; white-space: pre-wrap; flex: 1; }
     .input-area { padding: 16px; border-top: 1px solid #565869; display: flex; justify-content: center; }
     .input-wrapper { width: 100%; max-width: 768px; position: relative; display: flex; background-color: #40414f; border-radius: 8px; }
-    #prompt-textarea { width: 100%; max-height: 200px; padding: 12px 48px 12px 12px; background: transparent; border: none; color: #ececf1; resize: none; outline: none; font-family: inherit; font-size: 15px; }
-    #send-btn { position: absolute; right: 8px; bottom: 8px; background: #19c37d; border: none; color: white; cursor: pointer; padding: 6px 10px; border-radius: 6px; }
-    #send-btn:disabled { background: #565869; cursor: not-allowed; }
-    .result-streaming::after { content: '\u258B'; animation: blink 1s step-end infinite; }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    .ProseMirror { width: 100%; min-height: 24px; max-height: 200px; padding: 12px 48px 12px 12px; background: transparent; border: none; color: #ececf1; outline: none; font-family: inherit; font-size: 15px; overflow-y: auto; }
+    .ProseMirror p { margin: 0; }
+    .ProseMirror:empty::before { content: attr(data-placeholder); color: #8e8ea0; }
+    [data-testid="send-button"] { position: absolute; right: 8px; bottom: 8px; background: #19c37d; border: none; color: white; cursor: pointer; padding: 6px 10px; border-radius: 6px; }
+    [data-testid="send-button"]:disabled { background: #565869; cursor: not-allowed; }
+    .action-bar { display: flex; gap: 8px; padding: 4px 0; margin-top: 8px; }
+    .action-bar button { background: transparent; border: 1px solid #565869; color: #ececf1; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="chat-container" id="chat-history">
-    <div class="message-row assistant">
+    <div data-message-author-role="assistant">
       <div class="avatar"></div>
-      <div class="content">Hello! I am a simulated ChatGPT. How can I help you today?</div>
+      <div class="markdown">Hello! I am a simulated ChatGPT. How can I help you today?</div>
     </div>
   </div>
+
+  <!-- Streaming indicator (hidden initially) -->
+  <button aria-label="Stop generating" data-testid="stop-button" class="hidden" id="streaming-btn">Stop generating</button>
+
   <div class="input-area">
     <div class="input-wrapper">
-      <textarea id="prompt-textarea" placeholder="Send a message..." rows="1"></textarea>
-      <button id="send-btn">Send</button>
+      <div class="ProseMirror" id="prompt-textarea" contenteditable="true"
+           data-lexical-editor="true" role="textbox" aria-label="Message ChatGPT"
+           data-placeholder="Message ChatGPT...">
+        <p><br></p>
+      </div>
+      <button data-testid="send-button" aria-label="Send prompt" id="send-btn">Send</button>
     </div>
   </div>
 
   <script>
-    const textarea = document.getElementById('prompt-textarea');
+    const inputEl = document.getElementById('prompt-textarea');
     const sendBtn = document.getElementById('send-btn');
     const chatHistory = document.getElementById('chat-history');
+    const streamingBtn = document.getElementById('streaming-btn');
 
     const MOCK_RESPONSE = "This is a streamed response from mock ChatGPT. It simulates token-by-token generation to verify the inject bridge contract.\n\nSecond paragraph for multiline extraction.";
 
-    function createMessage(role, text) {
+    function getInputText() {
+      return (inputEl.innerText || inputEl.textContent || '').trim();
+    }
+
+    function clearInput() {
+      inputEl.innerHTML = '<p><br></p>';
+    }
+
+    function createUserMessage(text) {
       const row = document.createElement('div');
-      row.className = 'message-row ' + role;
+      row.setAttribute('data-message-author-role', 'user');
       const avatar = document.createElement('div');
       avatar.className = 'avatar';
       const content = document.createElement('div');
-      content.className = 'content';
+      content.className = 'markdown';
       content.textContent = text;
       row.appendChild(avatar);
       row.appendChild(content);
       return row;
     }
 
+    function createAssistantMessage() {
+      const row = document.createElement('div');
+      row.setAttribute('data-message-author-role', 'assistant');
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      const content = document.createElement('div');
+      content.className = 'markdown';
+      row.appendChild(avatar);
+      row.appendChild(content);
+      return { row, content };
+    }
+
     async function streamResponse(contentEl) {
-      contentEl.classList.add('result-streaming');
+      // Show streaming indicator
+      streamingBtn.classList.remove('hidden');
+
       const tokens = MOCK_RESPONSE.split(/(?=\s)/);
       contentEl.textContent = '';
 
@@ -68,26 +102,47 @@
         await new Promise(r => setTimeout(r, 40));
       }
 
-      contentEl.classList.remove('result-streaming');
+      // Remove streaming indicator
+      streamingBtn.classList.add('hidden');
+
+      // Add complete indicators
+      const actionBar = document.createElement('div');
+      actionBar.className = 'action-bar';
+      const copyBtn = document.createElement('button');
+      copyBtn.setAttribute('data-testid', 'copy-turn-action-button');
+      copyBtn.textContent = 'Copy';
+      const likeBtn = document.createElement('button');
+      likeBtn.setAttribute('aria-label', 'Good response');
+      likeBtn.textContent = 'Like';
+      const dislikeBtn = document.createElement('button');
+      dislikeBtn.setAttribute('aria-label', 'Bad response');
+      dislikeBtn.textContent = 'Dislike';
+      actionBar.appendChild(copyBtn);
+      actionBar.appendChild(likeBtn);
+      actionBar.appendChild(dislikeBtn);
+      contentEl.parentElement.appendChild(actionBar);
+
       sendBtn.disabled = false;
     }
 
     sendBtn.addEventListener('click', () => {
-      const text = textarea.value.trim();
+      const text = getInputText();
       if (!text) return;
 
-      chatHistory.appendChild(createMessage('user', text));
-      textarea.value = '';
+      // Track for test verification
+      window.__mockLastInput = text;
+
+      chatHistory.appendChild(createUserMessage(text));
+      clearInput();
       sendBtn.disabled = true;
 
-      const assistantRow = createMessage('assistant', '');
-      const contentDiv = assistantRow.querySelector('.content');
-      chatHistory.appendChild(assistantRow);
+      const { row, content } = createAssistantMessage();
+      chatHistory.appendChild(row);
 
-      setTimeout(() => streamResponse(contentDiv), 300);
+      setTimeout(() => streamResponse(content), 300);
     });
 
-    textarea.addEventListener('keydown', (e) => {
+    inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendBtn.click();

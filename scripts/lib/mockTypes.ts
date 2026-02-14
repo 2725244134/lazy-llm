@@ -26,16 +26,21 @@ export interface MockProviderProfile {
   extractMode: 'last' | 'all';
 }
 
-/** Schema for a single entry in mock-provider-config.json. */
+/**
+ * Schema for a single entry in mock-provider-config.json.
+ * Only url and urlPattern are required. Real selectors come from
+ * the provider inject configs via the per-key spread merge in inject.ts.
+ * Selector overrides are supported but rarely needed.
+ */
 export interface MockProviderConfigEntry {
   url: string;
   urlPattern: string;
-  inputSelectors: string[];
-  submitSelectors: string[];
-  responseSelectors: string[];
-  streamingIndicatorSelectors: string[];
+  inputSelectors?: string[];
+  submitSelectors?: string[];
+  responseSelectors?: string[];
+  streamingIndicatorSelectors?: string[];
   completeIndicatorSelectors?: string[];
-  extractMode: 'last' | 'all';
+  extractMode?: 'last' | 'all';
 }
 
 /** Full mock provider config file (key -> entry). */

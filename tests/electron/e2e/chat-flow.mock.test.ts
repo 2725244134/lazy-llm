@@ -34,6 +34,9 @@ async function findMockPage(
 /**
  * Runs the full mock chat-flow verification for one provider:
  * updateProvider -> injectPrompt -> streaming -> waitForComplete -> extractResponse
+ *
+ * Mock pages replicate real site DOM structures so the inject runtime
+ * exercises the exact same selector paths as with live provider sites.
  */
 async function verifyChatFlow(
   electronApp: import('@playwright/test').ElectronApplication,
@@ -48,29 +51,9 @@ async function verifyChatFlow(
   // 2. Find the mock pane page
   const mockPage = await findMockPage(electronApp, urlFragment);
 
-  // 3. Send a prompt via the sidebar composer
-  const textarea = appWindow.locator(selectors.promptTextarea);
-  const sendButton = appWindow.locator(selectors.promptSendButton);
-
-  await textarea.fill(`Hello ${displayName}`);
-  await sendButton.click();
-
-  // 4. Verify the prompt was injected into the mock page
-  await mockPage.waitForFunction(
-    (expected: string) => {
-      const el = document.querySelector('#prompt-textarea') as HTMLTextAreaElement;
-      return el && el.value === expected;
-    },
-    `Hello ${displayName}`,
-    { timeout: POLL_TIMEOUT },
-  );
-
-  // 5. Wait for assistant response to appear
-  await expect(
-    mockPage.locator('.message-row.assistant .content').last(),
-  ).toContainText('streamed response', { timeout: POLL_TIMEOUT });
-
-  // 6. Verify __llmBridge is present and detected correctly
+  // 3. Verify __llmBridge is present and detected correctly
+  //    The inject runtime should detect the provider via urlPattern matching
+  //    and use REAL selectors from providers/*/inject.ts (not mock overrides).
   const bridgeInfo = await mockPage.evaluate(() => {
     const bridge = (window as unknown as { __llmBridge?: { provider: string } }).__llmBridge;
     return bridge ? { exists: true, provider: bridge.provider } : { exists: false, provider: '' };
@@ -78,7 +61,28 @@ async function verifyChatFlow(
   expect(bridgeInfo.exists).toBe(true);
   expect(bridgeInfo.provider).toBe(providerKey);
 
-  // 7. Wait for completion and verify extraction
+  // 4. Send a prompt via the sidebar composer
+  const textarea = appWindow.locator(selectors.promptTextarea);
+  const sendButton = appWindow.locator(selectors.promptSendButton);
+
+  await textarea.fill(`Hello ${displayName}`);
+  await sendButton.click();
+
+  // 5. Verify the prompt was injected into the mock page.
+  //    The mock page tracks the last submitted input in window.__mockLastInput.
+  //    This confirms the full chain: sidebar -> IPC -> injectPrompt -> mock DOM.
+  await mockPage.waitForFunction(
+    (expected: string) => {
+      return (window as unknown as { __mockLastInput?: string }).__mockLastInput === expected;
+    },
+    `Hello ${displayName}`,
+    { timeout: POLL_TIMEOUT },
+  );
+
+  // 6. Wait for completion via the inject bridge's own API.
+  //    This exercises the real streaming-status.ts detection logic:
+  //    isStreaming() checks for streaming indicator selectors,
+  //    isComplete() checks streaming is gone + complete indicators present.
   const result = await mockPage.evaluate(() => {
     const bridge = (window as unknown as {
       __llmBridge?: { waitForComplete: (t: number, p: number) => Promise<{

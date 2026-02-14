@@ -7,58 +7,97 @@
   <style>
     body { font-family: sans-serif; background-color: #1e1f20; color: #e3e3e3; margin: 0; display: flex; flex-direction: column; height: 100vh; }
     .chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
-    .message-row { display: flex; padding: 16px; border-radius: 8px; }
-    .message-row.user { background-color: #282a2c; }
-    .message-row.assistant { background-color: #1e1f20; }
-    .avatar { width: 28px; height: 28px; border-radius: 50%; margin-right: 16px; flex-shrink: 0; }
-    .user .avatar { background-color: #5436da; }
-    .assistant .avatar { background-color: #8ab4f8; }
-    .content { line-height: 1.6; white-space: pre-wrap; flex: 1; }
-    .input-area { padding: 16px; border-top: 1px solid #3c4043; display: flex; justify-content: center; }
-    .input-wrapper { width: 100%; max-width: 768px; position: relative; display: flex; background-color: #282a2c; border-radius: 8px; border: 1px solid #3c4043; }
-    #prompt-textarea { width: 100%; max-height: 200px; padding: 12px 48px 12px 12px; background: transparent; border: none; color: #e3e3e3; resize: none; outline: none; font-family: inherit; font-size: 15px; }
-    #send-btn { position: absolute; right: 8px; bottom: 8px; background: #8ab4f8; border: none; color: #1e1f20; cursor: pointer; padding: 6px 10px; border-radius: 6px; }
-    #send-btn:disabled { background: #3c4043; color: #666; cursor: not-allowed; }
-    .result-streaming::after { content: '\u258B'; animation: blink 1s step-end infinite; }
-    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    model-response { display: block; padding: 16px; border-radius: 8px; background-color: #1e1f20; }
+    .user-query { display: block; padding: 16px; border-radius: 8px; background-color: #282a2c; }
+    message-content { display: block; }
+    message-actions { display: flex; gap: 8px; padding: 4px 0; margin-top: 8px; }
+    message-actions button { background: transparent; border: 1px solid #3c4043; color: #e3e3e3; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .markdown.markdown-main-panel { line-height: 1.6; white-space: pre-wrap; }
+    .user-text { line-height: 1.6; white-space: pre-wrap; }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; flex-shrink: 0; }
+    .user-query .avatar { background-color: #5436da; }
+    model-response .avatar { background-color: #8ab4f8; }
+    .input-area { padding: 16px; border-top: 1px solid #3c4043; display: flex; justify-content: center; align-items: flex-end; gap: 8px; }
+    .input-wrapper { width: 100%; max-width: 768px; position: relative; display: flex; align-items: flex-end; }
+    rich-textarea { display: block; flex: 1; background-color: #282a2c; border-radius: 8px; border: 1px solid #3c4043; }
+    .ql-editor { min-height: 24px; max-height: 200px; padding: 12px; background: transparent; color: #e3e3e3; outline: none; font-family: inherit; font-size: 15px; overflow-y: auto; }
+    .ql-editor p { margin: 0; }
+    .ql-editor:empty::before { content: 'Enter a prompt here'; color: #80868b; font-style: italic; }
+    button.send-button { background: #8ab4f8; border: none; color: #1e1f20; cursor: pointer; padding: 8px 12px; border-radius: 50%; margin-left: 8px; font-size: 14px; flex-shrink: 0; }
+    button.send-button:disabled { background: #3c4043; color: #666; cursor: not-allowed; }
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
   <div class="chat-container" id="chat-history">
-    <div class="message-row assistant">
+    <model-response>
       <div class="avatar"></div>
-      <div class="content">Hello! I am a simulated Gemini. How can I help you today?</div>
-    </div>
+      <message-content>
+        <div class="markdown markdown-main-panel">Hello! I am a simulated Gemini. How can I help you today?</div>
+      </message-content>
+    </model-response>
   </div>
+
+  <!-- Streaming indicator (hidden initially) -->
+  <button aria-label="Stop response" class="hidden" id="streaming-btn">Stop</button>
+
   <div class="input-area">
     <div class="input-wrapper">
-      <textarea id="prompt-textarea" placeholder="Enter a prompt here..." rows="1"></textarea>
-      <button id="send-btn">Send</button>
+      <rich-textarea>
+        <div class="ql-editor" contenteditable="true" role="textbox" id="gemini-input">
+          <p><br></p>
+        </div>
+      </rich-textarea>
+      <button aria-label="Send message" class="send-button" id="send-btn">Send</button>
     </div>
   </div>
 
   <script>
-    const textarea = document.getElementById('prompt-textarea');
+    const inputEl = document.querySelector('rich-textarea .ql-editor');
     const sendBtn = document.getElementById('send-btn');
     const chatHistory = document.getElementById('chat-history');
+    const streamingBtn = document.getElementById('streaming-btn');
 
     const MOCK_RESPONSE = "This is a streamed response from mock Gemini. It simulates token-by-token generation to verify the inject bridge contract.\n\nSecond paragraph for multiline extraction.";
 
-    function createMessage(role, text) {
-      const row = document.createElement('div');
-      row.className = 'message-row ' + role;
+    function getInputText() {
+      return (inputEl.innerText || inputEl.textContent || '').trim();
+    }
+
+    function clearInput() {
+      inputEl.innerHTML = '<p><br></p>';
+    }
+
+    function createUserQuery(text) {
+      const query = document.createElement('div');
+      query.className = 'user-query';
       const avatar = document.createElement('div');
       avatar.className = 'avatar';
       const content = document.createElement('div');
-      content.className = 'content';
+      content.className = 'user-text';
       content.textContent = text;
-      row.appendChild(avatar);
-      row.appendChild(content);
-      return row;
+      query.appendChild(avatar);
+      query.appendChild(content);
+      return query;
     }
 
-    async function streamResponse(contentEl) {
-      contentEl.classList.add('result-streaming');
+    function createModelResponse() {
+      const response = document.createElement('model-response');
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      const messageContent = document.createElement('message-content');
+      const markdown = document.createElement('div');
+      markdown.className = 'markdown markdown-main-panel';
+      messageContent.appendChild(markdown);
+      response.appendChild(avatar);
+      response.appendChild(messageContent);
+      return { response, markdown };
+    }
+
+    async function streamResponse(contentEl, responseEl) {
+      // Show streaming indicator
+      streamingBtn.classList.remove('hidden');
+
       const tokens = MOCK_RESPONSE.split(/(?=\s)/);
       contentEl.textContent = '';
 
@@ -68,26 +107,42 @@
         await new Promise(r => setTimeout(r, 40));
       }
 
-      contentEl.classList.remove('result-streaming');
+      // Remove streaming indicator
+      streamingBtn.classList.add('hidden');
+
+      // Add complete indicators (message-actions inside model-response)
+      const actions = document.createElement('message-actions');
+      const copyBtn = document.createElement('button');
+      copyBtn.setAttribute('aria-label', 'Copy');
+      copyBtn.textContent = 'Copy';
+      const checkBtn = document.createElement('button');
+      checkBtn.setAttribute('aria-label', 'Double-check response');
+      checkBtn.textContent = 'Double-check';
+      actions.appendChild(copyBtn);
+      actions.appendChild(checkBtn);
+      responseEl.appendChild(actions);
+
       sendBtn.disabled = false;
     }
 
     sendBtn.addEventListener('click', () => {
-      const text = textarea.value.trim();
+      const text = getInputText();
       if (!text) return;
 
-      chatHistory.appendChild(createMessage('user', text));
-      textarea.value = '';
+      // Track for test verification
+      window.__mockLastInput = text;
+
+      chatHistory.appendChild(createUserQuery(text));
+      clearInput();
       sendBtn.disabled = true;
 
-      const assistantRow = createMessage('assistant', '');
-      const contentDiv = assistantRow.querySelector('.content');
-      chatHistory.appendChild(assistantRow);
+      const { response, markdown } = createModelResponse();
+      chatHistory.appendChild(response);
 
-      setTimeout(() => streamResponse(contentDiv), 300);
+      setTimeout(() => streamResponse(markdown, response), 300);
     });
 
-    textarea.addEventListener('keydown', (e) => {
+    inputEl.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendBtn.click();

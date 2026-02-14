@@ -26,35 +26,50 @@ describe('mockProfiles', () => {
 });
 
 describe('mockTypes schema compliance', () => {
-  it('MockProviderConfigFile validates a well-formed config', () => {
+  it('MockProviderConfigFile validates a minimal config (url + urlPattern only)', () => {
     const config: MockProviderConfigFile = {
       chatgpt: {
         url: 'file://./tests/fixtures/mock-site/chatgpt-simulation.html',
         urlPattern: 'chatgpt-simulation.html',
-        inputSelectors: ['#prompt-textarea'],
-        submitSelectors: ['#send-btn'],
-        responseSelectors: ['.message-row.assistant .content'],
-        streamingIndicatorSelectors: ['.result-streaming'],
+      },
+    };
+
+    expect(config.chatgpt.urlPattern).toBe('chatgpt-simulation.html');
+    expect(config.chatgpt.inputSelectors).toBeUndefined();
+  });
+
+  it('MockProviderConfigFile validates a config with optional selector overrides', () => {
+    const config: MockProviderConfigFile = {
+      chatgpt: {
+        url: 'file://./tests/fixtures/mock-site/chatgpt-simulation.html',
+        urlPattern: 'chatgpt-simulation.html',
+        inputSelectors: ['div.ProseMirror#prompt-textarea'],
         extractMode: 'last',
       },
     };
 
     expect(config.chatgpt.inputSelectors).toHaveLength(1);
-    expect(config.chatgpt.urlPattern).toBe('chatgpt-simulation.html');
+    expect(config.chatgpt.extractMode).toBe('last');
   });
 
-  it('ParityManifestEntry validates a well-formed entry', () => {
+  it('ParityManifestEntry validates a well-formed entry with real selectors', () => {
     const entry: ParityManifestEntry = {
       provider: 'chatgpt',
-      structuralSelectors: ['#prompt-textarea', '#send-btn'],
+      structuralSelectors: [
+        'div.ProseMirror#prompt-textarea',
+        "button[data-testid='send-button']",
+        "div[data-message-author-role='assistant'] .markdown",
+      ],
       selectorProbes: [
-        { category: 'input', selector: '#prompt-textarea', required: true },
-        { category: 'submit', selector: '#send-btn', required: true },
-        { category: 'streaming', selector: '.result-streaming', required: false },
+        { category: 'input', selector: 'div.ProseMirror#prompt-textarea', required: true },
+        { category: 'submit', selector: "button[data-testid='send-button']", required: true },
+        { category: 'streaming', selector: "button[aria-label='Stop generating']", required: false },
+        { category: 'complete', selector: "button[data-testid='copy-turn-action-button']", required: false },
+        { category: 'extract', selector: "div[data-message-author-role='assistant'] .markdown", required: true },
       ],
     };
 
-    expect(entry.selectorProbes).toHaveLength(3);
-    expect(entry.selectorProbes.filter((p: { required: boolean }) => p.required)).toHaveLength(2);
+    expect(entry.selectorProbes).toHaveLength(5);
+    expect(entry.selectorProbes.filter((p: { required: boolean }) => p.required)).toHaveLength(3);
   });
 });
