@@ -39,7 +39,7 @@ function hasIntermediateWidthSample(samples: number[], fromWidth: number, toWidt
   return samples.some((width) => width > lowerBound && width < upperBound);
 }
 
-test.describe('Smoke / Sidebar', () => {
+test.describe('E2E / Sidebar', () => {
   test('sidebar toggle works', async ({ appWindow }) => {
     const sidebar = appWindow.locator(selectors.sidebar);
     const toggleButton = appWindow.locator(selectors.sidebarCollapse);

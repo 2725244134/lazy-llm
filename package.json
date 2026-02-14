@@ -17,6 +17,7 @@
     "test": "bun run test:unit",
     "test:unit": "vitest run",
     "test:electron:smoke": "bun run build:inject && bun run build:app && playwright test tests/electron/",
+    "test:electron:e2e": "bun run build:inject && bun run build:app && playwright test tests/electron/",
     "prepare": "echo 'Hooks ready'"
   },
   "dependencies": {
