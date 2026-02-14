@@ -6,6 +6,7 @@ import { inject as perplexityInject } from '../providers/perplexity/inject';
 import { inject as aistudioInject } from '../providers/aistudio/inject';
 
 export interface ProviderInjectConfig {
+  urlPattern?: string;
   inputSelectors: string[];
   submitSelectors: string[];
   responseSelectors?: string[];

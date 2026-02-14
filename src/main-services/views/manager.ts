@@ -11,7 +11,7 @@ import {
   webContents,
 } from 'electron';
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { APP_CONFIG } from '@shared-config/src/app.js';
 import { type LayoutResult } from './geometry.js';
@@ -704,7 +704,21 @@ export class ViewManager {
     }
 
     try {
-      this.injectRuntimeScript = readFileSync(injectRuntimePath, 'utf8');
+      let script = readFileSync(injectRuntimePath, 'utf8');
+
+      const extraProvidersFile = process.env.LAZYLLM_EXTRA_PROVIDERS_FILE;
+      if (extraProvidersFile && extraProvidersFile.trim().length > 0) {
+        const extraConfigPath = resolve(process.cwd(), extraProvidersFile);
+        if (existsSync(extraConfigPath)) {
+          const extraConfig = readFileSync(extraConfigPath, 'utf8');
+          script = `window.__lazyllm_extra_config = ${extraConfig};\n${script}`;
+          console.log(`[ViewManager] Injected extra providers config from ${extraConfigPath}`);
+        } else {
+          console.warn(`[ViewManager] Extra providers file not found at ${extraConfigPath}`);
+        }
+      }
+
+      this.injectRuntimeScript = script;
       return this.injectRuntimeScript;
     } catch (error) {
       console.error('[ViewManager] Failed to read inject runtime:', error);
