@@ -1,6 +1,5 @@
 import type { SidebarRuntime, PaneCount, AppConfig } from './types';
 import { createElectronRuntime } from './electronRuntime';
-import { createFallbackRuntime } from './fallbackRuntime';
 
 export type { SidebarRuntime, PaneCount, AppConfig };
 
@@ -11,11 +10,7 @@ export function getSidebarRuntime(): SidebarRuntime {
     return runtimeInstance;
   }
 
-  if (typeof window !== 'undefined' && window.council) {
-    runtimeInstance = createElectronRuntime();
-  } else {
-    runtimeInstance = createFallbackRuntime();
-  }
+  runtimeInstance = createElectronRuntime();
 
   return runtimeInstance;
 }

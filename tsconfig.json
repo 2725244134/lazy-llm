@@ -17,14 +17,16 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@shared-config/*": ["packages/shared-config/*"],
+      "@shared-contracts/*": ["packages/shared-contracts/*"]
     }
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.d.ts",
     "src/**/*.tsx",
-    "electron/**/*.ts",
+    "forge.env.d.ts",
     "tests/**/*.ts"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]

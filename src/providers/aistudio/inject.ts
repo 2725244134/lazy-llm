@@ -29,9 +29,9 @@ export const inject: ProviderInject = {
     '.text-chunk',
   ],
   streamingIndicatorSelectors: [
-    'mat-progress-bar',
-    '.is-streaming',
-    '.loading',
+    "button[aria-label='Stop']",
+    "button[aria-label='Stop generating']",
+    "mat-progress-bar[mode='indeterminate']",
     'ms-chat-turn-loader',
   ],
   completeIndicatorSelectors: [

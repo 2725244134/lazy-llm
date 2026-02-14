@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateQuickPromptBounds } from '../../electron/views/quickPromptGeometry';
+import { calculateQuickPromptBounds } from '../../src/main-services/views/quickPromptGeometry';
 import { runCliScript } from './cliTestUtils';
 
 const SCRIPT_PATH = 'scripts/lib/quickPromptGeometryCli.ts';

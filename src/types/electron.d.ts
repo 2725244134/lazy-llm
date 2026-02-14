@@ -18,9 +18,9 @@ import type {
   QuickPromptHideResponse,
   QuickPromptResizeRequest,
   QuickPromptResizeResponse,
-} from '../../packages/shared-contracts/ipc/contracts';
+} from '@shared-contracts/ipc/contracts';
 
-export interface CouncilAPI {
+export interface LazyLLMAPI {
   healthCheck: () => Promise<HealthResponse>;
   getConfig: () => Promise<AppConfig>;
   setPaneCount: (request: PaneCountRequest) => Promise<PaneCountResponse>;
@@ -37,7 +37,7 @@ export interface CouncilAPI {
 
 declare global {
   interface Window {
-    council: CouncilAPI;
+    lazyllm: LazyLLMAPI;
   }
 }
 

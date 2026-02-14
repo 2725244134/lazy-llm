@@ -2,8 +2,8 @@
  * Import boundary guardrails with baseline tolerance.
  *
  * Policy:
- * - `electron/**` must not import `src/**` implementation paths.
- * - `src/**` must not import `electron/**` implementation paths.
+ * - `src/main-services/**` must not import renderer implementation paths.
+ * - renderer-side `src/**` code must not import `src/main-services/**`.
  *
  * Existing violations are tolerated through a committed baseline file.
  * New violations fail with non-zero exit status.
@@ -34,8 +34,8 @@ type CliArgs = {
 type BaselineDocument = {
   version: number;
   policy: {
-    electronMustNotImportSrc: true;
-    srcMustNotImportElectron: true;
+    mainServicesMustNotImportRenderer: true;
+    rendererMustNotImportMainServices: true;
     allowedCrossBoundaryTargets: readonly string[];
   };
   violations: string[];
@@ -106,8 +106,8 @@ function writeBaseline(absoluteBaselinePath: string, violations: BoundaryViolati
   const baselineDocument: BaselineDocument = {
     version: BASELINE_VERSION,
     policy: {
-      electronMustNotImportSrc: true,
-      srcMustNotImportElectron: true,
+      mainServicesMustNotImportRenderer: true,
+      rendererMustNotImportMainServices: true,
       allowedCrossBoundaryTargets: ALLOWED_CROSS_BOUNDARY_TARGETS,
     },
     violations: keys,
@@ -118,7 +118,9 @@ function writeBaseline(absoluteBaselinePath: string, violations: BoundaryViolati
 }
 
 function formatViolation(violation: BoundaryViolation): string {
-  const direction = violation.boundary === 'electron_to_src' ? 'electron -> src' : 'src -> electron';
+  const direction = violation.boundary === 'main_services_to_renderer'
+    ? 'main-services -> renderer'
+    : 'renderer -> main-services';
   return `${direction} | ${violation.importerPath}:${violation.line} | "${violation.specifier}" -> ${violation.importedPath}`;
 }
 

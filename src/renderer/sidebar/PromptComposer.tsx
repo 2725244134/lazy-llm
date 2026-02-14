@@ -187,7 +187,6 @@ export function PromptComposer() {
         onInput={syncTextareaHeight}
         onKeyDown={handleKeyDown}
       />
-      <p className="composer-shortcut-hint">Enter to send · Ctrl+Enter to clear · Shift+Enter for newline</p>
       <button
         type="button"
         className={`composer-send-btn${isLoading ? ' loading' : ''}`}

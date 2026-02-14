@@ -84,7 +84,7 @@ export function Sidebar() {
 
   const collapsedWidth = APP_CONFIG.layout.sidebar.defaultCollapsedWidth;
   const sidebarTransitionDurationMs = APP_CONFIG.layout.sidebar.transitionDurationMs;
-  const isElectronRuntime = typeof window !== 'undefined' && typeof window.council !== 'undefined';
+  const isElectronRuntime = typeof window !== 'undefined' && typeof window.lazyllm !== 'undefined';
 
   const configuredSidebarWidth = collapsed ? collapsedWidth : expandedWidth;
 

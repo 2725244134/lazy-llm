@@ -2,7 +2,7 @@ import {
   decidePaneLoadRecovery,
   type PaneRecoveryDecisionInput,
   type PaneRecoveryState,
-} from '../../electron/views/paneRecovery.js';
+} from '../../src/main-services/views/paneRecovery.js';
 import {
   expectRecord,
   readBoolean,

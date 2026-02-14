@@ -1,36 +1,37 @@
 {
   "name": "lazy-llm",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "author": "LazyLLM Maintainer <cccc38753@gmail.com>",
   "description": "Multi-LLM desktop interface built with Electron, React, and TypeScript.",
-  "type": "module",
-  "main": "dist-electron/main.js",
+  "main": ".vite/build/main.js",
   "scripts": {
-    "dev": "vite",
-    "build:preloads": "bunx esbuild electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/preload.cjs && bunx esbuild electron/pane-preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/pane-preload.cjs && bunx esbuild electron/quick-prompt-preload.ts --bundle --platform=node --format=cjs --external:electron --outfile=dist-electron/quick-prompt-preload.cjs",
-    "build:inject": "bunx esbuild src/inject/inject.ts --bundle --platform=browser --format=iife --target=es2020 --minify --outfile=dist-electron/inject.js",
-    "build:electron-artifacts": "bun run build:preloads && bun run build:inject",
-    "dev:electron": "bun run build:electron-artifacts && cross-env NODE_ENV=development vite",
-    "build": "tsc --noEmit && vite build && bun run build:electron-artifacts",
-    "preview": "vite preview",
-    "package": "bun run build && electron-builder",
+    "dev": "bun run build:inject && bunx electron-forge start",
+    "build:inject": "bunx esbuild src/inject/inject.ts --bundle --platform=browser --format=iife --target=es2020 --minify --outfile=dist-electron/inject.js && bunx esbuild src/inject/inject.ts --bundle --platform=browser --format=iife --target=es2020 --minify --outfile=.vite/build/inject.js",
+    "build:app": "bunx electron-forge package",
+    "build": "tsc --noEmit && bun run build:inject && bun run build:app",
+    "package": "bun run build:inject && bunx electron-forge make",
     "typecheck": "tsc --noEmit",
     "test": "bun run test:unit",
     "test:unit": "vitest run",
-    "test:electron:smoke": "playwright test tests/electron/",
+    "test:electron:smoke": "bun run build:inject && bun run build:app && playwright test tests/electron/",
     "prepare": "echo 'Hooks ready'"
   },
   "dependencies": {
     "clsx": "^2.1.1",
-    "electron-store": "^10.0.0",
-    "node-machine-id": "^1.1.12",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@electron-forge/cli": "^7.11.1",
+    "@electron-forge/maker-deb": "^7.11.1",
+    "@electron-forge/maker-rpm": "^7.11.1",
+    "@electron-forge/maker-squirrel": "^7.11.1",
+    "@electron-forge/maker-zip": "^7.11.1",
+    "@electron-forge/plugin-vite": "^7.11.1",
+    "@electron-forge/shared-types": "^7.11.1",
     "@playwright/test": "^1.58.0",
     "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^22.10.0",
@@ -38,45 +39,11 @@
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",
     "autoprefixer": "^10.4.23",
-    "concurrently": "^9.1.0",
-    "cross-env": "^7.0.3",
     "electron": "^38.0.0",
-    "electron-builder": "^25.1.8",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
-    "vite-plugin-electron": "^0.28.8",
-    "vite-plugin-electron-renderer": "^0.14.6",
-    "vitest": "^4.0.18",
-    "wait-on": "^8.0.1"
-  },
-  "build": {
-    "appId": "com.lazyllm.app",
-    "productName": "LazyLLM",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*"
-    ],
-    "mac": {
-      "category": "public.app-category.developer-tools"
-    },
-    "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
-      "category": "Development",
-      "icon": "build/icon.png"
-    },
-    "win": {
-      "target": [
-        "nsis",
-        "portable"
-      ]
-    }
+    "vitest": "^4.0.18"
   }
 }
