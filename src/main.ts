@@ -13,7 +13,7 @@ import { ViewManager } from './main-services/views/manager.js';
 
 const shouldSkipSingleInstanceLock = process.env.LAZYLLM_SKIP_SINGLE_INSTANCE_LOCK === '1';
 const overrideUserDataDir = process.env.LAZYLLM_USER_DATA_DIR;
-const paneUserAgentStrategy = 'default' as const;
+const paneUserAgentStrategy = 'chrome' as const;
 
 if (typeof overrideUserDataDir === 'string' && overrideUserDataDir.trim().length > 0) {
   app.setPath('userData', overrideUserDataDir);
