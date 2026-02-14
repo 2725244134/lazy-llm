@@ -98,6 +98,12 @@ describe('resolveStatus', () => {
     }
   });
 
+  it('gemini streaming selectors include stop icon signal on latest response turn', () => {
+    const geminiConfig = providersConfig.gemini;
+    const selectors = geminiConfig.streamingIndicatorSelectors ?? [];
+    expect(selectors).toContain("model-response:last-of-type mat-icon[fonticon='stop']");
+  });
+
   it.each(providerEntries)('%s reports busy when streaming selector matches', (provider, config) => {
     const streamingSelector = config.streamingIndicatorSelectors?.[0];
     expect(streamingSelector).toBeTruthy();
