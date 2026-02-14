@@ -542,15 +542,6 @@
     0 10px 24px var(--input-focus-shadow);
 }
 
-.composer-shortcut-hint {
-  margin: -2px 2px 10px;
-  font-size: 13px;
-  line-height: 1.4;
-  color: var(--text-muted);
-  opacity: 0.82;
-  overflow-wrap: anywhere;
-}
-
 .composer-send-btn {
   width: 100%;
   padding: 11px 14px;
@@ -760,16 +751,6 @@
 .sidebar.is-tight .composer-textarea {
   padding: 10px 11px;
   font-size: 13px;
-  margin-bottom: 7px;
-}
-
-.sidebar.is-compact .composer-shortcut-hint {
-  font-size: 12px;
-  margin-bottom: 8px;
-}
-
-.sidebar.is-tight .composer-shortcut-hint {
-  font-size: 11px;
   margin-bottom: 7px;
 }
 
