@@ -30,6 +30,11 @@ package:
   @echo "==> Packaging desktop app"
   @bun run package
 
+# Package Linux distributables (deb + rpm + appimage).
+package-linux:
+  @echo "==> Packaging Linux distributables (deb/rpm/appimage)"
+  @bun run package:linux
+
 # Preview renderer production assets locally.
 preview:
   @echo "==> Starting web preview server"

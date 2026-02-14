@@ -15,6 +15,16 @@ const config: ForgeConfig = {
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
     new MakerDeb({}),
+    {
+      name: '@reforged/maker-appimage',
+      platforms: ['linux'],
+      config: {
+        options: {
+          categories: ['Development'],
+          icon: 'build/icon.png',
+        },
+      },
+    },
   ],
   plugins: [
     new VitePlugin({
