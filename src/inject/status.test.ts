@@ -101,6 +101,7 @@ describe('resolveStatus', () => {
   it('gemini streaming selectors include stop icon signal on latest response turn', () => {
     const geminiConfig = providersConfig.gemini;
     const selectors = geminiConfig.streamingIndicatorSelectors ?? [];
+    expect(selectors).toContain("mat-icon[fonticon='stop']");
     expect(selectors).toContain("model-response:last-of-type mat-icon[fonticon='stop']");
   });
 

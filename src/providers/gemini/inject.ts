@@ -32,6 +32,9 @@ export const inject: ProviderInject = {
   streamingIndicatorSelectors: [
     "button[aria-label*='Stop']",
     "button[mattooltip*='Stop']",
+    "mat-icon[fonticon='stop']",
+    "mat-icon[data-mat-icon-name='stop']",
+    "button:has(mat-icon[fonticon='stop'])",
     "model-response:last-of-type mat-icon[fonticon='stop']",
     "model-response:last-of-type [aria-busy='true']",
     'model-response:last-of-type .typing-indicator',
