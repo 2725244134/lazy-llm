@@ -8,8 +8,6 @@ export interface PromptStatusEvalResult {
   isStreaming?: boolean;
   isComplete?: boolean;
   hasResponse?: boolean;
-  responseCount?: number;
-  lastResponseTextLength?: number;
   provider?: string;
   reason?: string;
 }
@@ -96,12 +94,6 @@ export function buildPromptStatusEvalScript(): string {
     const hasResponse = status && typeof status.hasResponse === "boolean"
       ? status.hasResponse
       : null;
-    const responseCount = status && typeof status.responseCount === "number"
-      ? status.responseCount
-      : null;
-    const lastResponseTextLength = status && typeof status.lastResponseTextLength === "number"
-      ? status.lastResponseTextLength
-      : null;
 
     if (isStreaming === null || isComplete === null || hasResponse === null) {
       return { success: false, reason: "getStatus returned an invalid payload" };
@@ -117,8 +109,6 @@ export function buildPromptStatusEvalScript(): string {
       isStreaming,
       isComplete,
       hasResponse,
-      responseCount: responseCount === null ? undefined : responseCount,
-      lastResponseTextLength: lastResponseTextLength === null ? undefined : lastResponseTextLength,
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

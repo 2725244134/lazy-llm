@@ -446,7 +446,6 @@ describe('PromptDispatchService', () => {
         getPaneTargets: () => [pane.target],
         getInjectRuntimeScript: () => injectRuntimeScript,
         postSubmitGuardMs: 50,
-        responseStabilityWindowMs: 0,
         queuePollIntervalMs: 10,
         queueIdleConfirmations: 1,
       });
@@ -461,67 +460,6 @@ describe('PromptDispatchService', () => {
 
       await vi.advanceTimersByTimeAsync(80);
 
-      expect(promptScripts).toHaveLength(2);
-      expect(promptScripts[1]).toContain(JSON.stringify('second'));
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('treats gemini as busy while latest response length is still changing', async () => {
-    vi.useFakeTimers();
-    try {
-      const injectRuntimeScript = 'inject-runtime-script';
-      const promptScripts: string[] = [];
-      let latestResponseLength = 120;
-
-      const pane = createPaneTarget(0, async (script) => {
-        if (script === injectRuntimeScript) {
-          return undefined;
-        }
-
-        if (script.includes('bridge.getStatus')) {
-          return {
-            success: true,
-            provider: 'gemini',
-            isStreaming: false,
-            isComplete: true,
-            hasResponse: true,
-            responseCount: 1,
-            lastResponseTextLength: latestResponseLength,
-          };
-        }
-
-        if (script.includes('bridge.injectPrompt')) {
-          promptScripts.push(script);
-          return { success: true };
-        }
-
-        return undefined;
-      });
-
-      const service = new PromptDispatchService({
-        getPaneTargets: () => [pane.target],
-        getInjectRuntimeScript: () => injectRuntimeScript,
-        postSubmitGuardMs: 0,
-        responseStabilityWindowMs: 50,
-        queuePollIntervalMs: 10,
-        queueIdleConfirmations: 1,
-      });
-
-      const first = await service.sendPromptToAll('first');
-      expect(first).toEqual({ success: true, failures: [] });
-      expect(promptScripts).toHaveLength(1);
-
-      latestResponseLength = 150;
-      const second = await service.sendPromptToAll('second');
-      expect(second).toEqual({ success: true, failures: [] });
-      expect(promptScripts).toHaveLength(1);
-
-      await vi.advanceTimersByTimeAsync(30);
-      expect(promptScripts).toHaveLength(1);
-
-      await vi.advanceTimersByTimeAsync(40);
       expect(promptScripts).toHaveLength(2);
       expect(promptScripts[1]).toContain(JSON.stringify('second'));
     } finally {
