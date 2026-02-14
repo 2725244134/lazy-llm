@@ -1,9 +1,36 @@
+import { readFileSync, existsSync } from 'fs';
+import { resolve } from 'path';
 import type { AppConfig } from '@shared-contracts/ipc/contracts';
 import { APP_CONFIG } from '@shared-config/src/app.js';
 
 export const CANONICAL_PROVIDERS: AppConfig['provider']['catalog'] = [
   ...APP_CONFIG.providers.catalog.map((provider) => ({ ...provider })),
 ];
+
+const extraProvidersFile = process.env.LAZYLLM_EXTRA_PROVIDERS_FILE;
+if (extraProvidersFile && extraProvidersFile.trim().length > 0) {
+  const extraConfigPath = resolve(process.cwd(), extraProvidersFile);
+  if (existsSync(extraConfigPath)) {
+    try {
+      const extraConfig = JSON.parse(readFileSync(extraConfigPath, 'utf8'));
+      for (const [key, config] of Object.entries(extraConfig as any)) {
+        if ((config as any).url) {
+          let url = (config as any).url;
+          if (url.startsWith('file://.')) {
+            url = `file://${resolve(process.cwd(), url.slice(7))}`;
+          }
+          CANONICAL_PROVIDERS.push({
+            key: key as any,
+            name: key,
+            url,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load extra providers', error);
+    }
+  }
+}
 
 const FALLBACK_PROVIDER_KEY =
   CANONICAL_PROVIDERS[0]?.key ?? APP_CONFIG.providers.catalog[0]?.key ?? 'chatgpt';

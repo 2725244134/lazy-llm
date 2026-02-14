@@ -1,0 +1,11 @@
+{
+  "mock-chatgpt": {
+    "url": "file://./tests/fixtures/mock-site/chatgpt-simulation.html",
+    "urlPattern": "chatgpt-simulation.html",
+    "inputSelectors": ["#prompt-textarea"],
+    "submitSelectors": ["#send-btn"],
+    "responseSelectors": [".message-row.assistant .content"],
+    "streamingIndicatorSelectors": [".result-streaming"],
+    "extractMode": "last"
+  }
+}
