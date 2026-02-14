@@ -43,6 +43,7 @@ declare global {
         pollIntervalMs?: number
       ) => Promise<ExtractResult>;
     };
+    __lazyllm_extra_config?: Record<string, ProviderInjectConfig>;
   }
 }
 
@@ -58,6 +59,15 @@ function hostnameMatches(hostname: string, ruleHostname: string): boolean {
 }
 
 function detectProvider(): string {
+  // Check extra (mock) configs first — urlPattern matching takes priority
+  if (window.__lazyllm_extra_config) {
+    for (const [key, config] of Object.entries(window.__lazyllm_extra_config)) {
+      if (config.urlPattern && window.location.href.includes(config.urlPattern)) {
+        return key;
+      }
+    }
+  }
+
   const hostname = normalizeHostname(window.location.hostname);
   for (const rule of providerDetectRules) {
     const ruleHostname = normalizeHostname(rule.hostname);
@@ -196,6 +206,11 @@ async function waitForComplete(
 }
 
 (() => {
+  // Merge extra (mock) provider configs into the providers map
+  if (window.__lazyllm_extra_config) {
+    Object.assign(providersConfig, window.__lazyllm_extra_config);
+  }
+
   const provider = detectProvider();
   const config = providersConfig[provider];
 

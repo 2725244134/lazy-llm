@@ -11,7 +11,7 @@ import {
   webContents,
 } from 'electron';
 import { existsSync, readFileSync } from 'fs';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { APP_CONFIG } from '@shared-config/src/app.js';
 import { type LayoutResult } from './geometry.js';
@@ -704,7 +704,19 @@ export class ViewManager {
     }
 
     try {
-      this.injectRuntimeScript = readFileSync(injectRuntimePath, 'utf8');
+      let script = readFileSync(injectRuntimePath, 'utf8');
+
+      // Prepend mock provider config if available
+      const mockProvidersFile = process.env.LAZYLLM_MOCK_PROVIDERS_FILE;
+      if (mockProvidersFile && mockProvidersFile.trim().length > 0) {
+        const mockConfigPath = resolve(process.cwd(), mockProvidersFile);
+        if (existsSync(mockConfigPath)) {
+          const mockConfig = readFileSync(mockConfigPath, 'utf8');
+          script = `window.__lazyllm_extra_config = ${mockConfig};\n${script}`;
+        }
+      }
+
+      this.injectRuntimeScript = script;
       return this.injectRuntimeScript;
     } catch (error) {
       console.error('[ViewManager] Failed to read inject runtime:', error);
