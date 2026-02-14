@@ -6,8 +6,8 @@
   "description": "Multi-LLM desktop interface built with Electron, React, and TypeScript.",
   "main": ".vite/build/main.js",
   "scripts": {
-    "dev": "bunx electron-forge start",
-    "build:inject": "bunx esbuild src/inject/inject.ts --bundle --platform=browser --format=iife --target=es2020 --minify --outfile=.vite/build/inject.js",
+    "dev": "bun run build:inject && bunx electron-forge start",
+    "build:inject": "bunx esbuild src/inject/inject.ts --bundle --platform=browser --format=iife --target=es2020 --minify --outfile=dist-electron/inject.js && bunx esbuild src/inject/inject.ts --bundle --platform=browser --format=iife --target=es2020 --minify --outfile=.vite/build/inject.js",
     "build:app": "bunx electron-forge package",
     "build": "tsc --noEmit && bun run build:inject && bun run build:app",
     "package": "bun run build:inject && bunx electron-forge make",

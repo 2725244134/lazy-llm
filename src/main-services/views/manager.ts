@@ -108,8 +108,8 @@ const injectRuntimePath = resolveFirstExistingPath([
   join(runtimeDir, '..', 'inject.js'),
   join(runtimeDir, '..', '..', 'inject.js'),
   join(runtimeDir, '..', '..', 'dist-electron', 'inject.js'),
-  join(process.cwd(), '.vite', 'build', 'inject.js'),
   join(process.cwd(), 'dist-electron', 'inject.js'),
+  join(process.cwd(), '.vite', 'build', 'inject.js'),
 ]);
 
 const QUICK_PROMPT_PASSTHROUGH_MODE = APP_CONFIG.layout.quickPrompt.passthroughMode;
