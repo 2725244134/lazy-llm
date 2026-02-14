@@ -596,6 +596,23 @@
   animation: spin 0.8s linear infinite;
 }
 
+.composer-dispatch-hint {
+  margin-top: 10px;
+  margin-bottom: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  letter-spacing: 0.12px;
+  color: var(--text-muted);
+}
+
+.composer-dispatch-hint.is-queued {
+  color: var(--broadcast);
+}
+
+.composer-dispatch-hint.is-sent {
+  color: var(--text);
+}
+
 .dropdown-enter-active {
   transition: opacity 0.2s ease-out, transform 0.2s ease-out;
 }
@@ -762,6 +779,16 @@
 .sidebar.is-tight .composer-send-btn {
   padding: 9px 10px;
   font-size: 12px;
+}
+
+.sidebar.is-compact .composer-dispatch-hint {
+  margin-top: 8px;
+  font-size: 11px;
+}
+
+.sidebar.is-tight .composer-dispatch-hint {
+  margin-top: 7px;
+  font-size: 10px;
 }
 
 @keyframes spin {

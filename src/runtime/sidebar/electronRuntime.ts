@@ -55,11 +55,15 @@ export function createElectronRuntime(): SidebarRuntime {
       }
     },
 
-    async sendPrompt(text: string): Promise<void> {
+    async sendPrompt(text: string): Promise<{ queued: boolean }> {
       const result = await lazyllm.sendPrompt({ text });
       if (!result.success) {
         throw new Error(`Failed to send prompt: ${result.failures?.join(', ') ?? 'unknown error'}`);
       }
+
+      return {
+        queued: result.queued === true,
+      };
     },
 
     async syncPromptDraft(text: string): Promise<void> {

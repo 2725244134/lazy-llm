@@ -202,8 +202,8 @@ describe('PromptDispatchService', () => {
       const first = await service.sendPromptToAll('first');
       const second = await service.sendPromptToAll('second');
 
-      expect(first).toEqual({ success: true, failures: [] });
-      expect(second).toEqual({ success: true, failures: [] });
+      expect(first).toEqual({ success: true, failures: [], queued: true });
+      expect(second).toEqual({ success: true, failures: [], queued: true });
       expect(promptScripts).toHaveLength(0);
 
       isStreaming = false;
@@ -258,7 +258,7 @@ describe('PromptDispatchService', () => {
       });
 
       const queued = await service.sendPromptToAll('queued-by-unknown');
-      expect(queued).toEqual({ success: true, failures: [] });
+      expect(queued).toEqual({ success: true, failures: [], queued: true });
       expect(promptScripts).toHaveLength(0);
 
       statusReady = true;
@@ -312,7 +312,7 @@ describe('PromptDispatchService', () => {
       });
 
       const queued = await service.sendPromptToAll('timed-out-prompt');
-      expect(queued).toEqual({ success: true, failures: [] });
+      expect(queued).toEqual({ success: true, failures: [], queued: true });
 
       await vi.advanceTimersByTimeAsync(80);
 

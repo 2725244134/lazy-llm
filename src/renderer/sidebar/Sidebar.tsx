@@ -292,7 +292,7 @@ export function Sidebar() {
   const sendPrompt = useCallback(
     async (text: string) => {
       try {
-        await runtime.sendPrompt(text);
+        return await runtime.sendPrompt(text);
       } catch (error) {
         console.error('[Sidebar] sendPrompt error:', error);
         throw error;

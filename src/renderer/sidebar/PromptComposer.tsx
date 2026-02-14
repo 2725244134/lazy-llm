@@ -2,12 +2,25 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { APP_CONFIG } from '@/config';
 import { useSidebarContext } from './context';
 
+const DEFAULT_DISPATCH_HINT =
+  'If a pane is still responding, we queue only your latest prompt and auto-send when panes are idle.';
+const QUEUED_DISPATCH_HINT =
+  'Latest prompt queued. It will be sent automatically after current responses finish.';
+const SENT_DISPATCH_HINT = 'Prompt sent to panes.';
+const QUEUED_HINT_TIMEOUT_MS = 6000;
+const SENT_HINT_TIMEOUT_MS = 2200;
+
 export function PromptComposer() {
   const sidebar = useSidebarContext();
 
   const [text, setText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [dispatchHint, setDispatchHint] = useState<{
+    tone: 'queued' | 'sent';
+    message: string;
+  } | null>(null);
   const textareaEl = useRef<HTMLTextAreaElement | null>(null);
+  const dispatchHintTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isLoadingRef = useRef(false);
   const draftSyncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -103,6 +116,17 @@ export function PromptComposer() {
     [draftSyncDebounceMs, flushDraftSync],
   );
 
+  const scheduleDispatchHintReset = useCallback((delayMs: number) => {
+    if (dispatchHintTimerRef.current) {
+      clearTimeout(dispatchHintTimerRef.current);
+    }
+
+    dispatchHintTimerRef.current = setTimeout(() => {
+      dispatchHintTimerRef.current = null;
+      setDispatchHint(null);
+    }, delayMs);
+  }, []);
+
   const handleSend = useCallback(async () => {
     if (!canSend) {
       return;
@@ -113,15 +137,36 @@ export function PromptComposer() {
     suppressDraftSyncUntilRef.current = Date.now() + sendClearSyncGuardMs;
 
     try {
-      await sidebar.sendPrompt(prompt);
+      const sendResult = await sidebar.sendPrompt(prompt);
       skipNextDraftSyncRef.current = true;
       queuedDraftTextRef.current = null;
       setText('');
       requestAnimationFrame(syncTextareaHeight);
+
+      if (sendResult.queued) {
+        setDispatchHint({
+          tone: 'queued',
+          message: QUEUED_DISPATCH_HINT,
+        });
+        scheduleDispatchHintReset(QUEUED_HINT_TIMEOUT_MS);
+      } else {
+        setDispatchHint({
+          tone: 'sent',
+          message: SENT_DISPATCH_HINT,
+        });
+        scheduleDispatchHintReset(SENT_HINT_TIMEOUT_MS);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [canSend, sendClearSyncGuardMs, sidebar, syncTextareaHeight, trimmedText]);
+  }, [
+    canSend,
+    scheduleDispatchHintReset,
+    sendClearSyncGuardMs,
+    sidebar,
+    syncTextareaHeight,
+    trimmedText,
+  ]);
 
   const handleClear = useCallback(() => {
     if (text.length === 0) {
@@ -171,6 +216,9 @@ export function PromptComposer() {
       if (draftSyncTimerRef.current) {
         clearTimeout(draftSyncTimerRef.current);
       }
+      if (dispatchHintTimerRef.current) {
+        clearTimeout(dispatchHintTimerRef.current);
+      }
     };
   }, []);
 
@@ -197,6 +245,13 @@ export function PromptComposer() {
       >
         SEND
       </button>
+      <p
+        className={`composer-dispatch-hint${dispatchHint ? ` is-${dispatchHint.tone}` : ''}`}
+        role="status"
+        aria-live="polite"
+      >
+        {dispatchHint ? dispatchHint.message : DEFAULT_DISPATCH_HINT}
+      </p>
     </div>
   );
 }

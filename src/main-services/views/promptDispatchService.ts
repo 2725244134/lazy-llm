@@ -14,6 +14,7 @@ export interface PromptDispatchPaneExecutionTarget {
 export interface PromptDispatchResult {
   success: boolean;
   failures: string[];
+  queued?: boolean;
 }
 
 export interface PromptDispatchServiceOptions {
@@ -112,7 +113,7 @@ export class PromptDispatchService {
 
     if (this.queueDrainInProgress) {
       this.queueLatestPrompt(normalizedPrompt);
-      return { success: true, failures: [] };
+      return { success: true, failures: [], queued: true };
     }
 
     const paneTargets = this.getPaneTargets();
@@ -127,7 +128,7 @@ export class PromptDispatchService {
     const busyState = await this.detectBusyStateOnAllPanes(paneTargets, injectRuntimeScript);
     if (busyState !== 'idle') {
       this.queueLatestPrompt(normalizedPrompt);
-      return { success: true, failures: [] };
+      return { success: true, failures: [], queued: true };
     }
 
     this.resetQueueState();

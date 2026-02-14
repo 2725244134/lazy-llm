@@ -2,6 +2,10 @@ import type { AppConfig } from '@shared-contracts/ipc/contracts';
 
 export type PaneCount = 1 | 2 | 3 | 4;
 
+export interface PromptSendResult {
+  queued: boolean;
+}
+
 export interface SidebarRuntime {
   getConfig(): Promise<AppConfig>;
   setPaneCount(count: PaneCount): Promise<void>;
@@ -15,7 +19,7 @@ export interface SidebarRuntime {
     sidebarWidth: number;
   }): Promise<void>;
   syncPromptDraft(text: string): Promise<void>;
-  sendPrompt(text: string): Promise<void>;
+  sendPrompt(text: string): Promise<PromptSendResult>;
 }
 
 export type { AppConfig };
