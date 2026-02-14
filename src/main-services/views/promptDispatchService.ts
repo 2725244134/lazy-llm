@@ -20,6 +20,7 @@ export interface PromptDispatchServiceOptions {
   getPaneTargets: () => PromptDispatchPaneExecutionTarget[];
   getInjectRuntimeScript: () => string | null;
   onPaneExecutionError?: (paneIndex: number, error: unknown) => void;
+  postSubmitGuardMs?: number;
   queuePollIntervalMs?: number;
   queueMaxWaitMs?: number;
   queueIdleConfirmations?: number;
@@ -33,6 +34,7 @@ export interface PromptDispatchServiceOptions {
 const DEFAULT_QUEUE_POLL_INTERVAL_MS = 350;
 const DEFAULT_QUEUE_MAX_WAIT_MS = 90_000;
 const DEFAULT_QUEUE_IDLE_CONFIRMATIONS = 2;
+const DEFAULT_POST_SUBMIT_GUARD_MS = 2_000;
 
 type PaneBusyState = 'busy' | 'idle' | 'unknown';
 
@@ -65,6 +67,7 @@ export class PromptDispatchService {
   private readonly getPaneTargets: () => PromptDispatchPaneExecutionTarget[];
   private readonly getInjectRuntimeScript: () => string | null;
   private readonly onPaneExecutionError: (paneIndex: number, error: unknown) => void;
+  private readonly postSubmitGuardMs: number;
   private readonly queuePollIntervalMs: number;
   private readonly queueMaxWaitMs: number;
   private readonly queueIdleConfirmations: number;
@@ -75,6 +78,7 @@ export class PromptDispatchService {
   private readonly onQueueTimeout: (paneIndex: number, promptText: string, waitedMs: number) => void;
 
   private readonly paneQueueStates = new Map<number, PaneQueueState>();
+  private readonly panePostSubmitGuardUntilMs = new Map<number, number>();
 
   constructor(options: PromptDispatchServiceOptions) {
     this.getPaneTargets = options.getPaneTargets;
@@ -82,6 +86,10 @@ export class PromptDispatchService {
     this.onPaneExecutionError = options.onPaneExecutionError ?? ((paneIndex, error) => {
       console.error(`[PromptDispatchService] Failed to send prompt to pane ${paneIndex}:`, error);
     });
+    this.postSubmitGuardMs = Math.max(
+      0,
+      options.postSubmitGuardMs ?? DEFAULT_POST_SUBMIT_GUARD_MS
+    );
     this.queuePollIntervalMs = Math.max(
       20,
       options.queuePollIntervalMs ?? DEFAULT_QUEUE_POLL_INTERVAL_MS
@@ -247,6 +255,7 @@ export class PromptDispatchService {
     );
 
     if (executionResult.success) {
+      this.markPanePostSubmitGuard(pane.paneIndex);
       return { kind: 'dispatched' };
     }
 
@@ -316,6 +325,10 @@ export class PromptDispatchService {
     injectRuntimeScript: string,
     statusEvalScript: string
   ): Promise<PaneBusyState> {
+    if (this.isPaneInPostSubmitGuard(pane.paneIndex)) {
+      return 'busy';
+    }
+
     try {
       await pane.executeJavaScript(injectRuntimeScript, true);
       const statusResult = await pane.executeJavaScript(
@@ -354,6 +367,32 @@ export class PromptDispatchService {
     }
 
     return null;
+  }
+
+  private markPanePostSubmitGuard(paneIndex: number): void {
+    if (this.postSubmitGuardMs <= 0) {
+      this.panePostSubmitGuardUntilMs.delete(paneIndex);
+      return;
+    }
+
+    this.panePostSubmitGuardUntilMs.set(
+      paneIndex,
+      this.now() + this.postSubmitGuardMs
+    );
+  }
+
+  private isPaneInPostSubmitGuard(paneIndex: number): boolean {
+    const guardUntilMs = this.panePostSubmitGuardUntilMs.get(paneIndex);
+    if (guardUntilMs === undefined) {
+      return false;
+    }
+
+    if (this.now() <= guardUntilMs) {
+      return true;
+    }
+
+    this.panePostSubmitGuardUntilMs.delete(paneIndex);
+    return false;
   }
 
   private queueLatestPromptForPane(paneIndex: number, promptText: string): void {
@@ -498,6 +537,8 @@ export class PromptDispatchService {
           promptText,
           [`pane-${paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`]
         );
+      } else {
+        this.markPanePostSubmitGuard(paneIndex);
       }
     } catch (error) {
       console.error('[PromptDispatchService] Unexpected error while draining pane queue:', {

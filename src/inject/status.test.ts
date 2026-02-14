@@ -90,6 +90,14 @@ describe('resolveStatus', () => {
     expect(config.streamingIndicatorSelectors?.length ?? 0).toBeGreaterThan(0);
   });
 
+  it('gemini complete selectors are scoped to latest response turn', () => {
+    const geminiConfig = providersConfig.gemini;
+    expect(geminiConfig.completeIndicatorSelectors?.length ?? 0).toBeGreaterThan(0);
+    for (const selector of geminiConfig.completeIndicatorSelectors ?? []) {
+      expect(selector).toContain('model-response:last-of-type');
+    }
+  });
+
   it.each(providerEntries)('%s reports busy when streaming selector matches', (provider, config) => {
     const streamingSelector = config.streamingIndicatorSelectors?.[0];
     expect(streamingSelector).toBeTruthy();

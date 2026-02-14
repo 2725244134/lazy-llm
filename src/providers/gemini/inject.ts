@@ -30,15 +30,15 @@ export const inject: ProviderInject = {
     '.model-response-text .markdown',
   ],
   streamingIndicatorSelectors: [
-    "[aria-busy='true']",
     "button[aria-label*='Stop']",
     "button[mattooltip*='Stop']",
-    '.typing-indicator',
-    "mat-progress-bar[mode='indeterminate']",
+    "model-response:last-of-type [aria-busy='true']",
+    'model-response:last-of-type .typing-indicator',
+    "model-response:last-of-type mat-progress-bar[mode='indeterminate']",
   ],
   completeIndicatorSelectors: [
-    'message-actions button[aria-label*="Copy"]',
-    "button[aria-label='Double-check response']",
-    'message-actions',
+    'model-response:last-of-type message-actions button[aria-label*="Copy"]',
+    'model-response:last-of-type button[aria-label="Double-check response"]',
+    'model-response:last-of-type message-actions',
   ],
 }

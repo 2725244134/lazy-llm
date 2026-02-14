@@ -387,6 +387,7 @@ describe('PromptDispatchService', () => {
       const service = new PromptDispatchService({
         getPaneTargets: () => [pane0.target, pane1.target],
         getInjectRuntimeScript: () => injectRuntimeScript,
+        postSubmitGuardMs: 0,
         queuePollIntervalMs: 10,
         queueIdleConfirmations: 2,
       });
@@ -407,6 +408,60 @@ describe('PromptDispatchService', () => {
       expect(pane1PromptScripts).toHaveLength(1);
       expect(pane1PromptScripts[0]).toContain(JSON.stringify('second'));
       expect(pane1PromptScripts[0]).not.toContain(JSON.stringify('first'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('applies post-submit guard to avoid immediate false-idle redispatch', async () => {
+    vi.useFakeTimers();
+    try {
+      const injectRuntimeScript = 'inject-runtime-script';
+      const promptScripts: string[] = [];
+
+      const pane = createPaneTarget(0, async (script) => {
+        if (script === injectRuntimeScript) {
+          return undefined;
+        }
+
+        if (script.includes('bridge.getStatus')) {
+          return {
+            success: true,
+            provider: 'gemini',
+            isStreaming: false,
+            isComplete: true,
+            hasResponse: true,
+          };
+        }
+
+        if (script.includes('bridge.injectPrompt')) {
+          promptScripts.push(script);
+          return { success: true };
+        }
+
+        return undefined;
+      });
+
+      const service = new PromptDispatchService({
+        getPaneTargets: () => [pane.target],
+        getInjectRuntimeScript: () => injectRuntimeScript,
+        postSubmitGuardMs: 50,
+        queuePollIntervalMs: 10,
+        queueIdleConfirmations: 1,
+      });
+
+      const first = await service.sendPromptToAll('first');
+      const second = await service.sendPromptToAll('second');
+
+      expect(first).toEqual({ success: true, failures: [] });
+      expect(second).toEqual({ success: true, failures: [] });
+      expect(promptScripts).toHaveLength(1);
+      expect(promptScripts[0]).toContain(JSON.stringify('first'));
+
+      await vi.advanceTimersByTimeAsync(80);
+
+      expect(promptScripts).toHaveLength(2);
+      expect(promptScripts[1]).toContain(JSON.stringify('second'));
     } finally {
       vi.useRealTimers();
     }
