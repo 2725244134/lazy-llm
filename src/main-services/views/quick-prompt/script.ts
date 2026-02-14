@@ -10,6 +10,10 @@ const interactionConfig = APP_CONFIG.interaction;
 export const QUICK_PROMPT_SCRIPT = `
 const input = document.getElementById('quickPromptInput');
 const panel = document.querySelector('.panel');
+const attachmentRow = document.getElementById('quickPromptAttachmentRow');
+const attachmentLabel = document.getElementById('quickPromptAttachmentLabel');
+const attachmentClear = document.getElementById('quickPromptAttachmentClear');
+const attachmentError = document.getElementById('quickPromptAttachmentError');
 let isSending = false;
 let resizeRaf = 0;
 let lastResizeHeight = 0;
@@ -19,12 +23,15 @@ const DEFAULT_VIEW_HEIGHT = ${quickPromptConfig.defaultHeight};
 const PANEL_HEIGHT_SAFETY_GAP = ${quickPromptConfig.panelHeightSafetyGap};
 const DRAFT_SYNC_DEBOUNCE_MS = ${interactionConfig.draftSync.debounceMs};
 const SEND_CLEAR_SYNC_GUARD_MS = ${interactionConfig.draftSync.sendClearGuardMs};
+const MAX_CLIPBOARD_IMAGE_BYTES = 8 * 1024 * 1024;
 let pendingViewHeight = DEFAULT_VIEW_HEIGHT;
 let draftSyncTimer = 0;
 let draftSyncInFlight = false;
 let queuedDraftText = null;
 let lastSyncedDraftText = null;
 let suppressDraftSyncUntil = 0;
+let attachedImage = null;
+let attachmentErrorTimer = 0;
 
 const focusInput = () => {
   if (!input) return;
@@ -62,6 +69,61 @@ const syncPanelHeight = () => {
   }
   const measured = panel.getBoundingClientRect().height + PANEL_HEIGHT_SAFETY_GAP;
   pendingViewHeight = Math.max(DEFAULT_VIEW_HEIGHT, Math.ceil(measured));
+};
+
+const clearAttachmentError = () => {
+  if (attachmentErrorTimer !== 0) {
+    clearTimeout(attachmentErrorTimer);
+    attachmentErrorTimer = 0;
+  }
+  if (!attachmentError) return;
+  attachmentError.hidden = true;
+  attachmentError.textContent = '';
+};
+
+const showAttachmentError = (message) => {
+  if (!attachmentError) return;
+  clearAttachmentError();
+  attachmentError.hidden = false;
+  attachmentError.textContent = message;
+  attachmentErrorTimer = window.setTimeout(() => {
+    attachmentErrorTimer = 0;
+    if (!attachmentError) return;
+    attachmentError.hidden = true;
+    attachmentError.textContent = '';
+  }, 2600);
+};
+
+const formatFileSize = (sizeBytes) => {
+  if (sizeBytes >= 1024 * 1024) {
+    return (sizeBytes / (1024 * 1024)).toFixed(2) + ' MB';
+  }
+  if (sizeBytes >= 1024) {
+    return (sizeBytes / 1024).toFixed(1) + ' KB';
+  }
+  return sizeBytes + ' B';
+};
+
+const updateAttachmentUi = () => {
+  if (!attachmentRow || !attachmentLabel) return;
+
+  if (!attachedImage) {
+    attachmentRow.hidden = true;
+    attachmentLabel.textContent = '';
+    syncPanelHeight();
+    scheduleResize();
+    return;
+  }
+
+  attachmentRow.hidden = false;
+  attachmentLabel.textContent = 'Image attached (' + formatFileSize(attachedImage.sizeBytes) + ')';
+  syncPanelHeight();
+  scheduleResize();
+};
+
+const clearAttachedImage = () => {
+  attachedImage = null;
+  updateAttachmentUi();
 };
 
 const syncInputHeight = () => {
@@ -163,6 +225,74 @@ const hide = async () => {
   await window.quickPrompt.hide();
 };
 
+const extractBase64Data = (dataUrl) => {
+  if (typeof dataUrl !== 'string') {
+    return null;
+  }
+  const delimiterIndex = dataUrl.indexOf(',');
+  if (delimiterIndex < 0 || delimiterIndex >= dataUrl.length - 1) {
+    return null;
+  }
+  return dataUrl.slice(delimiterIndex + 1);
+};
+
+const readImageAsBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onerror = () => {
+      reject(new Error('Failed to read pasted image'));
+    };
+
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Unexpected reader result'));
+        return;
+      }
+      const base64Data = extractBase64Data(reader.result);
+      if (!base64Data) {
+        reject(new Error('Invalid data URL payload'));
+        return;
+      }
+      resolve(base64Data);
+    };
+
+    reader.readAsDataURL(file);
+  });
+};
+
+const attachClipboardImage = async (file) => {
+  if (!file || typeof file.type !== 'string' || !file.type.startsWith('image/')) {
+    return false;
+  }
+
+  if (!Number.isFinite(file.size) || file.size <= 0) {
+    showAttachmentError('Pasted image is empty.');
+    return true;
+  }
+
+  if (file.size > MAX_CLIPBOARD_IMAGE_BYTES) {
+    showAttachmentError('Image must be 8 MB or smaller.');
+    return true;
+  }
+
+  try {
+    const base64Data = await readImageAsBase64(file);
+    attachedImage = {
+      mimeType: file.type,
+      base64Data,
+      sizeBytes: file.size,
+      source: 'clipboard',
+    };
+    clearAttachmentError();
+    updateAttachmentUi();
+    return true;
+  } catch (_error) {
+    showAttachmentError('Failed to process pasted image.');
+    return true;
+  }
+};
+
 const submit = async () => {
   if (!input || !window.quickPrompt || typeof window.quickPrompt.sendPrompt !== 'function') return;
   const prompt = input.value.trim();
@@ -177,8 +307,12 @@ const submit = async () => {
   queuedDraftText = null;
   input.disabled = true;
   try {
-    await window.quickPrompt.sendPrompt(prompt);
+    await window.quickPrompt.sendPrompt({
+      text: prompt,
+      image: attachedImage ? { ...attachedImage } : null,
+    });
     input.value = '';
+    clearAttachedImage();
     syncInputHeight();
     await hide();
   } finally {
@@ -190,6 +324,33 @@ const submit = async () => {
 input?.addEventListener('input', () => {
   syncInputHeight();
   scheduleDraftSync(input.value);
+});
+
+input?.addEventListener('paste', (event) => {
+  const clipboardItems = event.clipboardData
+    ? Array.from(event.clipboardData.items || [])
+    : [];
+  const imageItem = clipboardItems.find((item) => {
+    return item.kind === 'file' && typeof item.type === 'string' && item.type.startsWith('image/');
+  });
+
+  if (!imageItem) {
+    return;
+  }
+
+  const file = imageItem.getAsFile();
+  if (!file) {
+    return;
+  }
+
+  event.preventDefault();
+  void attachClipboardImage(file);
+});
+
+attachmentClear?.addEventListener('click', () => {
+  clearAttachedImage();
+  clearAttachmentError();
+  focusInput();
 });
 
 window.addEventListener('keydown', (event) => {
@@ -209,6 +370,8 @@ window.addEventListener('quick-prompt:open', () => {
   resetDraftSyncState();
   input.disabled = false;
   isSending = false;
+  clearAttachedImage();
+  clearAttachmentError();
   syncInputHeight();
   focusInput();
 });
@@ -219,5 +382,6 @@ window.addEventListener('quick-prompt:focus', () => {
 });
 
 observePanelResize();
+updateAttachmentUi();
 syncInputHeight();
 `;
