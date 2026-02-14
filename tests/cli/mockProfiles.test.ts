@@ -28,7 +28,7 @@ describe('mockProfiles', () => {
 describe('mockTypes schema compliance', () => {
   it('MockProviderConfigFile validates a well-formed config', () => {
     const config: MockProviderConfigFile = {
-      'mock-chatgpt': {
+      chatgpt: {
         url: 'file://./tests/fixtures/mock-site/chatgpt-simulation.html',
         urlPattern: 'chatgpt-simulation.html',
         inputSelectors: ['#prompt-textarea'],
@@ -39,8 +39,8 @@ describe('mockTypes schema compliance', () => {
       },
     };
 
-    expect(config['mock-chatgpt'].inputSelectors).toHaveLength(1);
-    expect(config['mock-chatgpt'].urlPattern).toBe('chatgpt-simulation.html');
+    expect(config.chatgpt.inputSelectors).toHaveLength(1);
+    expect(config.chatgpt.urlPattern).toBe('chatgpt-simulation.html');
   });
 
   it('ParityManifestEntry validates a well-formed entry', () => {

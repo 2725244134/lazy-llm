@@ -1,5 +1,5 @@
 {
-  "mock-chatgpt": {
+  "chatgpt": {
     "url": "file://./tests/fixtures/mock-site/chatgpt-simulation.html",
     "urlPattern": "chatgpt-simulation.html",
     "inputSelectors": ["#prompt-textarea"],
@@ -8,7 +8,7 @@
     "streamingIndicatorSelectors": [".result-streaming"],
     "extractMode": "last"
   },
-  "mock-grok": {
+  "grok": {
     "url": "file://./tests/fixtures/mock-site/grok-simulation.html",
     "urlPattern": "grok-simulation.html",
     "inputSelectors": ["#prompt-textarea"],
@@ -17,7 +17,7 @@
     "streamingIndicatorSelectors": [".result-streaming"],
     "extractMode": "last"
   },
-  "mock-gemini": {
+  "gemini": {
     "url": "file://./tests/fixtures/mock-site/gemini-simulation.html",
     "urlPattern": "gemini-simulation.html",
     "inputSelectors": ["#prompt-textarea"],

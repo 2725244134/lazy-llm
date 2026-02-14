@@ -7,7 +7,9 @@ export const CANONICAL_PROVIDERS: AppConfig['provider']['catalog'] = [
   ...APP_CONFIG.providers.catalog.map((provider) => ({ ...provider })),
 ];
 
-// Load mock providers from LAZYLLM_MOCK_PROVIDERS_FILE if set
+// Load mock providers from LAZYLLM_MOCK_PROVIDERS_FILE if set.
+// If a mock key matches an existing provider, its URL is replaced in-place.
+// Otherwise the mock entry is appended as a new provider.
 const mockProvidersFile = process.env.LAZYLLM_MOCK_PROVIDERS_FILE;
 if (mockProvidersFile && mockProvidersFile.trim().length > 0) {
   const configPath = resolve(process.cwd(), mockProvidersFile);
@@ -21,11 +23,17 @@ if (mockProvidersFile && mockProvidersFile.trim().length > 0) {
           if (url.startsWith('file://.')) {
             url = `file://${resolve(process.cwd(), url.slice(7))}`;
           }
-          CANONICAL_PROVIDERS.push({
-            key: key as string & keyof typeof APP_CONFIG.providers.byKey,
-            name: key,
-            url,
-          });
+          // Replace existing provider URL if key matches
+          const existing = CANONICAL_PROVIDERS.find((p) => p.key === key);
+          if (existing) {
+            (existing as { url: string }).url = url;
+          } else {
+            CANONICAL_PROVIDERS.push({
+              key: key as string & keyof typeof APP_CONFIG.providers.byKey,
+              name: key,
+              url,
+            });
+          }
         }
       }
     } catch (error) {

@@ -177,7 +177,7 @@ function main(): void {
     }
   }
 
-  const mockKey = `mock-${provider}`;
+  const mockKey = provider;
   const entry: MockProviderConfigEntry = {
     url: `file://./tests/fixtures/mock-site/${htmlFilename}`,
     urlPattern: htmlFilename,

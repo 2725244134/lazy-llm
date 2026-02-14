@@ -46,7 +46,8 @@ bun scripts/lib/mockGenerateCli.ts --provider <key> [--output-dir tests/fixtures
 - Creates `<provider>-simulation.html` with unified mock runtime
   (input capture, streaming simulation, completion signal).
 - Creates/updates `mock-provider-config.json` with the mock provider entry.
-- The mock key follows the `mock-<provider>` convention (e.g. `mock-chatgpt`).
+- The mock key uses the real provider key (e.g. `chatgpt`) so it **replaces**
+  the real provider URL at runtime, ensuring no real sites are loaded.
 
 ### Step 4 — Verify
 

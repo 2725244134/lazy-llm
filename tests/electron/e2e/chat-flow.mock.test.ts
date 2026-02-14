@@ -1,10 +1,6 @@
-import { join } from 'path';
-import { createMockTest, expect } from '../fixtures/electronApp';
+import { test, expect } from '../fixtures/electronApp';
 import { selectors } from '../helpers/selectors';
 import { updateProvider } from '../helpers/lazyllm';
-
-const mockConfigPath = join(process.cwd(), 'tests/fixtures/mock-site/mock-provider-config.json');
-const test = createMockTest({ mockProvidersFile: mockConfigPath });
 
 /** Timeout for polling operations inside tests. */
 const POLL_TIMEOUT = 15000;
@@ -42,12 +38,12 @@ async function findMockPage(
 async function verifyChatFlow(
   electronApp: import('@playwright/test').ElectronApplication,
   appWindow: import('@playwright/test').Page,
-  mockKey: string,
+  providerKey: string,
   urlFragment: string,
-  expectedProvider: string,
+  displayName: string,
 ): Promise<void> {
-  // 1. Switch pane 0 to the mock provider
-  await updateProvider(appWindow, { paneIndex: 0, providerKey: mockKey });
+  // 1. Switch pane 0 to this provider (URL is already mock via config)
+  await updateProvider(appWindow, { paneIndex: 0, providerKey });
 
   // 2. Find the mock pane page
   const mockPage = await findMockPage(electronApp, urlFragment);
@@ -56,7 +52,7 @@ async function verifyChatFlow(
   const textarea = appWindow.locator(selectors.promptTextarea);
   const sendButton = appWindow.locator(selectors.promptSendButton);
 
-  await textarea.fill(`Hello ${expectedProvider}`);
+  await textarea.fill(`Hello ${displayName}`);
   await sendButton.click();
 
   // 4. Verify the prompt was injected into the mock page
@@ -65,7 +61,7 @@ async function verifyChatFlow(
       const el = document.querySelector('#prompt-textarea') as HTMLTextAreaElement;
       return el && el.value === expected;
     },
-    `Hello ${expectedProvider}`,
+    `Hello ${displayName}`,
     { timeout: POLL_TIMEOUT },
   );
 
@@ -80,7 +76,7 @@ async function verifyChatFlow(
     return bridge ? { exists: true, provider: bridge.provider } : { exists: false, provider: '' };
   });
   expect(bridgeInfo.exists).toBe(true);
-  expect(bridgeInfo.provider).toBe(mockKey);
+  expect(bridgeInfo.provider).toBe(providerKey);
 
   // 7. Wait for completion and verify extraction
   const result = await mockPage.evaluate(() => {
@@ -99,24 +95,24 @@ async function verifyChatFlow(
 }
 
 test.describe('E2E / Chat Flow (Mock)', () => {
-  test('mock-chatgpt: full inject bridge flow', async ({ electronApp, appWindow }) => {
+  test('chatgpt: full inject bridge flow', async ({ electronApp, appWindow }) => {
     await verifyChatFlow(
       electronApp, appWindow,
-      'mock-chatgpt', 'chatgpt-simulation.html', 'ChatGPT',
+      'chatgpt', 'chatgpt-simulation.html', 'ChatGPT',
     );
   });
 
-  test('mock-grok: full inject bridge flow', async ({ electronApp, appWindow }) => {
+  test('grok: full inject bridge flow', async ({ electronApp, appWindow }) => {
     await verifyChatFlow(
       electronApp, appWindow,
-      'mock-grok', 'grok-simulation.html', 'Grok',
+      'grok', 'grok-simulation.html', 'Grok',
     );
   });
 
-  test('mock-gemini: full inject bridge flow', async ({ electronApp, appWindow }) => {
+  test('gemini: full inject bridge flow', async ({ electronApp, appWindow }) => {
     await verifyChatFlow(
       electronApp, appWindow,
-      'mock-gemini', 'gemini-simulation.html', 'Gemini',
+      'gemini', 'gemini-simulation.html', 'Gemini',
     );
   });
 });

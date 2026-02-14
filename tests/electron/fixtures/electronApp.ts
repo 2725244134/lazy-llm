@@ -15,29 +15,26 @@ type ElectronFixtures = {
   appWindow: Page;
 };
 
-type LaunchOptions = {
-  mockProvidersFile?: string;
-};
+/**
+ * Path to mock provider config — all E2E tests use mock pages,
+ * no real provider URLs are ever loaded.
+ */
+const MOCK_PROVIDERS_FILE = join(process.cwd(), 'tests/fixtures/mock-site/mock-provider-config.json');
 
-function createLaunchEnv(options?: LaunchOptions): Record<string, string> {
+function createLaunchEnv(): Record<string, string> {
   const envEntries = Object.entries(process.env).filter(
     (entry): entry is [string, string] => typeof entry[1] === 'string',
   );
 
   const userDataDir = mkdtempSync(join(tmpdir(), 'lazy-llm-e2e-'));
 
-  const env: Record<string, string> = {
+  return {
     ...Object.fromEntries(envEntries),
     NODE_ENV: 'production',
     LAZYLLM_SKIP_SINGLE_INSTANCE_LOCK: '1',
     LAZYLLM_USER_DATA_DIR: userDataDir,
+    LAZYLLM_MOCK_PROVIDERS_FILE: MOCK_PROVIDERS_FILE,
   };
-
-  if (options?.mockProvidersFile) {
-    env.LAZYLLM_MOCK_PROVIDERS_FILE = options.mockProvidersFile;
-  }
-
-  return env;
 }
 
 async function hasLazyllmBridge(page: Page): Promise<boolean> {
@@ -89,7 +86,10 @@ async function resolveAppWindow(electronApp: ElectronApplication): Promise<Page>
   );
 }
 
-/** Default test fixture — launches Electron without mock providers. */
+/**
+ * Default test fixture — launches Electron with mock providers.
+ * All panes load local mock HTML pages; no real provider URLs are accessed.
+ */
 export const test = base.extend<ElectronFixtures>({
   electronApp: async ({}, use) => {
     const electronApp = await electron.launch({
@@ -107,29 +107,5 @@ export const test = base.extend<ElectronFixtures>({
     await use(appPage);
   },
 });
-
-/**
- * Create a test fixture with mock providers injected.
- * The mockProvidersFile path is resolved relative to process.cwd().
- */
-export function createMockTest(options: LaunchOptions) {
-  return base.extend<ElectronFixtures>({
-    electronApp: async ({}, use) => {
-      const electronApp = await electron.launch({
-        args: ['.'],
-        env: createLaunchEnv(options),
-      });
-
-      await use(electronApp);
-      await electronApp.close();
-    },
-
-    appWindow: async ({ electronApp }, use) => {
-      const appPage = await resolveAppWindow(electronApp);
-      await expect(appPage.locator(selectors.appLayout)).toBeVisible({ timeout: 15000 });
-      await use(appPage);
-    },
-  });
-}
 
 export { expect };
