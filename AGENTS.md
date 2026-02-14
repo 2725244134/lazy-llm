@@ -110,15 +110,15 @@ Before merge:
 - Validate locally with:
   - `EXPECTED_VERSION=vX.Y.Z just release-verify-tag`
 
-## But Workflow
+## Git Workflow
 
-Use GitButler (`but`) for branch/commit/push operations.
+Use `git` for branch/commit/push operations.
 
-- Sync: `but pull --check --json` then `but pull --json --status-after`
-- Create branch: `but branch new <branch-name>`
-- Inspect changes: `but status --json`
-- Commit changes: `but commit <branch-name> -m "<type>(<scope>): <subject>" --changes <change-id>`
-- Push: `but push`
+- Sync: `git pull`
+- Create branch: `git checkout -b <branch-name>`
+- Inspect changes: `git status`
+- Commit changes: `git add <files>` + `git commit -m "<type>(<scope>): <subject>"`
+- Push: `git push`
 
 ## CI
 
