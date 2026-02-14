@@ -31,13 +31,14 @@ export const inject: ProviderInject = {
   ],
   streamingIndicatorSelectors: [
     "[aria-busy='true']",
+    "button[aria-label*='Stop']",
+    "button[mattooltip*='Stop']",
     '.typing-indicator',
-    'mat-progress-bar',
-    '.loading-indicator',
+    "mat-progress-bar[mode='indeterminate']",
   ],
   completeIndicatorSelectors: [
-    "[aria-busy='false']",
+    'message-actions button[aria-label*="Copy"]',
+    "button[aria-label='Double-check response']",
     'message-actions',
-    "button[aria-label*='Copy']",
   ],
 }

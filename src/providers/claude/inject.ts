@@ -23,9 +23,10 @@ export const inject: ProviderInject = {
     'div[data-turn-role="assistant"]',
   ],
   streamingIndicatorSelectors: [
+    "button[aria-label*='Stop response']",
     "button[aria-label*='Stop']",
     "[data-testid='stop-button']",
-    '.is-streaming',
+    "fieldset button[aria-label*='Stop']",
   ],
   completeIndicatorSelectors: [
     "button[aria-label*='Copy']",

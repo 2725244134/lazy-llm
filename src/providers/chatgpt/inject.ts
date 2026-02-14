@@ -28,9 +28,10 @@ export const inject: ProviderInject = {
   ],
   streamingIndicatorSelectors: [
     "button[aria-label='Stop generating']",
+    "button[aria-label='Stop response']",
     "button[data-testid='stop-button']",
     "[data-testid='streaming-indicator']",
-    ".result-streaming",
+    "[data-message-author-role='assistant'] [aria-live='polite']",
   ],
   completeIndicatorSelectors: [
     "button[data-testid='copy-turn-action-button']",
