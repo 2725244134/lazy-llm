@@ -1,6 +1,5 @@
 import { createContext, createElement, useContext } from 'react';
 import { APP_CONFIG } from '@/config';
-import type { PromptSendResult } from '@/runtime/sidebar/types';
 
 export const MAX_PANES = APP_CONFIG.layout.pane.maxCount;
 export type PaneCount = 1 | 2 | 3 | 4;
@@ -13,7 +12,7 @@ export interface SidebarContextValue {
   newAll: () => Promise<void>;
   setProvider: (paneIndex: number, providerKey: string) => Promise<void>;
   syncPromptDraft: (text: string) => Promise<void>;
-  sendPrompt: (text: string) => Promise<PromptSendResult>;
+  sendPrompt: (text: string) => Promise<void>;
 }
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);

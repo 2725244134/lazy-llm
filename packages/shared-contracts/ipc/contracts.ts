@@ -81,7 +81,6 @@ export interface PromptRequest {
 export interface PromptResponse {
   success: boolean;
   failures?: string[];
-  queued?: boolean;
 }
 
 export interface PromptSyncRequest {

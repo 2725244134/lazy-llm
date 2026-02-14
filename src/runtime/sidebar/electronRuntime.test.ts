@@ -92,14 +92,6 @@ describe('createElectronRuntime', () => {
     await expect(runtime.sendPrompt('hello')).rejects.toThrow('Failed to send prompt: pane-1, pane-2');
   });
 
-  it('returns queued state when sendPrompt succeeds', async () => {
-    const sendPrompt = vi.fn().mockResolvedValue({ success: true, queued: true });
-    stubWindowLazyllm({ sendPrompt });
-    const runtime = createElectronRuntime();
-
-    await expect(runtime.sendPrompt('hello')).resolves.toEqual({ queued: true });
-  });
-
   it('forwards prompt draft sync requests', async () => {
     const syncPromptDraft = vi.fn().mockResolvedValue({ success: true });
     stubWindowLazyllm({ syncPromptDraft });
