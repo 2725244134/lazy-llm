@@ -2,28 +2,34 @@ import type { Page } from '@playwright/test';
 import { test, expect } from '../fixtures/electronApp';
 import { selectors } from '../helpers/selectors';
 
-const SIDEBAR_WIDTH_SAMPLE_COUNT = 8;
-const SIDEBAR_WIDTH_SAMPLE_INTERVAL_MS = 35;
+const SIDEBAR_WIDTH_CAPTURE_DURATION_MS = 520;
 
-async function collectSidebarWidthSamples(appWindow: Page): Promise<number[]> {
+async function captureSidebarWidthSamples(appWindow: Page): Promise<number[]> {
   return appWindow.evaluate(
-    async ({ sampleCount, intervalMs }) => {
+    ({ durationMs }) => {
       const sidebar = document.querySelector<HTMLElement>('aside.sidebar');
       if (!sidebar) {
         throw new Error('Sidebar element not found');
       }
 
-      const readWidth = () => Math.round(sidebar.getBoundingClientRect().width);
-      const samples: number[] = [readWidth()];
-      for (let index = 0; index < sampleCount; index += 1) {
-        await new Promise<void>((resolve) => {
-          window.setTimeout(resolve, intervalMs);
-        });
-        samples.push(readWidth());
-      }
-      return samples;
+      return new Promise<number[]>((resolve) => {
+        const samples: number[] = [];
+        const readWidth = () => Math.round(sidebar.getBoundingClientRect().width);
+        const startAt = performance.now();
+
+        const capture = () => {
+          samples.push(readWidth());
+          if (performance.now() - startAt >= durationMs) {
+            resolve(samples);
+            return;
+          }
+          window.requestAnimationFrame(capture);
+        };
+
+        capture();
+      });
     },
-    { sampleCount: SIDEBAR_WIDTH_SAMPLE_COUNT, intervalMs: SIDEBAR_WIDTH_SAMPLE_INTERVAL_MS },
+    { durationMs: SIDEBAR_WIDTH_CAPTURE_DURATION_MS },
   );
 }
 
@@ -76,17 +82,19 @@ test.describe('Smoke / Sidebar', () => {
     };
 
     const expandedWidthBefore = await readSidebarWidth();
+    const collapseSamplesPromise = captureSidebarWidthSamples(appWindow);
     await toggleButton.click();
-    const collapseSamples = await collectSidebarWidthSamples(appWindow);
     await expect(sidebar).toHaveClass(/collapsed/);
+    const collapseSamples = await collapseSamplesPromise;
     const collapsedWidth = await readSidebarWidth();
 
     expect(collapsedWidth).toBeLessThan(expandedWidthBefore);
     expect(hasIntermediateWidthSample(collapseSamples, expandedWidthBefore, collapsedWidth)).toBe(true);
 
+    const expandSamplesPromise = captureSidebarWidthSamples(appWindow);
     await toggleButton.click();
-    const expandSamples = await collectSidebarWidthSamples(appWindow);
     await expect(sidebar).not.toHaveClass(/collapsed/);
+    const expandSamples = await expandSamplesPromise;
     const expandedWidthAfter = await readSidebarWidth();
 
     expect(expandedWidthAfter).toBeGreaterThan(collapsedWidth);
