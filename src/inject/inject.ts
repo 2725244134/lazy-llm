@@ -1,4 +1,6 @@
 import { providersConfig, providerDetectRules, type ProviderInjectConfig } from './providers-config';
+import type { PromptImagePayload } from '../../packages/shared-contracts/ipc/contracts';
+import { normalizePromptImagePayload } from '../../packages/shared-contracts/ipc/promptImage';
 import {
   findElement,
   injectText,
@@ -18,13 +20,6 @@ interface InjectResult {
 interface SubmitResult {
   success: boolean;
   reason?: string;
-}
-
-interface ClipboardImagePayload {
-  mimeType: string;
-  base64Data: string;
-  sizeBytes: number;
-  source: 'clipboard';
 }
 
 interface AttachImageResult {
@@ -47,7 +42,7 @@ declare global {
     __llmBridge?: {
       provider: string;
       injectPrompt: (text: string, autoSubmit?: boolean) => InjectResult;
-      attachImageFromClipboard: (image: ClipboardImagePayload) => AttachImageResult;
+      attachImageFromClipboard: (image: PromptImagePayload) => AttachImageResult;
       clickSubmitButton: () => SubmitResult;
       extractResponse: () => ExtractResult;
       extractAllResponses: () => string[];
@@ -98,37 +93,6 @@ function clickSubmit(config: ProviderInjectConfig | undefined): SubmitResult {
 
   button.click();
   return { success: true };
-}
-
-function normalizeClipboardImagePayload(
-  image: ClipboardImagePayload | null | undefined
-): ClipboardImagePayload | null {
-  if (!image || typeof image !== 'object') {
-    return null;
-  }
-
-  if (image.source !== 'clipboard') {
-    return null;
-  }
-
-  if (typeof image.mimeType !== 'string' || !image.mimeType.startsWith('image/')) {
-    return null;
-  }
-
-  if (typeof image.base64Data !== 'string' || image.base64Data.length === 0) {
-    return null;
-  }
-
-  if (!Number.isFinite(image.sizeBytes) || image.sizeBytes <= 0) {
-    return null;
-  }
-
-  return {
-    mimeType: image.mimeType,
-    base64Data: image.base64Data,
-    sizeBytes: image.sizeBytes,
-    source: image.source,
-  };
 }
 
 function decodeBase64(base64Data: string): Uint8Array {
@@ -241,10 +205,10 @@ function handleInject(
 
 function handleAttachImageFromClipboard(
   config: ProviderInjectConfig | undefined,
-  image: ClipboardImagePayload,
+  image: PromptImagePayload,
   provider: string
 ): AttachImageResult {
-  const normalizedImage = normalizeClipboardImagePayload(image);
+  const normalizedImage = normalizePromptImagePayload(image);
   if (!normalizedImage) {
     return { success: false, reason: 'Invalid clipboard image payload', provider };
   }

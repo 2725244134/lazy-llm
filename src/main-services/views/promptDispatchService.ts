@@ -1,4 +1,5 @@
 import type { PromptImagePayload, PromptRequest } from '@shared-contracts/ipc/contracts';
+import { normalizePromptImagePayload, validatePromptImagePayload } from '@shared-contracts/ipc/promptImage';
 import {
   buildPromptDraftSyncEvalScript,
   buildPromptImageAttachEvalScript,
@@ -295,41 +296,17 @@ export class PromptDispatchService {
       return { value: null };
     }
 
-    if (typeof image.mimeType !== 'string' || !image.mimeType.startsWith('image/')) {
+    const normalized = normalizePromptImagePayload(image);
+    if (!normalized) {
+      const validation = validatePromptImagePayload(image);
       return {
         value: null,
-        reason: 'prompt image mimeType must be a non-empty image/* string',
-      };
-    }
-
-    if (typeof image.base64Data !== 'string' || image.base64Data.length === 0) {
-      return {
-        value: null,
-        reason: 'prompt image base64Data must be a non-empty string',
-      };
-    }
-
-    if (!Number.isFinite(image.sizeBytes) || image.sizeBytes <= 0) {
-      return {
-        value: null,
-        reason: 'prompt image sizeBytes must be a positive number',
-      };
-    }
-
-    if (image.source !== 'clipboard') {
-      return {
-        value: null,
-        reason: 'prompt image source must be clipboard',
+        reason: validation.ok ? undefined : validation.reason,
       };
     }
 
     return {
-      value: {
-        mimeType: image.mimeType,
-        base64Data: image.base64Data,
-        sizeBytes: image.sizeBytes,
-        source: image.source,
-      },
+      value: normalized,
     };
   }
 

@@ -64,7 +64,7 @@ describe('buildPromptImageAttachEvalScript', () => {
       base64Data: 'abc',
       sizeBytes: 1,
       source: 'clipboard',
-    })).toThrow('prompt image mimeType must be a non-empty string');
+    })).toThrow('prompt image mimeType must be a non-empty image/* string');
   });
 
   test('serializes image payload and calls bridge attachment API', () => {

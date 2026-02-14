@@ -1,4 +1,5 @@
 import type { PromptImagePayload } from '@shared-contracts/ipc/contracts';
+import { validatePromptImagePayload } from '@shared-contracts/ipc/promptImage';
 
 export interface PromptInjectionResult {
   success: boolean;
@@ -91,37 +92,12 @@ export function buildPromptDraftSyncEvalScript(text: string): string {
 `;
 }
 
-function normalizePromptImagePayload(image: PromptImagePayload): PromptImagePayload {
-  if (!image || typeof image !== 'object') {
-    throw new Error('prompt image payload must be an object');
-  }
-
-  if (typeof image.mimeType !== 'string' || image.mimeType.trim().length === 0) {
-    throw new Error('prompt image mimeType must be a non-empty string');
-  }
-
-  if (typeof image.base64Data !== 'string' || image.base64Data.length === 0) {
-    throw new Error('prompt image base64Data must be a non-empty string');
-  }
-
-  if (!Number.isFinite(image.sizeBytes) || image.sizeBytes <= 0) {
-    throw new Error('prompt image sizeBytes must be a positive number');
-  }
-
-  if (image.source !== 'clipboard') {
-    throw new Error('prompt image source must be clipboard');
-  }
-
-  return {
-    mimeType: image.mimeType,
-    base64Data: image.base64Data,
-    sizeBytes: image.sizeBytes,
-    source: image.source,
-  };
-}
-
 export function buildPromptImageAttachEvalScript(image: PromptImagePayload): string {
-  const normalizedImage = normalizePromptImagePayload(image);
+  const validation = validatePromptImagePayload(image);
+  if (!validation.ok) {
+    throw new Error(validation.reason);
+  }
+  const normalizedImage = validation.value;
   const serializedImage = JSON.stringify(normalizedImage);
 
   return `
