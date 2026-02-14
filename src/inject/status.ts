@@ -1,9 +1,10 @@
-import { isComplete, isStreaming } from './core';
+import { findAllElements, isComplete, isStreaming } from './core';
 import type { ProviderInjectConfig } from './providers-config';
 
 export interface StatusResult {
   isStreaming: boolean;
   isComplete: boolean;
+  hasResponse: boolean;
   provider: string;
 }
 
@@ -14,15 +15,21 @@ export function resolveStatus(
   provider: string
 ): StatusResult {
   if (!config) {
-    return { isStreaming: false, isComplete: false, provider };
+    return { isStreaming: false, isComplete: false, hasResponse: false, provider };
   }
 
   const streamingIndicatorSelectors = config.streamingIndicatorSelectors || [];
   const completeIndicatorSelectors = config.completeIndicatorSelectors || [];
+  const hasResponse = Boolean(
+    config.responseSelectors &&
+    config.responseSelectors.length > 0 &&
+    findAllElements(config.responseSelectors).length > 0
+  );
 
   return {
     isStreaming: isStreaming(streamingIndicatorSelectors),
     isComplete: isComplete(streamingIndicatorSelectors, completeIndicatorSelectors),
+    hasResponse,
     provider,
   };
 }
@@ -33,6 +40,10 @@ export function resolveBusyState(status: StatusResult): BusyState {
   }
 
   if (status.isComplete) {
+    return 'idle';
+  }
+
+  if (!status.hasResponse) {
     return 'idle';
   }
 

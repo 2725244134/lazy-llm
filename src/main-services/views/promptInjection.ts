@@ -7,6 +7,7 @@ export interface PromptStatusEvalResult {
   success: boolean;
   isStreaming?: boolean;
   isComplete?: boolean;
+  hasResponse?: boolean;
   provider?: string;
   reason?: string;
 }
@@ -90,8 +91,11 @@ export function buildPromptStatusEvalScript(): string {
     const isComplete = status && typeof status.isComplete === "boolean"
       ? status.isComplete
       : null;
+    const hasResponse = status && typeof status.hasResponse === "boolean"
+      ? status.hasResponse
+      : null;
 
-    if (isStreaming === null || isComplete === null) {
+    if (isStreaming === null || isComplete === null || hasResponse === null) {
       return { success: false, reason: "getStatus returned an invalid payload" };
     }
 
@@ -104,6 +108,7 @@ export function buildPromptStatusEvalScript(): string {
       provider,
       isStreaming,
       isComplete,
+      hasResponse,
     };
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

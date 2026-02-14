@@ -92,6 +92,7 @@ describe('PromptDispatchService', () => {
           provider: 'chatgpt',
           isStreaming: false,
           isComplete: true,
+          hasResponse: true,
         };
       }
 
@@ -135,6 +136,7 @@ describe('PromptDispatchService', () => {
           provider: 'chatgpt',
           isStreaming: false,
           isComplete: false,
+          hasResponse: false,
         };
       }
 
@@ -181,6 +183,7 @@ describe('PromptDispatchService', () => {
             provider: 'chatgpt',
             isStreaming,
             isComplete: !isStreaming,
+            hasResponse: isStreaming,
           };
         }
 
@@ -239,6 +242,7 @@ describe('PromptDispatchService', () => {
             provider: 'chatgpt',
             isStreaming: false,
             isComplete: true,
+            hasResponse: true,
           };
         }
 
@@ -276,8 +280,8 @@ describe('PromptDispatchService', () => {
     try {
       const injectRuntimeScript = 'inject-runtime-script';
       const promptScripts: string[] = [];
-      const onQueueTimeout = vi.fn<(promptText: string, waitedMs: number) => void>();
-      const onQueuedDispatchFailure = vi.fn<(promptText: string, failures: string[]) => void>();
+      const onQueueTimeout = vi.fn<(paneIndex: number, promptText: string, waitedMs: number) => void>();
+      const onQueuedDispatchFailure = vi.fn<(paneIndex: number, promptText: string, failures: string[]) => void>();
 
       const pane = createPaneTarget(0, async (script) => {
         if (script === injectRuntimeScript) {
@@ -290,6 +294,7 @@ describe('PromptDispatchService', () => {
             provider: 'chatgpt',
             isStreaming: true,
             isComplete: false,
+            hasResponse: true,
           };
         }
 
@@ -318,8 +323,90 @@ describe('PromptDispatchService', () => {
 
       expect(promptScripts).toHaveLength(0);
       expect(onQueueTimeout).toHaveBeenCalledTimes(1);
-      expect(onQueueTimeout).toHaveBeenCalledWith('timed-out-prompt', expect.any(Number));
+      expect(onQueueTimeout).toHaveBeenCalledWith(0, 'timed-out-prompt', expect.any(Number));
       expect(onQueuedDispatchFailure).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('dispatches idle pane immediately while busy pane keeps latest-only queue', async () => {
+    vi.useFakeTimers();
+    try {
+      const injectRuntimeScript = 'inject-runtime-script';
+      const pane0PromptScripts: string[] = [];
+      const pane1PromptScripts: string[] = [];
+      let pane1Streaming = true;
+
+      const pane0 = createPaneTarget(0, async (script) => {
+        if (script === injectRuntimeScript) {
+          return undefined;
+        }
+
+        if (script.includes('bridge.getStatus')) {
+          return {
+            success: true,
+            provider: 'chatgpt',
+            isStreaming: false,
+            isComplete: true,
+            hasResponse: true,
+          };
+        }
+
+        if (script.includes('bridge.injectPrompt')) {
+          pane0PromptScripts.push(script);
+          return { success: true };
+        }
+
+        return undefined;
+      });
+
+      const pane1 = createPaneTarget(1, async (script) => {
+        if (script === injectRuntimeScript) {
+          return undefined;
+        }
+
+        if (script.includes('bridge.getStatus')) {
+          return {
+            success: true,
+            provider: 'gemini',
+            isStreaming: pane1Streaming,
+            isComplete: !pane1Streaming,
+            hasResponse: true,
+          };
+        }
+
+        if (script.includes('bridge.injectPrompt')) {
+          pane1PromptScripts.push(script);
+          return { success: true };
+        }
+
+        return undefined;
+      });
+
+      const service = new PromptDispatchService({
+        getPaneTargets: () => [pane0.target, pane1.target],
+        getInjectRuntimeScript: () => injectRuntimeScript,
+        queuePollIntervalMs: 10,
+        queueIdleConfirmations: 2,
+      });
+
+      const first = await service.sendPromptToAll('first');
+      const second = await service.sendPromptToAll('second');
+
+      expect(first).toEqual({ success: true, failures: [] });
+      expect(second).toEqual({ success: true, failures: [] });
+      expect(pane0PromptScripts).toHaveLength(2);
+      expect(pane0PromptScripts[0]).toContain(JSON.stringify('first'));
+      expect(pane0PromptScripts[1]).toContain(JSON.stringify('second'));
+      expect(pane1PromptScripts).toHaveLength(0);
+
+      pane1Streaming = false;
+      await vi.advanceTimersByTimeAsync(60);
+
+      expect(pane1PromptScripts).toHaveLength(1);
+      expect(pane1PromptScripts[0]).toContain(JSON.stringify('second'));
+      expect(pane1PromptScripts[0]).not.toContain(JSON.stringify('first'));
     } finally {
       vi.useRealTimers();
     }

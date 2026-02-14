@@ -26,8 +26,8 @@ export interface PromptDispatchServiceOptions {
   now?: () => number;
   setTimer?: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
-  onQueuedDispatchFailure?: (promptText: string, failures: string[]) => void;
-  onQueueTimeout?: (promptText: string, waitedMs: number) => void;
+  onQueuedDispatchFailure?: (paneIndex: number, promptText: string, failures: string[]) => void;
+  onQueueTimeout?: (paneIndex: number, promptText: string, waitedMs: number) => void;
 }
 
 const DEFAULT_QUEUE_POLL_INTERVAL_MS = 350;
@@ -35,6 +35,24 @@ const DEFAULT_QUEUE_MAX_WAIT_MS = 90_000;
 const DEFAULT_QUEUE_IDLE_CONFIRMATIONS = 2;
 
 type PaneBusyState = 'busy' | 'idle' | 'unknown';
+
+type PanePromptDispatchOutcome =
+  | { kind: 'dispatched' }
+  | { kind: 'queued' }
+  | { kind: 'failed'; failure: string };
+
+interface PaneQueueState {
+  queuedPromptText: string | null;
+  queueStartedAtMs: number | null;
+  idleStreak: number;
+  timer: ReturnType<typeof setTimeout> | null;
+  drainInProgress: boolean;
+}
+
+interface PaneScriptExecutionResult {
+  success: boolean;
+  reason?: string;
+}
 
 function toFailureReason(error: unknown): string {
   if (error instanceof Error) {
@@ -53,14 +71,10 @@ export class PromptDispatchService {
   private readonly now: () => number;
   private readonly setTimer: (callback: () => void, delayMs: number) => ReturnType<typeof setTimeout>;
   private readonly clearTimer: (timer: ReturnType<typeof setTimeout>) => void;
-  private readonly onQueuedDispatchFailure: (promptText: string, failures: string[]) => void;
-  private readonly onQueueTimeout: (promptText: string, waitedMs: number) => void;
+  private readonly onQueuedDispatchFailure: (paneIndex: number, promptText: string, failures: string[]) => void;
+  private readonly onQueueTimeout: (paneIndex: number, promptText: string, waitedMs: number) => void;
 
-  private queuedPromptText: string | null = null;
-  private queueStartedAtMs: number | null = null;
-  private queueIdleStreak = 0;
-  private queueTimer: ReturnType<typeof setTimeout> | null = null;
-  private queueDrainInProgress = false;
+  private readonly paneQueueStates = new Map<number, PaneQueueState>();
 
   constructor(options: PromptDispatchServiceOptions) {
     this.getPaneTargets = options.getPaneTargets;
@@ -83,16 +97,24 @@ export class PromptDispatchService {
     this.now = options.now ?? (() => Date.now());
     this.setTimer = options.setTimer ?? ((callback, delayMs) => setTimeout(callback, delayMs));
     this.clearTimer = options.clearTimer ?? ((timer) => clearTimeout(timer));
-    this.onQueuedDispatchFailure = options.onQueuedDispatchFailure ?? ((promptText, failures) => {
+    this.onQueuedDispatchFailure = options.onQueuedDispatchFailure ?? ((paneIndex, promptText, failures) => {
       console.error(
         '[PromptDispatchService] Failed to deliver queued prompt',
-        { promptLength: promptText.length, failures }
+        {
+          paneIndex,
+          promptLength: promptText.length,
+          failures,
+        }
       );
     });
-    this.onQueueTimeout = options.onQueueTimeout ?? ((promptText, waitedMs) => {
+    this.onQueueTimeout = options.onQueueTimeout ?? ((paneIndex, promptText, waitedMs) => {
       console.error(
         '[PromptDispatchService] Dropped queued prompt after timeout',
-        { promptLength: promptText.length, waitedMs }
+        {
+          paneIndex,
+          promptLength: promptText.length,
+          waitedMs,
+        }
       );
     });
   }
@@ -110,11 +132,6 @@ export class PromptDispatchService {
       };
     }
 
-    if (this.queueDrainInProgress) {
-      this.queueLatestPrompt(normalizedPrompt);
-      return { success: true, failures: [] };
-    }
-
     const paneTargets = this.getPaneTargets();
     const injectRuntimeScript = this.getInjectRuntimeScript();
     if (!injectRuntimeScript) {
@@ -124,14 +141,41 @@ export class PromptDispatchService {
       };
     }
 
-    const busyState = await this.detectBusyStateOnAllPanes(paneTargets, injectRuntimeScript);
-    if (busyState !== 'idle') {
-      this.queueLatestPrompt(normalizedPrompt);
-      return { success: true, failures: [] };
+    const statusEvalScript = buildPromptStatusEvalScript();
+    const outcomes = await Promise.all(
+      paneTargets.map((pane) =>
+        this.dispatchPromptToPane(
+          pane,
+          normalizedPrompt,
+          promptEvalScript,
+          injectRuntimeScript,
+          statusEvalScript
+        )
+      )
+    );
+
+    const failures: string[] = [];
+    let dispatchedCount = 0;
+    let queuedCount = 0;
+
+    for (const outcome of outcomes) {
+      if (outcome.kind === 'dispatched') {
+        dispatchedCount += 1;
+        continue;
+      }
+
+      if (outcome.kind === 'queued') {
+        queuedCount += 1;
+        continue;
+      }
+
+      failures.push(outcome.failure);
     }
 
-    this.resetQueueState();
-    return this.executePromptEvalScriptOnAllPanes(promptEvalScript);
+    return {
+      success: dispatchedCount > 0 || queuedCount > 0,
+      failures,
+    };
   }
 
   async syncPromptDraftToAll(text: string): Promise<PromptDispatchResult> {
@@ -162,20 +206,13 @@ export class PromptDispatchService {
     }
 
     for (const pane of paneTargets) {
-      try {
-        await pane.executeJavaScript(injectRuntimeScript, true);
-        const result = await pane.executeJavaScript(
-          promptEvalScript,
-          true
-        ) as PromptInjectionResult | undefined;
-
-        if (!result?.success) {
-          const reason = result?.reason ?? 'prompt injection failed';
-          failures.push(`pane-${pane.paneIndex}: ${reason}`);
-        }
-      } catch (error) {
-        this.onPaneExecutionError(pane.paneIndex, error);
-        failures.push(`pane-${pane.paneIndex}: ${toFailureReason(error)}`);
+      const executionResult = await this.executePromptEvalScriptOnPane(
+        pane,
+        injectRuntimeScript,
+        promptEvalScript
+      );
+      if (!executionResult.success) {
+        failures.push(`pane-${pane.paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`);
       }
     }
 
@@ -183,6 +220,69 @@ export class PromptDispatchService {
       success: failures.length === 0,
       failures,
     };
+  }
+
+  private async dispatchPromptToPane(
+    pane: PromptDispatchPaneExecutionTarget,
+    normalizedPrompt: string,
+    promptEvalScript: string,
+    injectRuntimeScript: string,
+    statusEvalScript: string
+  ): Promise<PanePromptDispatchOutcome> {
+    const busyState = await this.detectPaneBusyState(
+      pane,
+      injectRuntimeScript,
+      statusEvalScript
+    );
+
+    if (busyState !== 'idle') {
+      this.queueLatestPromptForPane(pane.paneIndex, normalizedPrompt);
+      return { kind: 'queued' };
+    }
+
+    const executionResult = await this.executePromptEvalScriptOnPane(
+      pane,
+      injectRuntimeScript,
+      promptEvalScript
+    );
+
+    if (executionResult.success) {
+      return { kind: 'dispatched' };
+    }
+
+    return {
+      kind: 'failed',
+      failure: `pane-${pane.paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`,
+    };
+  }
+
+  private async executePromptEvalScriptOnPane(
+    pane: PromptDispatchPaneExecutionTarget,
+    injectRuntimeScript: string,
+    promptEvalScript: string
+  ): Promise<PaneScriptExecutionResult> {
+    try {
+      await pane.executeJavaScript(injectRuntimeScript, true);
+      const result = await pane.executeJavaScript(
+        promptEvalScript,
+        true
+      ) as PromptInjectionResult | undefined;
+
+      if (result?.success) {
+        return { success: true };
+      }
+
+      return {
+        success: false,
+        reason: result?.reason ?? 'prompt injection failed',
+      };
+    } catch (error) {
+      this.onPaneExecutionError(pane.paneIndex, error);
+      return {
+        success: false,
+        reason: toFailureReason(error),
+      };
+    }
   }
 
   private buildInjectRuntimeUnavailableFailures(
@@ -200,137 +300,177 @@ export class PromptDispatchService {
       return 'busy';
     }
 
-    // Some providers do not expose a "complete" marker before the first turn.
-    // Treat any non-streaming successful status as idle to avoid startup deadlock.
-    return 'idle';
+    if (result.isComplete === true) {
+      return 'idle';
+    }
+
+    if (result.hasResponse === false) {
+      return 'idle';
+    }
+
+    return 'unknown';
   }
 
-  private async detectBusyStateOnAllPanes(
-    paneTargets: PromptDispatchPaneExecutionTarget[],
-    injectRuntimeScript: string
+  private async detectPaneBusyState(
+    pane: PromptDispatchPaneExecutionTarget,
+    injectRuntimeScript: string,
+    statusEvalScript: string
   ): Promise<PaneBusyState> {
-    const statusEvalScript = buildPromptStatusEvalScript();
-    let hasBusyPane = false;
-    let hasUnknownPane = false;
+    try {
+      await pane.executeJavaScript(injectRuntimeScript, true);
+      const statusResult = await pane.executeJavaScript(
+        statusEvalScript,
+        true
+      ) as PromptStatusEvalResult | undefined;
+      return this.resolvePaneBusyState(statusResult);
+    } catch (error) {
+      this.onPaneExecutionError(pane.paneIndex, error);
+      return 'unknown';
+    }
+  }
 
-    for (const pane of paneTargets) {
-      try {
-        await pane.executeJavaScript(injectRuntimeScript, true);
-        const statusResult = await pane.executeJavaScript(
-          statusEvalScript,
-          true
-        ) as PromptStatusEvalResult | undefined;
-        const busyState = this.resolvePaneBusyState(statusResult);
+  private getPaneQueueState(paneIndex: number): PaneQueueState {
+    const existing = this.paneQueueStates.get(paneIndex);
+    if (existing) {
+      return existing;
+    }
 
-        if (busyState === 'busy') {
-          hasBusyPane = true;
-          continue;
-        }
+    const initialState: PaneQueueState = {
+      queuedPromptText: null,
+      queueStartedAtMs: null,
+      idleStreak: 0,
+      timer: null,
+      drainInProgress: false,
+    };
+    this.paneQueueStates.set(paneIndex, initialState);
+    return initialState;
+  }
 
-        if (busyState === 'unknown') {
-          hasUnknownPane = true;
-        }
-      } catch (error) {
-        hasUnknownPane = true;
-        this.onPaneExecutionError(pane.paneIndex, error);
+  private findPaneTargetByIndex(paneIndex: number): PromptDispatchPaneExecutionTarget | null {
+    for (const pane of this.getPaneTargets()) {
+      if (pane.paneIndex === paneIndex) {
+        return pane;
       }
     }
 
-    if (hasBusyPane) {
-      return 'busy';
-    }
-
-    if (hasUnknownPane) {
-      return 'unknown';
-    }
-
-    return 'idle';
+    return null;
   }
 
-  private queueLatestPrompt(promptText: string): void {
-    this.queuedPromptText = promptText;
-    if (this.queueStartedAtMs === null) {
-      this.queueStartedAtMs = this.now();
+  private queueLatestPromptForPane(paneIndex: number, promptText: string): void {
+    const state = this.getPaneQueueState(paneIndex);
+    state.queuedPromptText = promptText;
+    if (state.queueStartedAtMs === null) {
+      state.queueStartedAtMs = this.now();
     }
-    this.queueIdleStreak = 0;
-    this.scheduleQueueDrain();
+    state.idleStreak = 0;
+    this.schedulePaneQueueDrain(paneIndex, state);
   }
 
-  private scheduleQueueDrain(delayMs = this.queuePollIntervalMs): void {
-    if (this.queueTimer !== null || this.queuedPromptText === null) {
+  private schedulePaneQueueDrain(
+    paneIndex: number,
+    state: PaneQueueState,
+    delayMs = this.queuePollIntervalMs
+  ): void {
+    if (state.timer !== null || state.queuedPromptText === null || state.drainInProgress) {
       return;
     }
 
-    this.queueTimer = this.setTimer(() => {
-      this.queueTimer = null;
-      void this.drainQueuedPrompt();
+    state.timer = this.setTimer(() => {
+      state.timer = null;
+      void this.drainPaneQueue(paneIndex);
     }, delayMs);
   }
 
-  private clearQueueTimer(): void {
-    if (this.queueTimer === null) {
+  private clearPaneQueueTimer(state: PaneQueueState): void {
+    if (state.timer === null) {
       return;
     }
 
-    this.clearTimer(this.queueTimer);
-    this.queueTimer = null;
+    this.clearTimer(state.timer);
+    state.timer = null;
   }
 
-  private resetQueueState(): void {
-    this.queuedPromptText = null;
-    this.queueStartedAtMs = null;
-    this.queueIdleStreak = 0;
-    this.clearQueueTimer();
+  private clearPaneQueueState(paneIndex: number, state: PaneQueueState): void {
+    this.clearPaneQueueTimer(state);
+    state.queuedPromptText = null;
+    state.queueStartedAtMs = null;
+    state.idleStreak = 0;
+    this.maybeCleanupPaneQueueState(paneIndex, state);
   }
 
-  private async drainQueuedPrompt(): Promise<void> {
-    if (this.queueDrainInProgress || this.queuedPromptText === null) {
+  private maybeCleanupPaneQueueState(paneIndex: number, state: PaneQueueState): void {
+    if (state.drainInProgress) {
       return;
     }
 
-    this.queueDrainInProgress = true;
+    if (state.queuedPromptText !== null || state.timer !== null) {
+      return;
+    }
+
+    this.paneQueueStates.delete(paneIndex);
+  }
+
+  private async drainPaneQueue(paneIndex: number): Promise<void> {
+    const state = this.getPaneQueueState(paneIndex);
+    if (state.drainInProgress || state.queuedPromptText === null) {
+      this.maybeCleanupPaneQueueState(paneIndex, state);
+      return;
+    }
+
+    state.drainInProgress = true;
     try {
-      const paneTargets = this.getPaneTargets();
+      const pane = this.findPaneTargetByIndex(paneIndex);
+      if (!pane) {
+        this.clearPaneQueueState(paneIndex, state);
+        return;
+      }
+
       const injectRuntimeScript = this.getInjectRuntimeScript();
       if (!injectRuntimeScript) {
-        const queuedPrompt = this.queuedPromptText;
-        this.resetQueueState();
+        const queuedPrompt = state.queuedPromptText;
+        this.clearPaneQueueState(paneIndex, state);
         if (queuedPrompt !== null) {
           this.onQueuedDispatchFailure(
+            paneIndex,
             queuedPrompt,
-            this.buildInjectRuntimeUnavailableFailures(paneTargets)
+            [`pane-${paneIndex}: inject runtime not available`]
           );
         }
         return;
       }
 
-      const waitedMs = this.queueStartedAtMs === null ? 0 : this.now() - this.queueStartedAtMs;
+      const waitedMs = state.queueStartedAtMs === null ? 0 : this.now() - state.queueStartedAtMs;
       if (waitedMs > this.queueMaxWaitMs) {
-        const queuedPrompt = this.queuedPromptText;
-        this.resetQueueState();
+        const queuedPrompt = state.queuedPromptText;
+        this.clearPaneQueueState(paneIndex, state);
         if (queuedPrompt !== null) {
-          this.onQueueTimeout(queuedPrompt, waitedMs);
+          this.onQueueTimeout(paneIndex, queuedPrompt, waitedMs);
         }
         return;
       }
 
-      const busyState = await this.detectBusyStateOnAllPanes(paneTargets, injectRuntimeScript);
+      const statusEvalScript = buildPromptStatusEvalScript();
+      const busyState = await this.detectPaneBusyState(
+        pane,
+        injectRuntimeScript,
+        statusEvalScript
+      );
       if (busyState !== 'idle') {
-        this.queueIdleStreak = 0;
-        this.scheduleQueueDrain();
+        state.idleStreak = 0;
+        this.schedulePaneQueueDrain(paneIndex, state);
         return;
       }
 
-      this.queueIdleStreak += 1;
-      if (this.queueIdleStreak < this.queueIdleConfirmations) {
-        this.scheduleQueueDrain();
+      state.idleStreak += 1;
+      if (state.idleStreak < this.queueIdleConfirmations) {
+        this.schedulePaneQueueDrain(paneIndex, state);
         return;
       }
 
-      const promptText = this.queuedPromptText;
-      this.queuedPromptText = null;
-      this.queueStartedAtMs = null;
-      this.queueIdleStreak = 0;
+      const promptText = state.queuedPromptText;
+      state.queuedPromptText = null;
+      state.queueStartedAtMs = null;
+      state.idleStreak = 0;
 
       if (promptText === null) {
         return;
@@ -340,23 +480,39 @@ export class PromptDispatchService {
       try {
         promptEvalScript = buildPromptInjectionEvalScript(promptText);
       } catch (error) {
-        this.onQueuedDispatchFailure(promptText, [`invalid-queued-prompt: ${toFailureReason(error)}`]);
+        this.onQueuedDispatchFailure(paneIndex, promptText, [
+          `invalid-queued-prompt: ${toFailureReason(error)}`,
+        ]);
         return;
       }
 
-      const result = await this.executePromptEvalScriptOnAllPanes(promptEvalScript);
-      if (!result.success) {
-        this.onQueuedDispatchFailure(promptText, result.failures);
+      const executionResult = await this.executePromptEvalScriptOnPane(
+        pane,
+        injectRuntimeScript,
+        promptEvalScript
+      );
+
+      if (!executionResult.success) {
+        this.onQueuedDispatchFailure(
+          paneIndex,
+          promptText,
+          [`pane-${paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`]
+        );
       }
     } catch (error) {
-      console.error('[PromptDispatchService] Unexpected error while draining prompt queue:', error);
+      console.error('[PromptDispatchService] Unexpected error while draining pane queue:', {
+        paneIndex,
+        error,
+      });
     } finally {
-      this.queueDrainInProgress = false;
-      if (this.queuedPromptText !== null) {
-        if (this.queueStartedAtMs === null) {
-          this.queueStartedAtMs = this.now();
+      state.drainInProgress = false;
+      if (state.queuedPromptText !== null) {
+        if (state.queueStartedAtMs === null) {
+          state.queueStartedAtMs = this.now();
         }
-        this.scheduleQueueDrain();
+        this.schedulePaneQueueDrain(paneIndex, state);
+      } else {
+        this.maybeCleanupPaneQueueState(paneIndex, state);
       }
     }
   }

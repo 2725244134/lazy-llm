@@ -3,13 +3,26 @@ import { providersConfig, type ProviderInjectConfig } from './providers-config';
 import { resolveBusyState, resolveStatus } from './status';
 
 type QuerySelectorImpl = (selector: string) => Element | null;
+type QuerySelectorAllImpl = (selector: string) => Element[];
 
-function withMockDocument(querySelectorImpl: QuerySelectorImpl): void {
+function withMockDocument(
+  querySelectorImpl: QuerySelectorImpl,
+  querySelectorAllImpl?: QuerySelectorAllImpl
+): void {
   const querySelector = vi.fn(querySelectorImpl);
+  const querySelectorAll = vi.fn((selector: string) => {
+    if (querySelectorAllImpl) {
+      return querySelectorAllImpl(selector);
+    }
+
+    const element = querySelectorImpl(selector);
+    return element ? [element] : [];
+  });
   vi.stubGlobal(
     'document',
     {
       querySelector,
+      querySelectorAll,
     } as unknown as Document
   );
 }
@@ -43,9 +56,10 @@ describe('resolveStatus', () => {
     expect(status).toEqual({
       isStreaming: false,
       isComplete: false,
+      hasResponse: false,
       provider: 'unknown',
     });
-    expect(resolveBusyState(status)).toBe('unknown');
+    expect(resolveBusyState(status)).toBe('idle');
   });
 
   it('handles selector errors and continues evaluating remaining selectors', () => {
@@ -65,6 +79,7 @@ describe('resolveStatus', () => {
 
     expect(status.isStreaming).toBe(true);
     expect(status.isComplete).toBe(false);
+    expect(status.hasResponse).toBe(false);
     expect(resolveBusyState(status)).toBe('busy');
     expect(logger).toHaveBeenCalled();
   });
@@ -86,6 +101,7 @@ describe('resolveStatus', () => {
     expect(status.provider).toBe(provider);
     expect(status.isStreaming).toBe(true);
     expect(status.isComplete).toBe(false);
+    expect(status.hasResponse).toBe(false);
     expect(resolveBusyState(status)).toBe('busy');
   });
 
@@ -100,24 +116,45 @@ describe('resolveStatus', () => {
     expect(status.provider).toBe(provider);
     expect(status.isStreaming).toBe(false);
     expect(status.isComplete).toBe(true);
+    expect(status.hasResponse).toBe(false);
     expect(resolveBusyState(status)).toBe('idle');
   });
 
-  it.each(providerEntries)('%s reports unknown when neither stream nor complete selectors match', (provider, config) => {
-    withMockDocument(mockQuerySelector(new Set()));
+  it.each(providerEntries)(
+    '%s reports idle without response when neither stream nor complete selectors match',
+    (provider, config) => {
+      withMockDocument(mockQuerySelector(new Set()));
 
-    const status = resolveStatus(config, provider);
+      const status = resolveStatus(config, provider);
 
-    expect(status.provider).toBe(provider);
-    expect(status.isStreaming).toBe(false);
+      expect(status.provider).toBe(provider);
+      expect(status.isStreaming).toBe(false);
+      expect(status.hasResponse).toBe(false);
 
-    if ((config.completeIndicatorSelectors?.length ?? 0) > 0) {
-      expect(status.isComplete).toBe(false);
-      expect(resolveBusyState(status)).toBe('unknown');
-      return;
+      if ((config.completeIndicatorSelectors?.length ?? 0) > 0) {
+        expect(status.isComplete).toBe(false);
+      } else {
+        expect(status.isComplete).toBe(true);
+      }
+      expect(resolveBusyState(status)).toBe('idle');
     }
+  );
 
-    expect(status.isComplete).toBe(true);
-    expect(resolveBusyState(status)).toBe('idle');
-  });
+  it.each(providerEntries)(
+    '%s reports unknown when response exists but stream/complete markers are both absent',
+    (provider, config) => {
+      const responseSelector = config.responseSelectors?.[0];
+      expect(responseSelector).toBeTruthy();
+
+      withMockDocument(mockQuerySelector(new Set([responseSelector!])));
+
+      const status = resolveStatus(config, provider);
+
+      expect(status.provider).toBe(provider);
+      expect(status.isStreaming).toBe(false);
+      expect(status.isComplete).toBe(false);
+      expect(status.hasResponse).toBe(true);
+      expect(resolveBusyState(status)).toBe('unknown');
+    }
+  );
 });
