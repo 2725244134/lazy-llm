@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '@shared-contracts/ipc/contracts';
 import type {
+  PromptRequest,
   PromptResponse,
   PromptSyncResponse,
   QuickPromptHideResponse,
@@ -8,8 +9,8 @@ import type {
 } from '@shared-contracts/ipc/contracts';
 
 const quickPromptAPI = {
-  sendPrompt: (text: string): Promise<PromptResponse> => {
-    return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SEND, { text });
+  sendPrompt: (request: PromptRequest): Promise<PromptResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SEND, request);
   },
   syncPromptDraft: (text: string): Promise<PromptSyncResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SYNC_DRAFT, { text });

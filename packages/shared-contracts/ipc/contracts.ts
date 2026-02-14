@@ -76,6 +76,7 @@ export interface PaneUpdateResponse {
 
 export interface PromptRequest {
   text: string;
+  image?: PromptImagePayload | null;
 }
 
 export interface PromptResponse {
@@ -90,6 +91,13 @@ export interface PromptSyncRequest {
 export interface PromptSyncResponse {
   success: boolean;
   failures?: string[];
+}
+
+export interface PromptImagePayload {
+  mimeType: string;
+  base64Data: string;
+  sizeBytes: number;
+  source: 'clipboard';
 }
 
 // Layout types
