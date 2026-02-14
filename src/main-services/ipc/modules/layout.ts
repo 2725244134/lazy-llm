@@ -14,7 +14,9 @@ export function registerLayoutIpcHandlers(context: IpcRuntimeContext): void {
     const paneCount = validatePaneCount(request?.paneCount);
     const sidebarWidth = validateSidebarWidth(request?.sidebarWidth);
 
-    viewManager.setPaneCount(paneCount);
+    if (viewManager.getPaneCount() !== paneCount) {
+      viewManager.setPaneCount(paneCount);
+    }
     viewManager.updateLayout(sidebarWidth);
 
     return { success: true };
