@@ -200,11 +200,9 @@ export class PromptDispatchService {
       return 'busy';
     }
 
-    if (result.isComplete === true) {
-      return 'idle';
-    }
-
-    return 'unknown';
+    // Some providers do not expose a "complete" marker before the first turn.
+    // Treat any non-streaming successful status as idle to avoid startup deadlock.
+    return 'idle';
   }
 
   private async detectBusyStateOnAllPanes(

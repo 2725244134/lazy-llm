@@ -120,6 +120,49 @@ describe('PromptDispatchService', () => {
     expect(promptScripts[0]).toContain(JSON.stringify('hello'));
   });
 
+  it('treats non-streaming incomplete status as idle to avoid first-message deadlock', async () => {
+    const injectRuntimeScript = 'inject-runtime-script';
+    const promptScripts: string[] = [];
+
+    const pane = createPaneTarget(0, async (script) => {
+      if (script === injectRuntimeScript) {
+        return undefined;
+      }
+
+      if (script.includes('bridge.getStatus')) {
+        return {
+          success: true,
+          provider: 'chatgpt',
+          isStreaming: false,
+          isComplete: false,
+        };
+      }
+
+      if (script.includes('bridge.injectPrompt')) {
+        promptScripts.push(script);
+        return { success: true };
+      }
+
+      return undefined;
+    });
+
+    const service = new PromptDispatchService({
+      getPaneTargets: () => [pane.target],
+      getInjectRuntimeScript: () => injectRuntimeScript,
+      queuePollIntervalMs: 10,
+      queueIdleConfirmations: 2,
+    });
+
+    const result = await service.sendPromptToAll('first-message');
+
+    expect(result).toEqual({
+      success: true,
+      failures: [],
+    });
+    expect(promptScripts).toHaveLength(1);
+    expect(promptScripts[0]).toContain(JSON.stringify('first-message'));
+  });
+
   it('queues latest prompt while busy and dispatches only the newest prompt after idle', async () => {
     vi.useFakeTimers();
     try {
