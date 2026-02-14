@@ -36,6 +36,7 @@ import { padProviderSequence } from '../ipc-handlers/providerConfig.js';
 import type {
   AppConfig,
   PaneCount,
+  PromptRequest,
   ProviderMeta,
 } from '@shared-contracts/ipc/contracts';
 
@@ -682,8 +683,10 @@ export class ViewManager {
   /**
    * Send prompt to all panes
    */
-  async sendPromptToAll(text: string): Promise<{ success: boolean; failures: string[] }> {
-    return this.promptDispatchService.sendPromptToAll(text);
+  async sendPromptToAll(
+    request: string | PromptRequest
+  ): Promise<{ success: boolean; failures: string[] }> {
+    return this.promptDispatchService.sendPromptToAll(request);
   }
 
   /**

@@ -165,6 +165,93 @@ describe('PromptDispatchService', () => {
     expect(promptScripts[0]).toContain(JSON.stringify('first-message'));
   });
 
+  it('records image attach failure but still submits text prompt', async () => {
+    const injectRuntimeScript = 'inject-runtime-script';
+    const executedScripts: string[] = [];
+
+    const pane = createPaneTarget(0, async (script) => {
+      if (script === injectRuntimeScript) {
+        return undefined;
+      }
+
+      if (script.includes('bridge.getStatus')) {
+        return {
+          success: true,
+          provider: 'chatgpt',
+          isStreaming: false,
+          isComplete: true,
+          hasResponse: true,
+        };
+      }
+
+      executedScripts.push(script);
+
+      if (script.includes('attachImageFromClipboard')) {
+        return { success: false, reason: 'paste ignored by page' };
+      }
+
+      if (script.includes('clickSubmitButton')) {
+        return { success: true };
+      }
+
+      if (script.includes('bridge.injectPrompt')) {
+        return { success: true };
+      }
+
+      return undefined;
+    });
+
+    const service = new PromptDispatchService({
+      getPaneTargets: () => [pane.target],
+      getInjectRuntimeScript: () => injectRuntimeScript,
+      postSubmitGuardMs: 0,
+      queuePollIntervalMs: 10,
+      queueIdleConfirmations: 2,
+    });
+
+    const result = await service.sendPromptToAll({
+      text: 'hello with image',
+      image: {
+        mimeType: 'image/png',
+        base64Data: 'QUJD',
+        sizeBytes: 3,
+        source: 'clipboard',
+      },
+    });
+
+    expect(result).toEqual({
+      success: true,
+      failures: ['pane-0: image attach failed (paste ignored by page)'],
+    });
+    expect(executedScripts.some((script) => script.includes('bridge.injectPrompt'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('attachImageFromClipboard'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('clickSubmitButton'))).toBe(true);
+  });
+
+  it('rejects invalid image payload before pane dispatch', async () => {
+    const pane = createPaneTarget(0, async () => ({ success: true }));
+    const service = new PromptDispatchService({
+      getPaneTargets: () => [pane.target],
+      getInjectRuntimeScript: () => 'inject-runtime-script',
+    });
+
+    const result = await service.sendPromptToAll({
+      text: 'hello',
+      image: {
+        mimeType: '',
+        base64Data: 'QUJD',
+        sizeBytes: 3,
+        source: 'clipboard',
+      },
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.failures).toEqual([
+      'invalid-prompt-image: prompt image mimeType must be a non-empty image/* string',
+    ]);
+    expect(pane.executeJavaScript).not.toHaveBeenCalled();
+  });
+
   it('queues latest prompt while busy and dispatches only the newest prompt after idle', async () => {
     vi.useFakeTimers();
     try {

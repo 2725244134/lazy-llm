@@ -1,7 +1,11 @@
+import type { PromptImagePayload, PromptRequest } from '@shared-contracts/ipc/contracts';
 import {
   buildPromptDraftSyncEvalScript,
+  buildPromptImageAttachEvalScript,
   buildPromptInjectionEvalScript,
   buildPromptStatusEvalScript,
+  buildPromptSubmitEvalScript,
+  type PromptImageAttachResult,
   type PromptInjectionResult,
   type PromptStatusEvalResult,
 } from './promptInjection.js';
@@ -39,12 +43,23 @@ const DEFAULT_POST_SUBMIT_GUARD_MS = 2_000;
 type PaneBusyState = 'busy' | 'idle' | 'unknown';
 
 type PanePromptDispatchOutcome =
-  | { kind: 'dispatched' }
+  | { kind: 'dispatched'; failures: string[] }
   | { kind: 'queued' }
   | { kind: 'failed'; failure: string };
 
+interface PanePromptDispatchScripts {
+  promptEvalScript: string;
+  imageAttachEvalScript: string | null;
+  submitEvalScript: string | null;
+}
+
+interface NormalizedPromptRequest {
+  text: string;
+  image: PromptImagePayload | null;
+}
+
 interface PaneQueueState {
-  queuedPromptText: string | null;
+  queuedPromptRequest: NormalizedPromptRequest | null;
   queueStartedAtMs: number | null;
   idleStreak: number;
   timer: ReturnType<typeof setTimeout> | null;
@@ -53,6 +68,11 @@ interface PaneQueueState {
 
 interface PaneScriptExecutionResult {
   success: boolean;
+  reason?: string;
+}
+
+interface NormalizationResult<TValue> {
+  value: TValue | null;
   reason?: string;
 }
 
@@ -127,16 +147,26 @@ export class PromptDispatchService {
     });
   }
 
-  async sendPromptToAll(text: string): Promise<PromptDispatchResult> {
-    const normalizedPrompt = text.trim();
-    let promptEvalScript: string;
-
-    try {
-      promptEvalScript = buildPromptInjectionEvalScript(text);
-    } catch (error) {
+  async sendPromptToAll(input: string | PromptRequest): Promise<PromptDispatchResult> {
+    const normalizedRequestResult = this.normalizePromptRequest(input);
+    if (!normalizedRequestResult.value) {
       return {
         success: false,
-        failures: [`invalid-prompt: ${toFailureReason(error)}`],
+        failures: [normalizedRequestResult.reason ?? 'invalid-prompt'],
+      };
+    }
+
+    const normalizedRequest = normalizedRequestResult.value;
+
+    let promptScripts: PanePromptDispatchScripts;
+    try {
+      promptScripts = this.buildPromptDispatchScripts(normalizedRequest);
+    } catch (error) {
+      const message = toFailureReason(error);
+      const prefix = message.includes('prompt image') ? 'invalid-prompt-image' : 'invalid-prompt';
+      return {
+        success: false,
+        failures: [`${prefix}: ${message}`],
       };
     }
 
@@ -154,8 +184,8 @@ export class PromptDispatchService {
       paneTargets.map((pane) =>
         this.dispatchPromptToPane(
           pane,
-          normalizedPrompt,
-          promptEvalScript,
+          normalizedRequest,
+          promptScripts,
           injectRuntimeScript,
           statusEvalScript
         )
@@ -169,6 +199,7 @@ export class PromptDispatchService {
     for (const outcome of outcomes) {
       if (outcome.kind === 'dispatched') {
         dispatchedCount += 1;
+        failures.push(...outcome.failures);
         continue;
       }
 
@@ -230,10 +261,99 @@ export class PromptDispatchService {
     };
   }
 
+  private normalizePromptRequest(input: string | PromptRequest): NormalizationResult<NormalizedPromptRequest> {
+    const request = typeof input === 'string' ? { text: input } : input;
+    const text = typeof request?.text === 'string' ? request.text : '';
+    const normalizedText = text.trim();
+    if (!normalizedText) {
+      return {
+        value: null,
+        reason: 'invalid-prompt: prompt text cannot be empty',
+      };
+    }
+
+    const normalizedImageResult = this.normalizePromptImage(request?.image);
+    if (!normalizedImageResult.value && normalizedImageResult.reason) {
+      return {
+        value: null,
+        reason: `invalid-prompt-image: ${normalizedImageResult.reason}`,
+      };
+    }
+
+    return {
+      value: {
+        text: normalizedText,
+        image: normalizedImageResult.value,
+      },
+    };
+  }
+
+  private normalizePromptImage(
+    image: PromptRequest['image']
+  ): NormalizationResult<PromptImagePayload | null> {
+    if (image === undefined || image === null) {
+      return { value: null };
+    }
+
+    if (typeof image.mimeType !== 'string' || !image.mimeType.startsWith('image/')) {
+      return {
+        value: null,
+        reason: 'prompt image mimeType must be a non-empty image/* string',
+      };
+    }
+
+    if (typeof image.base64Data !== 'string' || image.base64Data.length === 0) {
+      return {
+        value: null,
+        reason: 'prompt image base64Data must be a non-empty string',
+      };
+    }
+
+    if (!Number.isFinite(image.sizeBytes) || image.sizeBytes <= 0) {
+      return {
+        value: null,
+        reason: 'prompt image sizeBytes must be a positive number',
+      };
+    }
+
+    if (image.source !== 'clipboard') {
+      return {
+        value: null,
+        reason: 'prompt image source must be clipboard',
+      };
+    }
+
+    return {
+      value: {
+        mimeType: image.mimeType,
+        base64Data: image.base64Data,
+        sizeBytes: image.sizeBytes,
+        source: image.source,
+      },
+    };
+  }
+
+  private buildPromptDispatchScripts(request: NormalizedPromptRequest): PanePromptDispatchScripts {
+    const hasImage = request.image !== null;
+    const promptEvalScript = buildPromptInjectionEvalScript(request.text, {
+      autoSubmit: !hasImage,
+    });
+    const submitEvalScript = hasImage ? buildPromptSubmitEvalScript() : null;
+    const imageAttachEvalScript = hasImage && request.image
+      ? buildPromptImageAttachEvalScript(request.image)
+      : null;
+
+    return {
+      promptEvalScript,
+      imageAttachEvalScript,
+      submitEvalScript,
+    };
+  }
+
   private async dispatchPromptToPane(
     pane: PromptDispatchPaneExecutionTarget,
-    normalizedPrompt: string,
-    promptEvalScript: string,
+    request: NormalizedPromptRequest,
+    promptScripts: PanePromptDispatchScripts,
     injectRuntimeScript: string,
     statusEvalScript: string
   ): Promise<PanePromptDispatchOutcome> {
@@ -244,38 +364,98 @@ export class PromptDispatchService {
     );
 
     if (busyState !== 'idle') {
-      this.queueLatestPromptForPane(pane.paneIndex, normalizedPrompt);
+      this.queueLatestPromptForPane(pane.paneIndex, request);
       return { kind: 'queued' };
     }
 
-    const executionResult = await this.executePromptEvalScriptOnPane(
+    const executionResult = await this.executePromptDispatchOnPane(
       pane,
       injectRuntimeScript,
-      promptEvalScript
+      promptScripts
     );
 
-    if (executionResult.success) {
-      this.markPanePostSubmitGuard(pane.paneIndex);
-      return { kind: 'dispatched' };
+    if (!executionResult.success) {
+      return {
+        kind: 'failed',
+        failure: `pane-${pane.paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`,
+      };
+    }
+
+    this.markPanePostSubmitGuard(pane.paneIndex);
+    return {
+      kind: 'dispatched',
+      failures: executionResult.nonBlockingFailures,
+    };
+  }
+
+  private async executePromptDispatchOnPane(
+    pane: PromptDispatchPaneExecutionTarget,
+    injectRuntimeScript: string,
+    promptScripts: PanePromptDispatchScripts
+  ): Promise<{ success: boolean; reason?: string; nonBlockingFailures: string[] }> {
+    const nonBlockingFailures: string[] = [];
+
+    const promptInjectionResult = await this.executePromptEvalScriptOnPane(
+      pane,
+      injectRuntimeScript,
+      promptScripts.promptEvalScript
+    );
+    if (!promptInjectionResult.success) {
+      return {
+        success: false,
+        reason: promptInjectionResult.reason ?? 'prompt injection failed',
+        nonBlockingFailures,
+      };
+    }
+
+    if (promptScripts.imageAttachEvalScript) {
+      const imageAttachResult = await this.executePromptEvalScriptOnPane(
+        pane,
+        injectRuntimeScript,
+        promptScripts.imageAttachEvalScript,
+        'prompt image attachment failed'
+      );
+      if (!imageAttachResult.success) {
+        nonBlockingFailures.push(
+          `pane-${pane.paneIndex}: image attach failed (${imageAttachResult.reason ?? 'unknown reason'})`
+        );
+      }
+    }
+
+    if (promptScripts.submitEvalScript) {
+      const submitResult = await this.executePromptEvalScriptOnPane(
+        pane,
+        injectRuntimeScript,
+        promptScripts.submitEvalScript,
+        'prompt submit failed'
+      );
+      if (!submitResult.success) {
+        return {
+          success: false,
+          reason: submitResult.reason ?? 'prompt submit failed',
+          nonBlockingFailures,
+        };
+      }
     }
 
     return {
-      kind: 'failed',
-      failure: `pane-${pane.paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`,
+      success: true,
+      nonBlockingFailures,
     };
   }
 
   private async executePromptEvalScriptOnPane(
     pane: PromptDispatchPaneExecutionTarget,
     injectRuntimeScript: string,
-    promptEvalScript: string
+    promptEvalScript: string,
+    fallbackReason = 'prompt injection failed'
   ): Promise<PaneScriptExecutionResult> {
     try {
       await pane.executeJavaScript(injectRuntimeScript, true);
       const result = await pane.executeJavaScript(
         promptEvalScript,
         true
-      ) as PromptInjectionResult | undefined;
+      ) as PromptInjectionResult | PromptImageAttachResult | undefined;
 
       if (result?.success) {
         return { success: true };
@@ -283,7 +463,7 @@ export class PromptDispatchService {
 
       return {
         success: false,
-        reason: result?.reason ?? 'prompt injection failed',
+        reason: result?.reason ?? fallbackReason,
       };
     } catch (error) {
       this.onPaneExecutionError(pane.paneIndex, error);
@@ -349,7 +529,7 @@ export class PromptDispatchService {
     }
 
     const initialState: PaneQueueState = {
-      queuedPromptText: null,
+      queuedPromptRequest: null,
       queueStartedAtMs: null,
       idleStreak: 0,
       timer: null,
@@ -395,9 +575,9 @@ export class PromptDispatchService {
     return false;
   }
 
-  private queueLatestPromptForPane(paneIndex: number, promptText: string): void {
+  private queueLatestPromptForPane(paneIndex: number, request: NormalizedPromptRequest): void {
     const state = this.getPaneQueueState(paneIndex);
-    state.queuedPromptText = promptText;
+    state.queuedPromptRequest = request;
     if (state.queueStartedAtMs === null) {
       state.queueStartedAtMs = this.now();
     }
@@ -410,7 +590,7 @@ export class PromptDispatchService {
     state: PaneQueueState,
     delayMs = this.queuePollIntervalMs
   ): void {
-    if (state.timer !== null || state.queuedPromptText === null || state.drainInProgress) {
+    if (state.timer !== null || state.queuedPromptRequest === null || state.drainInProgress) {
       return;
     }
 
@@ -431,7 +611,7 @@ export class PromptDispatchService {
 
   private clearPaneQueueState(paneIndex: number, state: PaneQueueState): void {
     this.clearPaneQueueTimer(state);
-    state.queuedPromptText = null;
+    state.queuedPromptRequest = null;
     state.queueStartedAtMs = null;
     state.idleStreak = 0;
     this.maybeCleanupPaneQueueState(paneIndex, state);
@@ -442,7 +622,7 @@ export class PromptDispatchService {
       return;
     }
 
-    if (state.queuedPromptText !== null || state.timer !== null) {
+    if (state.queuedPromptRequest !== null || state.timer !== null) {
       return;
     }
 
@@ -451,7 +631,7 @@ export class PromptDispatchService {
 
   private async drainPaneQueue(paneIndex: number): Promise<void> {
     const state = this.getPaneQueueState(paneIndex);
-    if (state.drainInProgress || state.queuedPromptText === null) {
+    if (state.drainInProgress || state.queuedPromptRequest === null) {
       this.maybeCleanupPaneQueueState(paneIndex, state);
       return;
     }
@@ -466,12 +646,12 @@ export class PromptDispatchService {
 
       const injectRuntimeScript = this.getInjectRuntimeScript();
       if (!injectRuntimeScript) {
-        const queuedPrompt = state.queuedPromptText;
+        const queuedPrompt = state.queuedPromptRequest;
         this.clearPaneQueueState(paneIndex, state);
         if (queuedPrompt !== null) {
           this.onQueuedDispatchFailure(
             paneIndex,
-            queuedPrompt,
+            queuedPrompt.text,
             [`pane-${paneIndex}: inject runtime not available`]
           );
         }
@@ -480,10 +660,10 @@ export class PromptDispatchService {
 
       const waitedMs = state.queueStartedAtMs === null ? 0 : this.now() - state.queueStartedAtMs;
       if (waitedMs > this.queueMaxWaitMs) {
-        const queuedPrompt = state.queuedPromptText;
+        const queuedPrompt = state.queuedPromptRequest;
         this.clearPaneQueueState(paneIndex, state);
         if (queuedPrompt !== null) {
-          this.onQueueTimeout(paneIndex, queuedPrompt, waitedMs);
+          this.onQueueTimeout(paneIndex, queuedPrompt.text, waitedMs);
         }
         return;
       }
@@ -506,38 +686,45 @@ export class PromptDispatchService {
         return;
       }
 
-      const promptText = state.queuedPromptText;
-      state.queuedPromptText = null;
+      const queuedPrompt = state.queuedPromptRequest;
+      state.queuedPromptRequest = null;
       state.queueStartedAtMs = null;
       state.idleStreak = 0;
 
-      if (promptText === null) {
+      if (queuedPrompt === null) {
         return;
       }
 
-      let promptEvalScript: string;
+      let promptScripts: PanePromptDispatchScripts;
       try {
-        promptEvalScript = buildPromptInjectionEvalScript(promptText);
+        promptScripts = this.buildPromptDispatchScripts(queuedPrompt);
       } catch (error) {
-        this.onQueuedDispatchFailure(paneIndex, promptText, [
+        this.onQueuedDispatchFailure(paneIndex, queuedPrompt.text, [
           `invalid-queued-prompt: ${toFailureReason(error)}`,
         ]);
         return;
       }
 
-      const executionResult = await this.executePromptEvalScriptOnPane(
+      const executionResult = await this.executePromptDispatchOnPane(
         pane,
         injectRuntimeScript,
-        promptEvalScript
+        promptScripts
       );
 
       if (!executionResult.success) {
         this.onQueuedDispatchFailure(
           paneIndex,
-          promptText,
+          queuedPrompt.text,
           [`pane-${paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`]
         );
       } else {
+        if (executionResult.nonBlockingFailures.length > 0) {
+          this.onQueuedDispatchFailure(
+            paneIndex,
+            queuedPrompt.text,
+            executionResult.nonBlockingFailures
+          );
+        }
         this.markPanePostSubmitGuard(paneIndex);
       }
     } catch (error) {
@@ -547,7 +734,7 @@ export class PromptDispatchService {
       });
     } finally {
       state.drainInProgress = false;
-      if (state.queuedPromptText !== null) {
+      if (state.queuedPromptRequest !== null) {
         if (state.queueStartedAtMs === null) {
           state.queueStartedAtMs = this.now();
         }
