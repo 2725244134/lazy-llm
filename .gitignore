@@ -3,7 +3,7 @@ dist/
 dist-electron/
 .vite/
 out/
-release/
+/release/
 *.log
 .DS_Store
 test-results/
