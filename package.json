@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.1.2",
   "author": "LazyLLM Maintainer <cccc38753@gmail.com>",
+  "license": "MIT",
   "description": "Multi-LLM desktop interface built with Electron, React, and TypeScript.",
   "main": ".vite/build/main.js",
   "scripts": {
