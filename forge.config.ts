@@ -8,6 +8,8 @@ import type { ForgeConfig } from '@electron-forge/shared-types';
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
+    // Keep prompt injection runtime outside app.asar so runtime resolution is stable in packaged builds.
+    extraResource: ['dist-electron/inject.js'],
   },
   rebuildConfig: {},
   makers: [

@@ -105,6 +105,9 @@ const rendererIndexPath = resolveFirstExistingPath([
 ]);
 
 const injectRuntimePath = resolveFirstExistingPath([
+  ...(typeof process.resourcesPath === 'string'
+    ? [join(process.resourcesPath, 'inject.js')]
+    : []),
   join(runtimeDir, 'inject.js'),
   join(runtimeDir, '..', 'inject.js'),
   join(runtimeDir, '..', '..', 'inject.js'),
