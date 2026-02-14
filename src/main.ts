@@ -6,7 +6,6 @@ import { getConfig, getResolvedSettings, setDefaultPaneCount, setDefaultProvider
 import {
   attachPaneNetworkDiagnostics,
   PANE_SESSION_PARTITION,
-  resolvePaneSessionProxy,
 } from './main-services/network/paneSession.js';
 import { registerIpcHandlers } from './main-services/ipc/register.js';
 import { ViewManager } from './main-services/views/manager.js';
@@ -78,13 +77,6 @@ app.whenReady().then(() => {
     }
     console.warn('[PaneSession] Request failed', record);
   });
-  resolvePaneSessionProxy('https://chatgpt.com')
-    .then((proxy) => {
-      console.info(`[PaneSession] resolveProxy(chatgpt.com) => ${proxy}`);
-    })
-    .catch((error) => {
-      console.warn('[PaneSession] Failed to resolve proxy for chatgpt.com', error);
-    });
 
   registerIpcHandlers({
     getViewManager: () => viewManager,
