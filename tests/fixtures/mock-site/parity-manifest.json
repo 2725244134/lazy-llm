@@ -1,0 +1,47 @@
+[
+  {
+    "provider": "chatgpt",
+    "structuralSelectors": [
+      "#prompt-textarea",
+      "#send-btn",
+      ".chat-container",
+      ".message-row.assistant .content"
+    ],
+    "selectorProbes": [
+      { "category": "input", "selector": "#prompt-textarea", "required": true },
+      { "category": "submit", "selector": "#send-btn", "required": true },
+      { "category": "extract", "selector": ".message-row.assistant .content", "required": true },
+      { "category": "streaming", "selector": ".result-streaming", "required": false }
+    ]
+  },
+  {
+    "provider": "grok",
+    "structuralSelectors": [
+      "#prompt-textarea",
+      "#send-btn",
+      ".chat-container",
+      ".message-row.assistant .content"
+    ],
+    "selectorProbes": [
+      { "category": "input", "selector": "#prompt-textarea", "required": true },
+      { "category": "submit", "selector": "#send-btn", "required": true },
+      { "category": "extract", "selector": ".message-row.assistant .content", "required": true },
+      { "category": "streaming", "selector": ".result-streaming", "required": false }
+    ]
+  },
+  {
+    "provider": "gemini",
+    "structuralSelectors": [
+      "#prompt-textarea",
+      "#send-btn",
+      ".chat-container",
+      ".message-row.assistant .content"
+    ],
+    "selectorProbes": [
+      { "category": "input", "selector": "#prompt-textarea", "required": true },
+      { "category": "submit", "selector": "#send-btn", "required": true },
+      { "category": "extract", "selector": ".message-row.assistant .content", "required": true },
+      { "category": "streaming", "selector": ".result-streaming", "required": false }
+    ]
+  }
+]

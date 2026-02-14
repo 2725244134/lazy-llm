@@ -15,19 +15,29 @@ type ElectronFixtures = {
   appWindow: Page;
 };
 
-function createLaunchEnv(): Record<string, string> {
+type LaunchOptions = {
+  mockProvidersFile?: string;
+};
+
+function createLaunchEnv(options?: LaunchOptions): Record<string, string> {
   const envEntries = Object.entries(process.env).filter(
     (entry): entry is [string, string] => typeof entry[1] === 'string',
   );
 
   const userDataDir = mkdtempSync(join(tmpdir(), 'lazy-llm-e2e-'));
 
-  return {
+  const env: Record<string, string> = {
     ...Object.fromEntries(envEntries),
     NODE_ENV: 'production',
     LAZYLLM_SKIP_SINGLE_INSTANCE_LOCK: '1',
     LAZYLLM_USER_DATA_DIR: userDataDir,
   };
+
+  if (options?.mockProvidersFile) {
+    env.LAZYLLM_MOCK_PROVIDERS_FILE = options.mockProvidersFile;
+  }
+
+  return env;
 }
 
 async function hasLazyllmBridge(page: Page): Promise<boolean> {
@@ -79,6 +89,7 @@ async function resolveAppWindow(electronApp: ElectronApplication): Promise<Page>
   );
 }
 
+/** Default test fixture — launches Electron without mock providers. */
 export const test = base.extend<ElectronFixtures>({
   electronApp: async ({}, use) => {
     const electronApp = await electron.launch({
@@ -96,5 +107,29 @@ export const test = base.extend<ElectronFixtures>({
     await use(appPage);
   },
 });
+
+/**
+ * Create a test fixture with mock providers injected.
+ * The mockProvidersFile path is resolved relative to process.cwd().
+ */
+export function createMockTest(options: LaunchOptions) {
+  return base.extend<ElectronFixtures>({
+    electronApp: async ({}, use) => {
+      const electronApp = await electron.launch({
+        args: ['.'],
+        env: createLaunchEnv(options),
+      });
+
+      await use(electronApp);
+      await electronApp.close();
+    },
+
+    appWindow: async ({ electronApp }, use) => {
+      const appPage = await resolveAppWindow(electronApp);
+      await expect(appPage.locator(selectors.appLayout)).toBeVisible({ timeout: 15000 });
+      await use(appPage);
+    },
+  });
+}
 
 export { expect };
