@@ -7,6 +7,7 @@ import {
   extractLastResponse,
   extractAllResponses,
 } from './core';
+import { resolveStatus, type StatusResult } from './status';
 
 interface InjectResult {
   success: boolean;
@@ -26,12 +27,6 @@ interface ExtractResult {
   isStreaming: boolean;
   provider: string;
   reason?: string;
-}
-
-interface StatusResult {
-  isStreaming: boolean;
-  isComplete: boolean;
-  provider: string;
 }
 
 declare global {
@@ -167,21 +162,6 @@ function handleExtractAllResponses(config: ProviderInjectConfig | undefined): st
   return extractAllResponses(config.responseSelectors);
 }
 
-function getStatus(config: ProviderInjectConfig | undefined, provider: string): StatusResult {
-  if (!config) {
-    return { isStreaming: false, isComplete: false, provider };
-  }
-
-  return {
-    isStreaming: isStreaming(config.streamingIndicatorSelectors || []),
-    isComplete: isComplete(
-      config.streamingIndicatorSelectors || [],
-      config.completeIndicatorSelectors || []
-    ),
-    provider,
-  };
-}
-
 async function waitForComplete(
   config: ProviderInjectConfig | undefined,
   provider: string,
@@ -225,7 +205,7 @@ async function waitForComplete(
     clickSubmitButton: () => clickSubmit(config),
     extractResponse: () => handleExtractResponse(config, provider),
     extractAllResponses: () => handleExtractAllResponses(config),
-    getStatus: () => getStatus(config, provider),
+    getStatus: () => resolveStatus(config, provider),
     waitForComplete: (timeoutMs = 60000, pollIntervalMs = 500) =>
       waitForComplete(config, provider, timeoutMs, pollIntervalMs),
   };

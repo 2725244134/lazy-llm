@@ -1,0 +1,123 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { providersConfig, type ProviderInjectConfig } from './providers-config';
+import { resolveBusyState, resolveStatus } from './status';
+
+type QuerySelectorImpl = (selector: string) => Element | null;
+
+function withMockDocument(querySelectorImpl: QuerySelectorImpl): void {
+  const querySelector = vi.fn(querySelectorImpl);
+  vi.stubGlobal(
+    'document',
+    {
+      querySelector,
+    } as unknown as Document
+  );
+}
+
+function mockQuerySelector(
+  matchedSelectors: Set<string>,
+  throwingSelectors: Set<string> = new Set()
+): QuerySelectorImpl {
+  return (selector: string) => {
+    if (throwingSelectors.has(selector)) {
+      throw new Error(`Invalid selector: ${selector}`);
+    }
+
+    if (matchedSelectors.has(selector)) {
+      return {} as Element;
+    }
+
+    return null;
+  };
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+
+describe('resolveStatus', () => {
+  it('returns unknown-like status when provider config is unavailable', () => {
+    const status = resolveStatus(undefined, 'unknown');
+
+    expect(status).toEqual({
+      isStreaming: false,
+      isComplete: false,
+      provider: 'unknown',
+    });
+    expect(resolveBusyState(status)).toBe('unknown');
+  });
+
+  it('handles selector errors and continues evaluating remaining selectors', () => {
+    const logger = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const config: ProviderInjectConfig = {
+      inputSelectors: ['textarea'],
+      submitSelectors: ['button[type="submit"]'],
+      streamingIndicatorSelectors: ['[broken', '[data-streaming]'],
+      completeIndicatorSelectors: ['[data-complete]'],
+    };
+
+    withMockDocument(
+      mockQuerySelector(new Set(['[data-streaming]']), new Set(['[broken']))
+    );
+
+    const status = resolveStatus(config, 'synthetic');
+
+    expect(status.isStreaming).toBe(true);
+    expect(status.isComplete).toBe(false);
+    expect(resolveBusyState(status)).toBe('busy');
+    expect(logger).toHaveBeenCalled();
+  });
+
+  const providerEntries = Object.entries(providersConfig);
+
+  it.each(providerEntries)('%s has streaming selectors for busy detection', (_provider, config) => {
+    expect(config.streamingIndicatorSelectors?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it.each(providerEntries)('%s reports busy when streaming selector matches', (provider, config) => {
+    const streamingSelector = config.streamingIndicatorSelectors?.[0];
+    expect(streamingSelector).toBeTruthy();
+
+    withMockDocument(mockQuerySelector(new Set([streamingSelector!])));
+
+    const status = resolveStatus(config, provider);
+
+    expect(status.provider).toBe(provider);
+    expect(status.isStreaming).toBe(true);
+    expect(status.isComplete).toBe(false);
+    expect(resolveBusyState(status)).toBe('busy');
+  });
+
+  it.each(providerEntries)('%s reports idle when complete selector matches and stream is absent', (provider, config) => {
+    const completeSelector = config.completeIndicatorSelectors?.[0];
+    expect(completeSelector).toBeTruthy();
+
+    withMockDocument(mockQuerySelector(new Set([completeSelector!])));
+
+    const status = resolveStatus(config, provider);
+
+    expect(status.provider).toBe(provider);
+    expect(status.isStreaming).toBe(false);
+    expect(status.isComplete).toBe(true);
+    expect(resolveBusyState(status)).toBe('idle');
+  });
+
+  it.each(providerEntries)('%s reports unknown when neither stream nor complete selectors match', (provider, config) => {
+    withMockDocument(mockQuerySelector(new Set()));
+
+    const status = resolveStatus(config, provider);
+
+    expect(status.provider).toBe(provider);
+    expect(status.isStreaming).toBe(false);
+
+    if ((config.completeIndicatorSelectors?.length ?? 0) > 0) {
+      expect(status.isComplete).toBe(false);
+      expect(resolveBusyState(status)).toBe('unknown');
+      return;
+    }
+
+    expect(status.isComplete).toBe(true);
+    expect(resolveBusyState(status)).toBe('idle');
+  });
+});
