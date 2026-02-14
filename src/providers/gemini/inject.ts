@@ -30,8 +30,11 @@ export const inject: ProviderInject = {
     '.model-response-text .markdown',
   ],
   streamingIndicatorSelectors: [
+    "button[aria-label='Stop response']",
     "button[aria-label*='Stop']",
     "button[mattooltip*='Stop']",
+    'button.send-button.stop',
+    '.send-button-container .stop-icon',
     "mat-icon[fonticon='stop']",
     "mat-icon[data-mat-icon-name='stop']",
     "button:has(mat-icon[fonticon='stop'])",
