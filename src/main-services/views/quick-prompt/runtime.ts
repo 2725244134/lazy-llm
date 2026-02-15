@@ -530,6 +530,29 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     trackImageCapture(attachClipboardImage(file));
   });
 
+  input?.addEventListener('keydown', (event) => {
+    logDebug('input keydown observed', {
+      key: event.key,
+      shiftKey: event.shiftKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      isComposing: event.isComposing,
+      defaultPrevented: event.defaultPrevented,
+      inputValueLength: input?.value.length ?? 0,
+    });
+
+    if (event.isComposing) {
+      return;
+    }
+
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      logDebug('input keydown triggers submit');
+      void submit();
+    }
+  });
+
   window.addEventListener('paste', (event) => {
     if (event.target === input) {
       return;
@@ -546,6 +569,19 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   }, true);
 
   window.addEventListener('keydown', (event) => {
+    logDebug('window keydown observed', {
+      key: event.key,
+      shiftKey: event.shiftKey,
+      ctrlKey: event.ctrlKey,
+      metaKey: event.metaKey,
+      isComposing: event.isComposing,
+      defaultPrevented: event.defaultPrevented,
+    });
+
+    if (event.isComposing) {
+      return;
+    }
+
     if (event.key === 'Escape') {
       event.preventDefault();
       void hide();
@@ -554,6 +590,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
 
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
+      logDebug('window keydown triggers submit');
       void submit();
     }
   });
