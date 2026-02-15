@@ -1,4 +1,4 @@
-import { execFileSync } from 'child_process';
+import { execFileSync, spawnSync } from 'child_process';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -8,6 +8,19 @@ import type { CliOutput, DriftReport } from '../../scripts/lib/mockTypes';
 
 function runBunScript(scriptPath: string, args: string[]): string {
   return execFileSync('bun', [scriptPath, ...args], { encoding: 'utf8' });
+}
+
+function runBunScriptWithStatus(scriptPath: string, args: string[]): {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+} {
+  const result = spawnSync('bun', [scriptPath, ...args], { encoding: 'utf8' });
+  return {
+    status: result.status,
+    stdout: result.stdout,
+    stderr: result.stderr,
+  };
 }
 
 describe('mock tooling regressions', () => {
@@ -198,5 +211,39 @@ describe('mock tooling regressions', () => {
     expect(result.success).toBe(true);
     expect(existsSync(htmlPath)).toBe(true);
     expect(config.chatgpt.url).toBe(pathToFileURL(htmlPath).toString());
+  });
+
+  it('mockTransformCli returns structured error for failed crawl snapshots', () => {
+    const root = mkdtempSync(join(tmpdir(), 'mock-transform-failed-crawl-'));
+    const outputDir = join(root, 'transform out');
+    const snapshotPath = join(root, 'crawl-failed.json');
+
+    writeFileSync(
+      snapshotPath,
+      JSON.stringify(
+        {
+          success: false,
+          error: 'Chat region not found: main [class*="react-scroll-to-bottom"]',
+        },
+        null,
+        2,
+      ),
+    );
+
+    const { status, stdout } = runBunScriptWithStatus('scripts/lib/mockTransformCli.ts', [
+      '--provider',
+      'chatgpt',
+      '--snapshot',
+      snapshotPath,
+      '--output-dir',
+      outputDir,
+    ]);
+    const result = JSON.parse(stdout) as CliOutput;
+
+    expect(status).toBe(1);
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('failed crawl output');
+    expect(result.error).toContain('Chat region not found');
+    expect(existsSync(join(outputDir, 'chatgpt-simulation.html'))).toBe(false);
   });
 });

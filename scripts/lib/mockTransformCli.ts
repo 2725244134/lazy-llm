@@ -603,6 +603,72 @@ function ensureGrokForm(inputRegion: StyledDomNode): void {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isStyledDomNodeLike(value: unknown): value is StyledDomNode {
+  if (!isRecord(value)) return false;
+  if (typeof value.tag !== 'string') return false;
+  if (!isRecord(value.attrs)) return false;
+  if (!Array.isArray(value.children)) return false;
+  return value.children.every((child) => isStyledDomNodeLike(child));
+}
+
+function isCrawlSnapshotLike(value: unknown): value is CrawlSnapshot {
+  if (!isRecord(value)) return false;
+  if (typeof value.provider !== 'string') return false;
+  if (typeof value.capturedAt !== 'string') return false;
+  if (typeof value.url !== 'string') return false;
+  if (!isStyledDomNodeLike(value.chatRegionDom)) return false;
+  if (!isStyledDomNodeLike(value.inputRegionDom)) return false;
+  if (!isRecord(value.cssVariables)) return false;
+  if (!Object.values(value.cssVariables).every((v) => typeof v === 'string')) return false;
+  if (!Array.isArray(value.fonts)) return false;
+  if (!value.fonts.every((v) => typeof v === 'string')) return false;
+  return true;
+}
+
+function loadCrawlSnapshot(snapshotPath: string): CliOutput<CrawlSnapshot> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(snapshotPath, 'utf8'));
+  } catch (err) {
+    return {
+      success: false,
+      error: `Failed to parse snapshot: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+
+  if (isRecord(parsed) && typeof parsed.success === 'boolean') {
+    if (!parsed.success) {
+      const cause = typeof parsed.error === 'string' ? parsed.error : 'unknown crawl error';
+      return {
+        success: false,
+        error: `Snapshot file contains failed crawl output: ${cause}`,
+      };
+    }
+
+    if (!isCrawlSnapshotLike(parsed.data)) {
+      return {
+        success: false,
+        error: 'Snapshot file has success=true but data is not a valid CrawlSnapshot',
+      };
+    }
+
+    return { success: true, data: parsed.data };
+  }
+
+  if (!isCrawlSnapshotLike(parsed)) {
+    return {
+      success: false,
+      error: 'Snapshot file is neither CrawlSnapshot nor CliOutput<CrawlSnapshot>',
+    };
+  }
+
+  return { success: true, data: parsed };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -630,17 +696,14 @@ function main(): void {
     return output({ success: false, error: `Snapshot file not found: ${snapshotPath}` });
   }
 
-  let crawl: CrawlSnapshot;
-  try {
-    const raw = JSON.parse(readFileSync(snapshotPath, 'utf8'));
-    // Accept both raw CrawlSnapshot and CliOutput<CrawlSnapshot>
-    crawl = raw.data ? raw.data : raw;
-  } catch (err) {
+  const crawlResult = loadCrawlSnapshot(snapshotPath);
+  if (!crawlResult.success || !crawlResult.data) {
     return output({
       success: false,
-      error: `Failed to parse snapshot: ${err instanceof Error ? err.message : String(err)}`,
+      error: crawlResult.error ?? 'Failed to load crawl snapshot',
     });
   }
+  const crawl = crawlResult.data;
 
   // Reset auto class counter
   autoClassCounter = 0;
