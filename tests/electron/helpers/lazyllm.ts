@@ -1,6 +1,9 @@
 import { expect, type Page } from '@playwright/test';
 import type {
+  AppConfig,
   HealthResponse,
+  PaneCountRequest,
+  PaneCountResponse,
   PaneResetAllResponse,
   PaneUpdateRequest,
   PaneUpdateResponse,
@@ -12,6 +15,8 @@ import type {
 
 type LazyllmApi = {
   healthCheck: () => Promise<HealthResponse>;
+  getConfig: () => Promise<AppConfig>;
+  setPaneCount: (request: PaneCountRequest) => Promise<PaneCountResponse>;
   resetAllPanes: () => Promise<PaneResetAllResponse>;
   toggleQuickPrompt: () => Promise<QuickPromptToggleResponse>;
   hideQuickPrompt: () => Promise<QuickPromptHideResponse>;
@@ -42,6 +47,23 @@ export async function getHealthCheck(page: Page): Promise<HealthResponse> {
   return page.evaluate(() => {
     return (window as unknown as BrowserWindowWithLazyllm).lazyllm.healthCheck();
   });
+}
+
+export async function getConfig(page: Page): Promise<AppConfig> {
+  await ensureLazyllmReady(page);
+  return page.evaluate(() => {
+    return (window as unknown as BrowserWindowWithLazyllm).lazyllm.getConfig();
+  });
+}
+
+export async function setPaneCount(
+  page: Page,
+  request: PaneCountRequest,
+): Promise<PaneCountResponse> {
+  await ensureLazyllmReady(page);
+  return page.evaluate((payload: PaneCountRequest) => {
+    return (window as unknown as BrowserWindowWithLazyllm).lazyllm.setPaneCount(payload);
+  }, request);
 }
 
 export async function resetAllPanes(page: Page): Promise<PaneResetAllResponse> {

@@ -1,122 +1,209 @@
+import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from '../fixtures/electronApp';
 import { selectors } from '../helpers/selectors';
-import { updateProvider } from '../helpers/lazyllm';
+import { getConfig, setPaneCount, updateProvider } from '../helpers/lazyllm';
 
-/** Timeout for polling operations inside tests. */
+type BridgeCompletionResult = {
+  isComplete: boolean;
+  response: string | null;
+  provider: string;
+};
+
 const POLL_TIMEOUT = 15000;
-const POLL_INTERVAL = 500;
+const POLL_INTERVAL = 250;
 
-/**
- * Finds a pane page whose URL contains the given substring.
- * Polls electronApp.context().pages() until found or timeout.
- */
+async function sleep(ms: number): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function findMockPage(
-  electronApp: import('@playwright/test').ElectronApplication,
+  electronApp: ElectronApplication,
   urlFragment: string,
-): Promise<import('@playwright/test').Page> {
+): Promise<Page> {
   const deadline = Date.now() + POLL_TIMEOUT;
   while (Date.now() < deadline) {
     const pages = electronApp.context().pages();
     for (const page of pages) {
+      if (page.isClosed()) {
+        continue;
+      }
+
       try {
         if (page.url().includes(urlFragment)) {
           return page;
         }
       } catch {
-        // Page might be closed or loading
+        // Page may still be navigating.
       }
     }
-    await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+
+    await sleep(POLL_INTERVAL);
   }
+
   throw new Error(`Mock page containing "${urlFragment}" not found within ${POLL_TIMEOUT}ms`);
 }
 
-/**
- * Runs the full mock chat-flow verification for one provider:
- * updateProvider -> injectPrompt -> streaming -> waitForComplete -> extractResponse
- *
- * Mock pages replicate real site DOM structures so the inject runtime
- * exercises the exact same selector paths as with live provider sites.
- */
-async function verifyChatFlow(
-  electronApp: import('@playwright/test').ElectronApplication,
-  appWindow: import('@playwright/test').Page,
-  providerKey: string,
+async function waitForBridgeProvider(page: Page, providerKey: string): Promise<void> {
+  await page.waitForFunction(
+    (expectedProvider: string) => {
+      const bridge = (window as unknown as {
+        __llmBridge?: { provider?: string };
+      }).__llmBridge;
+      return bridge?.provider === expectedProvider;
+    },
+    providerKey,
+    { timeout: POLL_TIMEOUT },
+  );
+}
+
+async function findPromptInjectedPage(
+  electronApp: ElectronApplication,
+  urlFragment: string,
+  expectedPrompt: string,
+): Promise<Page> {
+  const deadline = Date.now() + POLL_TIMEOUT;
+  while (Date.now() < deadline) {
+    const pages = electronApp.context().pages();
+    for (const page of pages) {
+      if (page.isClosed()) {
+        continue;
+      }
+
+      try {
+        if (!page.url().includes(urlFragment)) {
+          continue;
+        }
+
+        const hasPrompt = await page.evaluate((expected: string) => {
+          return (window as unknown as { __mockLastInput?: string }).__mockLastInput === expected;
+        }, expectedPrompt);
+        if (hasPrompt) {
+          return page;
+        }
+      } catch {
+        // Page may still be navigating or detached.
+      }
+    }
+    await sleep(POLL_INTERVAL);
+  }
+
+  throw new Error(
+    `Unable to find injected mock page for "${urlFragment}" with prompt "${expectedPrompt}" within ${POLL_TIMEOUT}ms`,
+  );
+}
+
+async function waitForCompletion(page: Page): Promise<BridgeCompletionResult> {
+  const result = await page.evaluate(() => {
+    const bridge = (window as unknown as {
+      __llmBridge?: {
+        waitForComplete: (timeoutMs: number, pollIntervalMs: number) => Promise<BridgeCompletionResult>;
+      };
+    }).__llmBridge;
+    return bridge?.waitForComplete(15000, 300) ?? null;
+  });
+
+  expect(result).toBeTruthy();
+  expect(result?.isComplete).toBe(true);
+  expect(result?.response).toContain('streamed response');
+  return result as BridgeCompletionResult;
+}
+
+async function sendPrompt(appWindow: Page, prompt: string): Promise<void> {
+  const textarea = appWindow.locator(selectors.promptTextarea);
+  const sendButton = appWindow.locator(selectors.promptSendButton);
+  await textarea.fill(prompt);
+  await expect(sendButton).toBeEnabled({ timeout: POLL_TIMEOUT });
+  await sendButton.click();
+}
+
+async function prepareSinglePane(appWindow: Page, providerKey: string): Promise<void> {
+  const paneCountResult = await setPaneCount(appWindow, { count: 1 });
+  expect(paneCountResult.success).toBe(true);
+
+  const switchResult = await updateProvider(appWindow, { paneIndex: 0, providerKey });
+  expect(switchResult.success).toBe(true);
+  expect(switchResult.paneIndex).toBe(0);
+
+  const config = await getConfig(appWindow);
+  expect(config.provider.pane_count).toBe(1);
+  expect(config.provider.panes[0]).toBe(providerKey);
+}
+
+async function prepareThreePaneBroadcast(appWindow: Page): Promise<void> {
+  const paneCountResult = await setPaneCount(appWindow, { count: 3 });
+  expect(paneCountResult.success).toBe(true);
+
+  await expect(async () => {
+    const config = await getConfig(appWindow);
+    expect(config.provider.pane_count).toBe(3);
+  }).toPass({ timeout: POLL_TIMEOUT, intervals: [250] });
+
+  const expectedProviders = ['chatgpt', 'grok', 'gemini'] as const;
+  for (const [paneIndex, providerKey] of expectedProviders.entries()) {
+    const result = await updateProvider(appWindow, { paneIndex, providerKey });
+    expect(result.success).toBe(true);
+  }
+
+  const config = await getConfig(appWindow);
+  expect(config.provider.panes.slice(0, 3)).toEqual(expectedProviders);
+}
+
+async function verifySingleProviderFlow(
+  electronApp: ElectronApplication,
+  appWindow: Page,
+  providerKey: 'chatgpt' | 'grok' | 'gemini',
   urlFragment: string,
   displayName: string,
 ): Promise<void> {
-  // 1. Switch pane 0 to this provider (URL is already mock via config)
-  await updateProvider(appWindow, { paneIndex: 0, providerKey });
+  await prepareSinglePane(appWindow, providerKey);
 
-  // 2. Find the mock pane page
-  const mockPage = await findMockPage(electronApp, urlFragment);
+  await findMockPage(electronApp, urlFragment);
 
-  // 3. Verify __llmBridge is present and detected correctly
-  //    The inject runtime should detect the provider via urlPattern matching
-  //    and use REAL selectors from providers/*/inject.ts (not mock overrides).
-  const bridgeInfo = await mockPage.evaluate(() => {
-    const bridge = (window as unknown as { __llmBridge?: { provider: string } }).__llmBridge;
-    return bridge ? { exists: true, provider: bridge.provider } : { exists: false, provider: '' };
-  });
-  expect(bridgeInfo.exists).toBe(true);
-  expect(bridgeInfo.provider).toBe(providerKey);
+  const prompt = `Hello ${displayName} [single-pane]`;
+  await sendPrompt(appWindow, prompt);
 
-  // 4. Send a prompt via the sidebar composer
-  const textarea = appWindow.locator(selectors.promptTextarea);
-  const sendButton = appWindow.locator(selectors.promptSendButton);
-
-  await textarea.fill(`Hello ${displayName}`);
-  await sendButton.click();
-
-  // 5. Verify the prompt was injected into the mock page.
-  //    The mock page tracks the last submitted input in window.__mockLastInput.
-  //    This confirms the full chain: sidebar -> IPC -> injectPrompt -> mock DOM.
-  await mockPage.waitForFunction(
-    (expected: string) => {
-      return (window as unknown as { __mockLastInput?: string }).__mockLastInput === expected;
-    },
-    `Hello ${displayName}`,
-    { timeout: POLL_TIMEOUT },
-  );
-
-  // 6. Wait for completion via the inject bridge's own API.
-  //    This exercises the real streaming-status.ts detection logic:
-  //    isStreaming() checks for streaming indicator selectors,
-  //    isComplete() checks streaming is gone + complete indicators present.
-  const result = await mockPage.evaluate(() => {
-    const bridge = (window as unknown as {
-      __llmBridge?: { waitForComplete: (t: number, p: number) => Promise<{
-        isComplete: boolean;
-        response: string | null;
-      }> };
-    }).__llmBridge;
-    return bridge?.waitForComplete(15000, 300);
-  });
-
-  expect(result).toBeDefined();
-  expect(result?.isComplete).toBe(true);
-  expect(result?.response).toContain('streamed response');
+  const mockPage = await findPromptInjectedPage(electronApp, urlFragment, prompt);
+  await waitForBridgeProvider(mockPage, providerKey);
+  const result = await waitForCompletion(mockPage);
+  expect(result.provider).toBe(providerKey);
 }
 
 test.describe('E2E / Chat Flow (Mock)', () => {
-  test('chatgpt: full inject bridge flow', async ({ electronApp, appWindow }) => {
-    await verifyChatFlow(
-      electronApp, appWindow,
-      'chatgpt', 'chatgpt-simulation.html', 'ChatGPT',
-    );
+  test('chatgpt: single-pane flow uses real inject selectors', async ({ electronApp, appWindow }) => {
+    await verifySingleProviderFlow(electronApp, appWindow, 'chatgpt', 'chatgpt-simulation.html', 'ChatGPT');
   });
 
-  test('grok: full inject bridge flow', async ({ electronApp, appWindow }) => {
-    await verifyChatFlow(
-      electronApp, appWindow,
-      'grok', 'grok-simulation.html', 'Grok',
-    );
+  test('grok: single-pane flow uses real inject selectors', async ({ electronApp, appWindow }) => {
+    await verifySingleProviderFlow(electronApp, appWindow, 'grok', 'grok-simulation.html', 'Grok');
   });
 
-  test('gemini: full inject bridge flow', async ({ electronApp, appWindow }) => {
-    await verifyChatFlow(
-      electronApp, appWindow,
-      'gemini', 'gemini-simulation.html', 'Gemini',
-    );
+  test('gemini: single-pane flow uses real inject selectors', async ({ electronApp, appWindow }) => {
+    await verifySingleProviderFlow(electronApp, appWindow, 'gemini', 'gemini-simulation.html', 'Gemini');
+  });
+
+  test('broadcast prompt reaches all pane providers', async ({ electronApp, appWindow }) => {
+    await prepareThreePaneBroadcast(appWindow);
+
+    const prompt = 'Hello all providers [broadcast]';
+    await sendPrompt(appWindow, prompt);
+
+    const pages = {
+      chatgpt: await findPromptInjectedPage(electronApp, 'chatgpt-simulation.html', prompt),
+      grok: await findPromptInjectedPage(electronApp, 'grok-simulation.html', prompt),
+      gemini: await findPromptInjectedPage(electronApp, 'gemini-simulation.html', prompt),
+    };
+
+    await Promise.all([
+      waitForBridgeProvider(pages.chatgpt, 'chatgpt'),
+      waitForBridgeProvider(pages.grok, 'grok'),
+      waitForBridgeProvider(pages.gemini, 'gemini'),
+    ]);
+
+    const results = await Promise.all([
+      waitForCompletion(pages.chatgpt),
+      waitForCompletion(pages.grok),
+      waitForCompletion(pages.gemini),
+    ]);
+    expect(results.map((result) => result.provider).sort()).toEqual(['chatgpt', 'gemini', 'grok']);
   });
 });
