@@ -13,7 +13,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { resolve, join } from 'path';
+import { resolve, join, relative, isAbsolute, sep } from 'path';
 import { pathToFileURL } from 'url';
 import { MOCK_PROFILES } from './mockProfiles';
 import { generateProviderRuntime } from './mockRuntime';
@@ -59,6 +59,16 @@ function parseArgs(): TransformArgs {
 function output<T>(result: CliOutput<T>): never {
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   process.exit(result.success ? 0 : 1);
+}
+
+function toConfigFileUrl(htmlPath: string): string {
+  const cwd = resolve(process.cwd());
+  const rel = relative(cwd, htmlPath);
+  const insideCwd = rel.length > 0 && !rel.startsWith('..') && !isAbsolute(rel);
+  if (insideCwd) {
+    return `file://./${rel.split(sep).join('/')}`;
+  }
+  return pathToFileURL(htmlPath).toString();
 }
 
 // ---------------------------------------------------------------------------
@@ -718,7 +728,7 @@ ${runtimeScript}
   }
 
   const entry: MockProviderConfigEntry = {
-    url: pathToFileURL(htmlPath).toString(),
+    url: toConfigFileUrl(htmlPath),
     urlPattern: htmlFilename,
   };
 
