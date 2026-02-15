@@ -368,6 +368,20 @@ export class ViewManager {
     webContents.setZoomFactor(this.sidebarZoomFactor);
   }
 
+  private attachQuickPromptDebugConsoleHooks(webContents: WebContents): void {
+    webContents.on('console-message', (_event, level, message, line, sourceId) => {
+      if (typeof message !== 'string' || !message.includes('[QuickPromptDebug]')) {
+        return;
+      }
+      console.info('[QuickPromptDebug][QuickPromptConsole]', {
+        level,
+        message,
+        line,
+        sourceId,
+      });
+    });
+  }
+
   private attachSidebarRuntimePreferenceHooks(webContents: WebContents): void {
     webContents.on('did-finish-load', () => {
       this.applySidebarRuntimePreferences(webContents);
@@ -414,6 +428,7 @@ export class ViewManager {
 
     quickPromptView.setBackgroundColor('#00000000');
     this.attachGlobalShortcutHooks(quickPromptView.webContents);
+    this.attachQuickPromptDebugConsoleHooks(quickPromptView.webContents);
     quickPromptView.webContents.on('did-finish-load', () => {
       this.quickPromptLifecycleService.markReady();
     });

@@ -56,6 +56,7 @@ export class PaneViewService {
     this.attachPaneShortcutHooks(view.webContents);
     this.attachPaneContextMenuHooks(view.webContents);
     this.attachPaneRuntimePreferenceHooks(view.webContents);
+    this.attachPaneDebugConsoleHooks(paneIndex, view.webContents);
     this.options.paneLoadMonitor.attachPane(paneIndex, view.webContents);
     view.webContents.on('focus', () => {
       this.options.setQuickPromptAnchorPaneIndex(paneIndex);
@@ -122,6 +123,22 @@ export class PaneViewService {
   private attachPaneRuntimePreferenceHooks(webContents: WebContents): void {
     webContents.on('did-finish-load', () => {
       this.applyPaneRuntimePreferences(webContents);
+    });
+  }
+
+  private attachPaneDebugConsoleHooks(paneIndex: number, webContents: WebContents): void {
+    webContents.on('console-message', (_event, level, message, line, sourceId) => {
+      if (typeof message !== 'string' || !message.includes('[QuickPromptDebug]')) {
+        return;
+      }
+      console.info('[QuickPromptDebug][PaneConsole]', {
+        paneIndex,
+        webContentsId: webContents.id,
+        level,
+        message,
+        line,
+        sourceId,
+      });
     });
   }
 
