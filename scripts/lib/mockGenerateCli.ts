@@ -15,7 +15,9 @@
 
 import { existsSync, mkdirSync, writeFileSync, readFileSync } from 'fs';
 import { resolve, join } from 'path';
+import { pathToFileURL } from 'url';
 import { MOCK_PROFILES } from './mockProfiles';
+import { MOCK_RESPONSES } from './mockRuntime';
 import type { CliOutput, MockProviderConfigEntry, MockProviderConfigFile } from './mockTypes';
 
 function parseArgs(): { provider: string; outputDir: string } {
@@ -38,16 +40,6 @@ function output<T>(result: CliOutput<T>): never {
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   process.exit(result.success ? 0 : 1);
 }
-
-// ---------------------------------------------------------------------------
-// Per-provider mock response text
-// ---------------------------------------------------------------------------
-
-const MOCK_RESPONSES: Record<string, string> = {
-  chatgpt: 'This is a streamed response from mock ChatGPT. It simulates token-by-token generation to verify the inject bridge contract.\\n\\nSecond paragraph for multiline extraction.',
-  grok: 'This is a streamed response from mock Grok. It simulates token-by-token generation to verify the inject bridge contract.\\n\\nSecond paragraph for multiline extraction.',
-  gemini: 'This is a streamed response from mock Gemini. It simulates token-by-token generation to verify the inject bridge contract.\\n\\nSecond paragraph for multiline extraction.',
-};
 
 // ---------------------------------------------------------------------------
 // ChatGPT template: Lexical contenteditable + data-testid selectors
@@ -357,6 +349,332 @@ function generateGeminiHtml(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Claude template: ProseMirror contenteditable + fieldset + font-claude-message
+// Text-injection path: handleContentEditable() (no data-lexical-editor, no ql-editor)
+// ---------------------------------------------------------------------------
+
+function generateClaudeHtml(): string {
+  const mockResp = MOCK_RESPONSES.claude;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock Claude Simulation</title>
+  <style>
+    body { font-family: sans-serif; background-color: #2b2a27; color: #e8e6e3; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+    .chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .message-row { display: flex; padding: 16px; border-radius: 8px; flex-direction: column; }
+    .message-row.user { background-color: #343330; }
+    .message-row.assistant { background-color: #2b2a27; }
+    .font-claude-message { line-height: 1.6; white-space: pre-wrap; }
+    .prose { line-height: 1.6; white-space: pre-wrap; }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; flex-shrink: 0; }
+    .message-row.user .avatar { background-color: #5436da; }
+    .message-row.assistant .avatar { background-color: #d97706; }
+    .input-area { padding: 16px; border-top: 1px solid #3f3e3b; display: flex; justify-content: center; }
+    fieldset { width: 100%; max-width: 768px; position: relative; display: flex; background-color: #343330; border-radius: 8px; border: 1px solid #3f3e3b; margin: 0; padding: 0; }
+    .ProseMirror { width: 100%; min-height: 24px; max-height: 200px; padding: 12px 48px 12px 12px; background: transparent; border: none; color: #e8e6e3; outline: none; font-family: inherit; font-size: 15px; overflow-y: auto; }
+    .ProseMirror p { margin: 0; }
+    .ProseMirror:empty::before { content: attr(data-placeholder); color: #8a8885; }
+    fieldset button[aria-label='Send Message'] { position: absolute; right: 8px; bottom: 8px; background: #d97706; border: none; color: white; cursor: pointer; padding: 6px 10px; border-radius: 6px; }
+    fieldset button[aria-label='Send Message']:disabled { background: #3f3e3b; cursor: not-allowed; }
+    .action-bar { display: flex; gap: 8px; padding: 4px 0; margin-top: 8px; }
+    .action-bar button { background: transparent; border: 1px solid #3f3e3b; color: #e8e6e3; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="chat-container" id="chat-history">
+    <div class="message-row assistant" data-turn-role="assistant">
+      <div class="avatar"></div>
+      <div class="font-claude-message">Hello! I am a simulated Claude. How can I help you today?</div>
+    </div>
+  </div>
+  <button aria-label="Stop response" data-testid="stop-button" class="hidden" id="streaming-btn">Stop</button>
+  <div class="input-area">
+    <fieldset>
+      <div class="ProseMirror" contenteditable="true" role="textbox"
+           data-placeholder="Reply to Claude..." id="claude-input"><p><br></p></div>
+      <button aria-label="Send Message" id="send-btn">Send</button>
+    </fieldset>
+  </div>
+  <script>
+    const inputEl = document.getElementById('claude-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatHistory = document.getElementById('chat-history');
+    const streamingBtn = document.getElementById('streaming-btn');
+    const MOCK_RESPONSE = "${mockResp}";
+
+    function getInputText() { return (inputEl.innerText || inputEl.textContent || '').trim(); }
+    function clearInput() { inputEl.innerHTML = '<p><br></p>'; }
+
+    function createUserMessage(text) {
+      const row = document.createElement('div');
+      row.className = 'message-row user';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'prose'; c.textContent = text;
+      row.appendChild(av); row.appendChild(c); return row;
+    }
+    function createAssistantMessage() {
+      const row = document.createElement('div');
+      row.className = 'message-row assistant';
+      row.setAttribute('data-turn-role', 'assistant');
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'font-claude-message';
+      row.appendChild(av); row.appendChild(c); return { row, content: c };
+    }
+    async function streamResponse(contentEl) {
+      streamingBtn.classList.remove('hidden');
+      const tokens = MOCK_RESPONSE.split(/(?=\\s)/);
+      contentEl.textContent = '';
+      for (const token of tokens) { contentEl.textContent += token; chatHistory.scrollTop = chatHistory.scrollHeight; await new Promise(r => setTimeout(r, 40)); }
+      streamingBtn.classList.add('hidden');
+      const bar = document.createElement('div'); bar.className = 'action-bar';
+      const cp = document.createElement('button'); cp.setAttribute('aria-label','Copy'); cp.textContent = 'Copy';
+      const rt = document.createElement('button'); rt.setAttribute('aria-label','Retry'); rt.textContent = 'Retry';
+      const lk = document.createElement('button'); lk.setAttribute('aria-label','Good response'); lk.textContent = 'Like';
+      bar.appendChild(cp); bar.appendChild(rt); bar.appendChild(lk);
+      contentEl.parentElement.appendChild(bar);
+      sendBtn.disabled = false;
+    }
+    sendBtn.addEventListener('click', () => {
+      const text = getInputText(); if (!text) return;
+      window.__mockLastInput = text;
+      chatHistory.appendChild(createUserMessage(text)); clearInput(); sendBtn.disabled = true;
+      const { row, content } = createAssistantMessage(); chatHistory.appendChild(row);
+      setTimeout(() => streamResponse(content), 300);
+    });
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
+  </script>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
+// Perplexity template: Lexical editor #ask-input + Voice mode submit
+// Text-injection path: handleLexicalEditor() (data-lexical-editor="true")
+// ---------------------------------------------------------------------------
+
+function generatePerplexityHtml(): string {
+  const mockResp = MOCK_RESPONSES.perplexity;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock Perplexity Simulation</title>
+  <style>
+    body { font-family: sans-serif; background-color: #191a1a; color: #e8e8e8; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+    .chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .query-row { display: flex; flex-direction: column; padding: 16px; border-radius: 8px; background-color: #232425; }
+    .answer-row { display: flex; flex-direction: column; padding: 16px; border-radius: 8px; background-color: #191a1a; }
+    .prose { line-height: 1.6; white-space: pre-wrap; }
+    .default.font-sans.text-base { line-height: 1.6; white-space: pre-wrap; }
+    .min-w-0.break-words { line-height: 1.6; }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; flex-shrink: 0; }
+    .query-row .avatar { background-color: #5436da; }
+    .answer-row .avatar { background-color: #20b2aa; }
+    .input-area { padding: 16px; border-top: 1px solid #333; display: flex; justify-content: center; }
+    .input-wrapper { width: 100%; max-width: 768px; position: relative; display: flex; background-color: #232425; border-radius: 8px; border: 1px solid #333; }
+    #ask-input { width: 100%; min-height: 24px; max-height: 200px; padding: 12px 48px 12px 12px; background: transparent; border: none; color: #e8e8e8; outline: none; font-family: inherit; font-size: 15px; overflow-y: auto; }
+    #ask-input p { margin: 0; }
+    #ask-input:empty::before { content: 'Ask anything...'; color: #666; }
+    button[aria-label='Voice mode'] { position: absolute; right: 8px; bottom: 8px; background: #20b2aa; border: none; color: white; cursor: pointer; padding: 6px 10px; border-radius: 6px; }
+    button[aria-label='Voice mode']:disabled { background: #333; cursor: not-allowed; }
+    .action-bar { display: flex; gap: 8px; padding: 4px 0; margin-top: 8px; }
+    .action-bar button { background: transparent; border: 1px solid #333; color: #e8e8e8; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="chat-container" id="chat-history">
+    <div class="answer-row">
+      <div class="avatar"></div>
+      <div class="prose" id="markdown-content-0">Hello! I am a simulated Perplexity. How can I help you today?</div>
+    </div>
+  </div>
+  <button aria-label="Stop" class="hidden" id="streaming-btn">Stop</button>
+  <div class="input-area">
+    <div class="input-wrapper">
+      <div id="ask-input" data-lexical-editor="true" contenteditable="true"
+           role="textbox" aria-label="Ask anything"><p><br></p></div>
+      <button aria-label="Voice mode" id="send-btn">Ask</button>
+    </div>
+  </div>
+  <script>
+    const inputEl = document.getElementById('ask-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatHistory = document.getElementById('chat-history');
+    const streamingBtn = document.getElementById('streaming-btn');
+    let responseCount = 1;
+    const MOCK_RESPONSE = "${mockResp}";
+
+    function getInputText() { return (inputEl.innerText || inputEl.textContent || '').trim(); }
+    function clearInput() { inputEl.innerHTML = '<p><br></p>'; }
+
+    function createUserQuery(text) {
+      const row = document.createElement('div'); row.className = 'query-row';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'default font-sans text-base'; c.textContent = text;
+      row.appendChild(av); row.appendChild(c); return row;
+    }
+    function createAnswerRow() {
+      const row = document.createElement('div'); row.className = 'answer-row';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'prose';
+      c.id = 'markdown-content-' + responseCount++;
+      row.appendChild(av); row.appendChild(c); return { row, content: c };
+    }
+    async function streamResponse(contentEl) {
+      streamingBtn.classList.remove('hidden');
+      const tokens = MOCK_RESPONSE.split(/(?=\\s)/);
+      contentEl.textContent = '';
+      for (const token of tokens) { contentEl.textContent += token; chatHistory.scrollTop = chatHistory.scrollHeight; await new Promise(r => setTimeout(r, 40)); }
+      streamingBtn.classList.add('hidden');
+      const bar = document.createElement('div'); bar.className = 'action-bar';
+      const cp = document.createElement('button'); cp.setAttribute('aria-label','Copy'); cp.textContent = 'Copy';
+      const sh = document.createElement('button'); sh.setAttribute('aria-label','Share'); sh.textContent = 'Share';
+      const rw = document.createElement('button'); rw.setAttribute('aria-label','Rewrite'); rw.textContent = 'Rewrite';
+      bar.appendChild(cp); bar.appendChild(sh); bar.appendChild(rw);
+      contentEl.parentElement.appendChild(bar);
+      sendBtn.disabled = false;
+    }
+    sendBtn.addEventListener('click', () => {
+      const text = getInputText(); if (!text) return;
+      window.__mockLastInput = text;
+      chatHistory.appendChild(createUserQuery(text)); clearInput(); sendBtn.disabled = true;
+      const { row, content } = createAnswerRow(); chatHistory.appendChild(row);
+      setTimeout(() => streamResponse(content), 300);
+    });
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
+  </script>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
+// AI Studio template: textarea + Angular Material custom elements
+// Text-injection path: setNativeValue() (textarea element)
+// ---------------------------------------------------------------------------
+
+function generateAistudioHtml(): string {
+  const mockResp = MOCK_RESPONSES.aistudio;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock AI Studio Simulation</title>
+  <style>
+    body { font-family: sans-serif; background-color: #1a1a2e; color: #e8e8e8; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+    .chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    ms-chat-turn { display: block; padding: 16px; border-radius: 8px; }
+    ms-chat-turn.user-turn { background-color: #16213e; }
+    ms-chat-turn.model-turn { background-color: #1a1a2e; }
+    .turn-content { display: block; }
+    ms-cmark-node.cmark-node { display: block; line-height: 1.6; white-space: pre-wrap; }
+    ms-text-chunk { display: block; line-height: 1.6; white-space: pre-wrap; }
+    .text-chunk { line-height: 1.6; white-space: pre-wrap; }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; flex-shrink: 0; }
+    ms-chat-turn.user-turn .avatar { background-color: #5436da; }
+    ms-chat-turn.model-turn .avatar { background-color: #4361ee; }
+    .input-area { padding: 16px; border-top: 1px solid #333; display: flex; justify-content: center; align-items: flex-end; gap: 8px; }
+    .input-wrapper { width: 100%; max-width: 768px; position: relative; display: flex; align-items: flex-end; }
+    ms-prompt-box { display: block; flex: 1; }
+    .prompt-box-container { display: flex; flex-direction: column; }
+    textarea { width: 100%; min-height: 24px; max-height: 200px; padding: 12px; background-color: #16213e; border: 1px solid #333; border-radius: 8px; color: #e8e8e8; outline: none; font-family: inherit; font-size: 15px; resize: none; box-sizing: border-box; }
+    ms-run-button { display: block; }
+    ms-run-button button { background: #4361ee; border: none; color: white; cursor: pointer; padding: 8px 16px; border-radius: 8px; margin-left: 8px; font-size: 14px; flex-shrink: 0; }
+    ms-run-button button:disabled { background: #333; cursor: not-allowed; }
+    ms-chat-turn-options { display: flex; gap: 8px; padding: 4px 0; margin-top: 8px; }
+    ms-chat-turn-options button { background: transparent; border: 1px solid #333; color: #e8e8e8; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    ms-chat-turn-loader { display: none; }
+    ms-chat-turn-loader.active { display: block; padding: 8px; color: #4361ee; }
+    mat-progress-bar { display: none; height: 4px; background: #333; }
+    mat-progress-bar[mode='indeterminate'] { display: block; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="chat-container" id="chat-history">
+    <ms-chat-turn class="model-turn">
+      <div class="avatar"></div>
+      <div class="turn-content">
+        <ms-cmark-node class="cmark-node">Hello! I am a simulated AI Studio. How can I help you today?</ms-cmark-node>
+      </div>
+    </ms-chat-turn>
+  </div>
+  <button aria-label="Stop" class="hidden" id="streaming-btn">Stop</button>
+  <div class="input-area">
+    <div class="input-wrapper">
+      <ms-prompt-box>
+        <div class="prompt-box-container">
+          <textarea aria-label="Enter a prompt" placeholder="Start typing a prompt" id="aistudio-input"></textarea>
+        </div>
+      </ms-prompt-box>
+      <ms-run-button>
+        <button id="send-btn">Run</button>
+      </ms-run-button>
+    </div>
+  </div>
+  <script>
+    const inputEl = document.getElementById('aistudio-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatHistory = document.getElementById('chat-history');
+    const streamingBtn = document.getElementById('streaming-btn');
+    const MOCK_RESPONSE = "${mockResp}";
+
+    function getInputText() { return inputEl.value.trim(); }
+    function clearInput() { inputEl.value = ''; }
+
+    function createUserTurn(text) {
+      const turn = document.createElement('ms-chat-turn');
+      turn.className = 'user-turn';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const tc = document.createElement('div'); tc.className = 'turn-content';
+      const chunk = document.createElement('ms-text-chunk');
+      chunk.textContent = text;
+      tc.appendChild(chunk); turn.appendChild(av); turn.appendChild(tc); return turn;
+    }
+    function createModelTurn() {
+      const turn = document.createElement('ms-chat-turn');
+      turn.className = 'model-turn';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const tc = document.createElement('div'); tc.className = 'turn-content';
+      const node = document.createElement('ms-cmark-node');
+      node.className = 'cmark-node';
+      tc.appendChild(node); turn.appendChild(av); turn.appendChild(tc);
+      return { turn, content: node };
+    }
+    async function streamResponse(contentEl, turnEl) {
+      streamingBtn.classList.remove('hidden');
+      const tokens = MOCK_RESPONSE.split(/(?=\\s)/);
+      contentEl.textContent = '';
+      for (const token of tokens) { contentEl.textContent += token; chatHistory.scrollTop = chatHistory.scrollHeight; await new Promise(r => setTimeout(r, 40)); }
+      streamingBtn.classList.add('hidden');
+      const opts = document.createElement('ms-chat-turn-options');
+      const cp = document.createElement('button'); cp.setAttribute('aria-label','Copy'); cp.textContent = 'Copy';
+      const gd = document.createElement('button'); gd.setAttribute('aria-label','Good response'); gd.textContent = 'Good';
+      const bd = document.createElement('button'); bd.setAttribute('aria-label','Bad response'); bd.textContent = 'Bad';
+      opts.appendChild(cp); opts.appendChild(gd); opts.appendChild(bd);
+      turnEl.appendChild(opts);
+      sendBtn.disabled = false;
+    }
+    sendBtn.addEventListener('click', () => {
+      const text = getInputText(); if (!text) return;
+      window.__mockLastInput = text;
+      chatHistory.appendChild(createUserTurn(text)); clearInput(); sendBtn.disabled = true;
+      const { turn, content } = createModelTurn(); chatHistory.appendChild(turn);
+      setTimeout(() => streamResponse(content, turn), 300);
+    });
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
+  </script>
+</body>
+</html>`;
+}
+
+// ---------------------------------------------------------------------------
 // Provider template dispatch
 // ---------------------------------------------------------------------------
 
@@ -364,6 +682,9 @@ const PROVIDER_GENERATORS: Record<string, () => string> = {
   chatgpt: generateChatGPTHtml,
   grok: generateGrokHtml,
   gemini: generateGeminiHtml,
+  claude: generateClaudeHtml,
+  perplexity: generatePerplexityHtml,
+  aistudio: generateAistudioHtml,
 };
 
 // ---------------------------------------------------------------------------
@@ -416,7 +737,7 @@ function main(): void {
   }
 
   const entry: MockProviderConfigEntry = {
-    url: `file://./tests/fixtures/mock-site/${htmlFilename}`,
+    url: pathToFileURL(htmlPath).toString(),
     urlPattern: htmlFilename,
   };
 

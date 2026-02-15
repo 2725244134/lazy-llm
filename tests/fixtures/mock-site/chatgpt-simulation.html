@@ -28,123 +28,66 @@
 </head>
 <body>
   <div class="chat-container" id="chat-history">
-    <!-- Messages appear after prompt submission -->
+    <div data-message-author-role="assistant">
+      <div class="avatar"></div>
+      <div class="markdown">Hello! I am a simulated ChatGPT. How can I help you today?</div>
+    </div>
   </div>
-
-  <!-- Streaming indicator (hidden initially) -->
   <button aria-label="Stop generating" data-testid="stop-button" class="hidden" id="streaming-btn">Stop generating</button>
-
   <div class="input-area">
     <div class="input-wrapper">
       <div class="ProseMirror" id="prompt-textarea" contenteditable="true"
            data-lexical-editor="true" role="textbox" aria-label="Message ChatGPT"
-           data-placeholder="Message ChatGPT...">
-        <p><br></p>
-      </div>
+           data-placeholder="Message ChatGPT..."><p><br></p></div>
       <button data-testid="send-button" aria-label="Send prompt" id="send-btn">Send</button>
     </div>
   </div>
-
   <script>
     const inputEl = document.getElementById('prompt-textarea');
     const sendBtn = document.getElementById('send-btn');
     const chatHistory = document.getElementById('chat-history');
     const streamingBtn = document.getElementById('streaming-btn');
-
     const MOCK_RESPONSE = "This is a streamed response from mock ChatGPT. It simulates token-by-token generation to verify the inject bridge contract.\n\nSecond paragraph for multiline extraction.";
 
-    function getInputText() {
-      return (inputEl.innerText || inputEl.textContent || '').trim();
-    }
-
-    function clearInput() {
-      inputEl.innerHTML = '<p><br></p>';
-    }
+    function getInputText() { return (inputEl.innerText || inputEl.textContent || '').trim(); }
+    function clearInput() { inputEl.innerHTML = '<p><br></p>'; }
 
     function createUserMessage(text) {
       const row = document.createElement('div');
       row.setAttribute('data-message-author-role', 'user');
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      const content = document.createElement('div');
-      content.className = 'markdown';
-      content.textContent = text;
-      row.appendChild(avatar);
-      row.appendChild(content);
-      return row;
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'markdown'; c.textContent = text;
+      row.appendChild(av); row.appendChild(c); return row;
     }
-
     function createAssistantMessage() {
       const row = document.createElement('div');
       row.setAttribute('data-message-author-role', 'assistant');
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      const content = document.createElement('div');
-      content.className = 'markdown';
-      row.appendChild(avatar);
-      row.appendChild(content);
-      return { row, content };
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'markdown';
+      row.appendChild(av); row.appendChild(c); return { row, content: c };
     }
-
     async function streamResponse(contentEl) {
-      // Show streaming indicator
       streamingBtn.classList.remove('hidden');
-
       const tokens = MOCK_RESPONSE.split(/(?=\s)/);
       contentEl.textContent = '';
-
-      for (const token of tokens) {
-        contentEl.textContent += token;
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-        await new Promise(r => setTimeout(r, 40));
-      }
-
-      // Remove streaming indicator
+      for (const token of tokens) { contentEl.textContent += token; chatHistory.scrollTop = chatHistory.scrollHeight; await new Promise(r => setTimeout(r, 40)); }
       streamingBtn.classList.add('hidden');
-
-      // Add complete indicators
-      const actionBar = document.createElement('div');
-      actionBar.className = 'action-bar';
-      const copyBtn = document.createElement('button');
-      copyBtn.setAttribute('data-testid', 'copy-turn-action-button');
-      copyBtn.textContent = 'Copy';
-      const likeBtn = document.createElement('button');
-      likeBtn.setAttribute('aria-label', 'Good response');
-      likeBtn.textContent = 'Like';
-      const dislikeBtn = document.createElement('button');
-      dislikeBtn.setAttribute('aria-label', 'Bad response');
-      dislikeBtn.textContent = 'Dislike';
-      actionBar.appendChild(copyBtn);
-      actionBar.appendChild(likeBtn);
-      actionBar.appendChild(dislikeBtn);
-      contentEl.parentElement.appendChild(actionBar);
-
+      const bar = document.createElement('div'); bar.className = 'action-bar';
+      const cp = document.createElement('button'); cp.setAttribute('data-testid','copy-turn-action-button'); cp.textContent = 'Copy';
+      const lk = document.createElement('button'); lk.setAttribute('aria-label','Good response'); lk.textContent = 'Like';
+      const dl = document.createElement('button'); dl.setAttribute('aria-label','Bad response'); dl.textContent = 'Dislike';
+      bar.appendChild(cp); bar.appendChild(lk); bar.appendChild(dl);
+      contentEl.parentElement.appendChild(bar);
       sendBtn.disabled = false;
     }
-
     sendBtn.addEventListener('click', () => {
-      const text = getInputText();
-      if (!text) return;
-
-      // Track for test verification
+      const text = getInputText(); if (!text) return;
       window.__mockLastInput = text;
-
-      chatHistory.appendChild(createUserMessage(text));
-      clearInput();
-      sendBtn.disabled = true;
-
-      const { row, content } = createAssistantMessage();
-      chatHistory.appendChild(row);
-
+      chatHistory.appendChild(createUserMessage(text)); clearInput(); sendBtn.disabled = true;
+      const { row, content } = createAssistantMessage(); chatHistory.appendChild(row);
       setTimeout(() => streamResponse(content), 300);
     });
-
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendBtn.click();
-      }
-    });
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
   </script>
 </body>
 </html>

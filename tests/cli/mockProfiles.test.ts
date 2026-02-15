@@ -3,10 +3,13 @@ import type { MockProviderConfigFile, ParityManifestEntry } from '../../scripts/
 import { MOCK_PROFILES, SUPPORTED_PROVIDER_KEYS } from '../../scripts/lib/mockProfiles';
 
 describe('mockProfiles', () => {
-  it('exports profiles for chatgpt, grok, and gemini', () => {
+  it('exports profiles for chatgpt, grok, gemini, claude, perplexity, and aistudio', () => {
     expect(SUPPORTED_PROVIDER_KEYS).toContain('chatgpt');
     expect(SUPPORTED_PROVIDER_KEYS).toContain('grok');
     expect(SUPPORTED_PROVIDER_KEYS).toContain('gemini');
+    expect(SUPPORTED_PROVIDER_KEYS).toContain('claude');
+    expect(SUPPORTED_PROVIDER_KEYS).toContain('perplexity');
+    expect(SUPPORTED_PROVIDER_KEYS).toContain('aistudio');
   });
 
   it.each(SUPPORTED_PROVIDER_KEYS)('%s profile has all required selector fields', (key) => {

@@ -17,10 +17,10 @@ if (mockProvidersFile && mockProvidersFile.trim().length > 0) {
     try {
       const mockConfig = JSON.parse(readFileSync(configPath, 'utf8'));
       for (const [key, config] of Object.entries(mockConfig as Record<string, Record<string, unknown>>)) {
-        if (config.url) {
-          let url = config.url as string;
+        if (typeof config.url === 'string') {
+          let url = config.url;
           // Resolve relative file:// URLs to absolute paths
-          if (url.startsWith('file://.')) {
+          if (url.startsWith('file://./')) {
             url = `file://${resolve(process.cwd(), url.slice(7))}`;
           }
           // Replace existing provider URL if key matches

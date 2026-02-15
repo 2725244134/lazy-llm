@@ -30,119 +30,67 @@
 </head>
 <body>
   <div class="chat-container" id="chat-history">
-    <!-- Messages appear after prompt submission -->
+    <model-response>
+      <div class="avatar"></div>
+      <message-content>
+        <div class="markdown markdown-main-panel">Hello! I am a simulated Gemini. How can I help you today?</div>
+      </message-content>
+    </model-response>
   </div>
-
-  <!-- Streaming indicator (hidden initially) -->
   <button aria-label="Stop response" class="hidden" id="streaming-btn">Stop</button>
-
   <div class="input-area">
     <div class="input-wrapper">
       <rich-textarea>
-        <div class="ql-editor" contenteditable="true" role="textbox" id="gemini-input">
-          <p><br></p>
-        </div>
+        <div class="ql-editor" contenteditable="true" role="textbox" id="gemini-input"><p><br></p></div>
       </rich-textarea>
       <button aria-label="Send message" class="send-button" id="send-btn">Send</button>
     </div>
   </div>
-
   <script>
     const inputEl = document.querySelector('rich-textarea .ql-editor');
     const sendBtn = document.getElementById('send-btn');
     const chatHistory = document.getElementById('chat-history');
     const streamingBtn = document.getElementById('streaming-btn');
-
     const MOCK_RESPONSE = "This is a streamed response from mock Gemini. It simulates token-by-token generation to verify the inject bridge contract.\n\nSecond paragraph for multiline extraction.";
 
-    function getInputText() {
-      return (inputEl.innerText || inputEl.textContent || '').trim();
-    }
-
-    function clearInput() {
-      inputEl.innerHTML = '<p><br></p>';
-    }
+    function getInputText() { return (inputEl.innerText || inputEl.textContent || '').trim(); }
+    function clearInput() { inputEl.innerHTML = '<p><br></p>'; }
 
     function createUserQuery(text) {
-      const query = document.createElement('div');
-      query.className = 'user-query';
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      const content = document.createElement('div');
-      content.className = 'user-text';
-      content.textContent = text;
-      query.appendChild(avatar);
-      query.appendChild(content);
-      return query;
+      const q = document.createElement('div'); q.className = 'user-query';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'user-text'; c.textContent = text;
+      q.appendChild(av); q.appendChild(c); return q;
     }
-
     function createModelResponse() {
-      const response = document.createElement('model-response');
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      const messageContent = document.createElement('message-content');
-      const markdown = document.createElement('div');
-      markdown.className = 'markdown markdown-main-panel';
-      messageContent.appendChild(markdown);
-      response.appendChild(avatar);
-      response.appendChild(messageContent);
-      return { response, markdown };
+      const r = document.createElement('model-response');
+      const av = document.createElement('div'); av.className = 'avatar';
+      const mc = document.createElement('message-content');
+      const md = document.createElement('div'); md.className = 'markdown markdown-main-panel';
+      mc.appendChild(md); r.appendChild(av); r.appendChild(mc);
+      return { response: r, markdown: md };
     }
-
     async function streamResponse(contentEl, responseEl) {
-      // Show streaming indicator
       streamingBtn.classList.remove('hidden');
-
       const tokens = MOCK_RESPONSE.split(/(?=\s)/);
       contentEl.textContent = '';
-
-      for (const token of tokens) {
-        contentEl.textContent += token;
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-        await new Promise(r => setTimeout(r, 40));
-      }
-
-      // Remove streaming indicator
+      for (const token of tokens) { contentEl.textContent += token; chatHistory.scrollTop = chatHistory.scrollHeight; await new Promise(r => setTimeout(r, 40)); }
       streamingBtn.classList.add('hidden');
-
-      // Add complete indicators (message-actions inside model-response)
-      const actions = document.createElement('message-actions');
-      const copyBtn = document.createElement('button');
-      copyBtn.setAttribute('aria-label', 'Copy');
-      copyBtn.textContent = 'Copy';
-      const checkBtn = document.createElement('button');
-      checkBtn.setAttribute('aria-label', 'Double-check response');
-      checkBtn.textContent = 'Double-check';
-      actions.appendChild(copyBtn);
-      actions.appendChild(checkBtn);
-      responseEl.appendChild(actions);
-
+      const acts = document.createElement('message-actions');
+      const cp = document.createElement('button'); cp.setAttribute('aria-label','Copy'); cp.textContent = 'Copy';
+      const ch = document.createElement('button'); ch.setAttribute('aria-label','Double-check response'); ch.textContent = 'Double-check';
+      acts.appendChild(cp); acts.appendChild(ch);
+      responseEl.appendChild(acts);
       sendBtn.disabled = false;
     }
-
     sendBtn.addEventListener('click', () => {
-      const text = getInputText();
-      if (!text) return;
-
-      // Track for test verification
+      const text = getInputText(); if (!text) return;
       window.__mockLastInput = text;
-
-      chatHistory.appendChild(createUserQuery(text));
-      clearInput();
-      sendBtn.disabled = true;
-
-      const { response, markdown } = createModelResponse();
-      chatHistory.appendChild(response);
-
+      chatHistory.appendChild(createUserQuery(text)); clearInput(); sendBtn.disabled = true;
+      const { response, markdown } = createModelResponse(); chatHistory.appendChild(response);
       setTimeout(() => streamResponse(markdown, response), 300);
     });
-
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendBtn.click();
-      }
-    });
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
   </script>
 </body>
 </html>

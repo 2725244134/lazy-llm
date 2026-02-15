@@ -24,6 +24,10 @@ export interface MockProviderProfile {
   completeIndicatorSelectors: string[];
   /** Extraction mode. */
   extractMode: 'last' | 'all';
+  /** CSS selector for the chat/conversation region container (used by crawl). */
+  chatRegionSelector?: string;
+  /** CSS selector for the input region container (used by crawl). */
+  inputRegionSelector?: string;
 }
 
 /**
@@ -104,4 +108,76 @@ export interface CliOutput<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Style-aware crawl types (used by mockCrawlCli / mockTransformCli)
+// ---------------------------------------------------------------------------
+
+/** CSS properties captured during style-aware crawl. */
+export const CRAWL_CSS_PROPERTIES = [
+  // Box model & layout
+  'display', 'position', 'top', 'right', 'bottom', 'left',
+  'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+  'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+  'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+  'box-sizing',
+  // Flex
+  'flex-direction', 'flex-wrap', 'flex-grow', 'flex-shrink', 'flex-basis',
+  'justify-content', 'align-items', 'align-self', 'gap', 'row-gap', 'column-gap',
+  // Grid
+  'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
+  // Border
+  'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+  'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+  'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+  'border-radius',
+  // Color & background
+  'color', 'background-color', 'background-image', 'opacity',
+  // Typography
+  'font-family', 'font-size', 'font-weight', 'font-style',
+  'line-height', 'letter-spacing', 'text-align', 'text-decoration',
+  'text-transform', 'white-space', 'word-break', 'overflow-wrap',
+  // Overflow & visual
+  'overflow', 'overflow-x', 'overflow-y',
+  'visibility', 'z-index', 'cursor', 'box-shadow', 'outline',
+  'transform', 'transition',
+] as const;
+
+export type CrawlCssProperty = (typeof CRAWL_CSS_PROPERTIES)[number];
+
+/** A DOM node with computed style diffs captured by the crawl step. */
+export interface StyledDomNode {
+  tag: string;
+  attrs: Record<string, string>;
+  children: StyledDomNode[];
+  textContent?: string;
+  /** Only non-default computed style values. */
+  computedStyles: Partial<Record<CrawlCssProperty, string>>;
+}
+
+/** Output of the style-aware crawl step. */
+export interface CrawlSnapshot {
+  provider: string;
+  capturedAt: string;
+  url: string;
+  chatRegionDom: StyledDomNode;
+  inputRegionDom: StyledDomNode;
+  cssVariables: Record<string, string>;
+  fonts: string[];
+}
+
+/** Drift report comparing capture snapshot against parity manifest. */
+export interface DriftReport {
+  provider: string;
+  capturedAt: string;
+  selectorsFound: SelectorDriftEntry[];
+  selectorsMissing: SelectorDriftEntry[];
+}
+
+/** A single selector entry in a drift report. */
+export interface SelectorDriftEntry {
+  selector: string;
+  category: string;
+  required: boolean;
 }

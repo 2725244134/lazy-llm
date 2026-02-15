@@ -29,134 +29,66 @@
 </head>
 <body>
   <div class="chat-container" id="chat-history">
-    <!-- Messages appear after prompt submission -->
+    <div class="message-bubble assistant-msg">
+      <div class="avatar"></div>
+      <div class="response-content-markdown markdown">Hello! I am a simulated Grok. How can I help you today?</div>
+    </div>
   </div>
-
-  <!-- Streaming indicator (hidden initially) -->
   <button aria-label="Stop" class="hidden" id="streaming-btn">Stop</button>
-
   <div class="input-area">
     <form id="chat-form">
       <div class="ProseMirror" contenteditable="true" role="textbox"
-           data-placeholder="Ask Grok anything" id="grok-input">
-        <p><br></p>
-      </div>
+           data-placeholder="Ask Grok anything" id="grok-input"><p><br></p></div>
       <button type="submit" aria-label="Submit" id="send-btn">Send</button>
     </form>
   </div>
-
   <script>
     const inputEl = document.querySelector('.ProseMirror[contenteditable="true"]');
     const sendBtn = document.getElementById('send-btn');
     const chatForm = document.getElementById('chat-form');
     const chatHistory = document.getElementById('chat-history');
     const streamingBtn = document.getElementById('streaming-btn');
-
     const MOCK_RESPONSE = "This is a streamed response from mock Grok. It simulates token-by-token generation to verify the inject bridge contract.\n\nSecond paragraph for multiline extraction.";
 
-    function getInputText() {
-      return (inputEl.innerText || inputEl.textContent || '').trim();
-    }
-
-    function clearInput() {
-      inputEl.innerHTML = '<p><br></p>';
-    }
+    function getInputText() { return (inputEl.innerText || inputEl.textContent || '').trim(); }
+    function clearInput() { inputEl.innerHTML = '<p><br></p>'; }
 
     function createUserMessage(text) {
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble user-msg';
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      const content = document.createElement('div');
-      content.className = 'user-text';
-      content.textContent = text;
-      bubble.appendChild(avatar);
-      bubble.appendChild(content);
-      return bubble;
+      const b = document.createElement('div'); b.className = 'message-bubble user-msg';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'user-text'; c.textContent = text;
+      b.appendChild(av); b.appendChild(c); return b;
     }
-
     function createAssistantMessage() {
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble assistant-msg';
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar';
-      const content = document.createElement('div');
-      content.className = 'response-content-markdown markdown';
-      bubble.appendChild(avatar);
-      bubble.appendChild(content);
-      return { bubble, content };
+      const b = document.createElement('div'); b.className = 'message-bubble assistant-msg';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const c = document.createElement('div'); c.className = 'response-content-markdown markdown';
+      b.appendChild(av); b.appendChild(c); return { bubble: b, content: c };
     }
-
     async function streamResponse(contentEl) {
-      // Show streaming indicator
       streamingBtn.classList.remove('hidden');
-
       const tokens = MOCK_RESPONSE.split(/(?=\s)/);
       contentEl.textContent = '';
-
-      for (const token of tokens) {
-        contentEl.textContent += token;
-        chatHistory.scrollTop = chatHistory.scrollHeight;
-        await new Promise(r => setTimeout(r, 40));
-      }
-
-      // Remove streaming indicator
+      for (const token of tokens) { contentEl.textContent += token; chatHistory.scrollTop = chatHistory.scrollHeight; await new Promise(r => setTimeout(r, 40)); }
       streamingBtn.classList.add('hidden');
-
-      // Add complete indicators
-      const actionBar = document.createElement('div');
-      actionBar.className = 'action-bar';
-      const regenBtn = document.createElement('button');
-      regenBtn.setAttribute('aria-label', 'Regenerate');
-      regenBtn.textContent = 'Regenerate';
-      const copyBtn = document.createElement('button');
-      copyBtn.setAttribute('aria-label', 'Copy');
-      copyBtn.textContent = 'Copy';
-      const readBtn = document.createElement('button');
-      readBtn.setAttribute('aria-label', 'Read Aloud');
-      readBtn.textContent = 'Read Aloud';
-      actionBar.appendChild(regenBtn);
-      actionBar.appendChild(copyBtn);
-      actionBar.appendChild(readBtn);
-      contentEl.parentElement.appendChild(actionBar);
-
+      const bar = document.createElement('div'); bar.className = 'action-bar';
+      const rg = document.createElement('button'); rg.setAttribute('aria-label','Regenerate'); rg.textContent = 'Regenerate';
+      const cp = document.createElement('button'); cp.setAttribute('aria-label','Copy'); cp.textContent = 'Copy';
+      const rd = document.createElement('button'); rd.setAttribute('aria-label','Read Aloud'); rd.textContent = 'Read Aloud';
+      bar.appendChild(rg); bar.appendChild(cp); bar.appendChild(rd);
+      contentEl.parentElement.appendChild(bar);
       sendBtn.disabled = false;
     }
-
     function handleSubmit() {
-      const text = getInputText();
-      if (!text) return;
-
-      // Track for test verification
+      const text = getInputText(); if (!text) return;
       window.__mockLastInput = text;
-
-      chatHistory.appendChild(createUserMessage(text));
-      clearInput();
-      sendBtn.disabled = true;
-
-      const { bubble, content } = createAssistantMessage();
-      chatHistory.appendChild(bubble);
-
+      chatHistory.appendChild(createUserMessage(text)); clearInput(); sendBtn.disabled = true;
+      const { bubble, content } = createAssistantMessage(); chatHistory.appendChild(bubble);
       setTimeout(() => streamResponse(content), 300);
     }
-
-    // Handle both form submit and direct button click
-    chatForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      handleSubmit();
-    });
-
-    sendBtn.addEventListener('click', (e) => {
-      e.preventDefault();
-      handleSubmit();
-    });
-
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit();
-      }
-    });
+    chatForm.addEventListener('submit', (e) => { e.preventDefault(); handleSubmit(); });
+    sendBtn.addEventListener('click', (e) => { e.preventDefault(); handleSubmit(); });
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); } });
   </script>
 </body>
 </html>

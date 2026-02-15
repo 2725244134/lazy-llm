@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mock AI Studio Simulation</title>
+  <style>
+    body { font-family: sans-serif; background-color: #1a1a2e; color: #e8e8e8; margin: 0; display: flex; flex-direction: column; height: 100vh; }
+    .chat-container { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    ms-chat-turn { display: block; padding: 16px; border-radius: 8px; }
+    ms-chat-turn.user-turn { background-color: #16213e; }
+    ms-chat-turn.model-turn { background-color: #1a1a2e; }
+    .turn-content { display: block; }
+    ms-cmark-node.cmark-node { display: block; line-height: 1.6; white-space: pre-wrap; }
+    ms-text-chunk { display: block; line-height: 1.6; white-space: pre-wrap; }
+    .text-chunk { line-height: 1.6; white-space: pre-wrap; }
+    .avatar { width: 28px; height: 28px; border-radius: 50%; margin-bottom: 8px; flex-shrink: 0; }
+    ms-chat-turn.user-turn .avatar { background-color: #5436da; }
+    ms-chat-turn.model-turn .avatar { background-color: #4361ee; }
+    .input-area { padding: 16px; border-top: 1px solid #333; display: flex; justify-content: center; align-items: flex-end; gap: 8px; }
+    .input-wrapper { width: 100%; max-width: 768px; position: relative; display: flex; align-items: flex-end; }
+    ms-prompt-box { display: block; flex: 1; }
+    .prompt-box-container { display: flex; flex-direction: column; }
+    textarea { width: 100%; min-height: 24px; max-height: 200px; padding: 12px; background-color: #16213e; border: 1px solid #333; border-radius: 8px; color: #e8e8e8; outline: none; font-family: inherit; font-size: 15px; resize: none; box-sizing: border-box; }
+    ms-run-button { display: block; }
+    ms-run-button button { background: #4361ee; border: none; color: white; cursor: pointer; padding: 8px 16px; border-radius: 8px; margin-left: 8px; font-size: 14px; flex-shrink: 0; }
+    ms-run-button button:disabled { background: #333; cursor: not-allowed; }
+    ms-chat-turn-options { display: flex; gap: 8px; padding: 4px 0; margin-top: 8px; }
+    ms-chat-turn-options button { background: transparent; border: 1px solid #333; color: #e8e8e8; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+    ms-chat-turn-loader { display: none; }
+    ms-chat-turn-loader.active { display: block; padding: 8px; color: #4361ee; }
+    mat-progress-bar { display: none; height: 4px; background: #333; }
+    mat-progress-bar[mode='indeterminate'] { display: block; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="chat-container" id="chat-history">
+    <ms-chat-turn class="model-turn">
+      <div class="avatar"></div>
+      <div class="turn-content">
+        <ms-cmark-node class="cmark-node">Hello! I am a simulated AI Studio. How can I help you today?</ms-cmark-node>
+      </div>
+    </ms-chat-turn>
+  </div>
+  <button aria-label="Stop" class="hidden" id="streaming-btn">Stop</button>
+  <div class="input-area">
+    <div class="input-wrapper">
+      <ms-prompt-box>
+        <div class="prompt-box-container">
+          <textarea aria-label="Enter a prompt" placeholder="Start typing a prompt" id="aistudio-input"></textarea>
+        </div>
+      </ms-prompt-box>
+      <ms-run-button>
+        <button id="send-btn">Run</button>
+      </ms-run-button>
+    </div>
+  </div>
+  <script>
+    const inputEl = document.getElementById('aistudio-input');
+    const sendBtn = document.getElementById('send-btn');
+    const chatHistory = document.getElementById('chat-history');
+    const streamingBtn = document.getElementById('streaming-btn');
+    const MOCK_RESPONSE = "This is a streamed response from mock AI Studio. It simulates token-by-token generation to verify the inject bridge contract.\n\nSecond paragraph for multiline extraction.";
+
+    function getInputText() { return inputEl.value.trim(); }
+    function clearInput() { inputEl.value = ''; }
+
+    function createUserTurn(text) {
+      const turn = document.createElement('ms-chat-turn');
+      turn.className = 'user-turn';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const tc = document.createElement('div'); tc.className = 'turn-content';
+      const chunk = document.createElement('ms-text-chunk');
+      chunk.textContent = text;
+      tc.appendChild(chunk); turn.appendChild(av); turn.appendChild(tc); return turn;
+    }
+    function createModelTurn() {
+      const turn = document.createElement('ms-chat-turn');
+      turn.className = 'model-turn';
+      const av = document.createElement('div'); av.className = 'avatar';
+      const tc = document.createElement('div'); tc.className = 'turn-content';
+      const node = document.createElement('ms-cmark-node');
+      node.className = 'cmark-node';
+      tc.appendChild(node); turn.appendChild(av); turn.appendChild(tc);
+      return { turn, content: node };
+    }
+    async function streamResponse(contentEl, turnEl) {
+      streamingBtn.classList.remove('hidden');
+      const tokens = MOCK_RESPONSE.split(/(?=\s)/);
+      contentEl.textContent = '';
+      for (const token of tokens) { contentEl.textContent += token; chatHistory.scrollTop = chatHistory.scrollHeight; await new Promise(r => setTimeout(r, 40)); }
+      streamingBtn.classList.add('hidden');
+      const opts = document.createElement('ms-chat-turn-options');
+      const cp = document.createElement('button'); cp.setAttribute('aria-label','Copy'); cp.textContent = 'Copy';
+      const gd = document.createElement('button'); gd.setAttribute('aria-label','Good response'); gd.textContent = 'Good';
+      const bd = document.createElement('button'); bd.setAttribute('aria-label','Bad response'); bd.textContent = 'Bad';
+      opts.appendChild(cp); opts.appendChild(gd); opts.appendChild(bd);
+      turnEl.appendChild(opts);
+      sendBtn.disabled = false;
+    }
+    sendBtn.addEventListener('click', () => {
+      const text = getInputText(); if (!text) return;
+      window.__mockLastInput = text;
+      chatHistory.appendChild(createUserTurn(text)); clearInput(); sendBtn.disabled = true;
+      const { turn, content } = createModelTurn(); chatHistory.appendChild(turn);
+      setTimeout(() => streamResponse(content, turn), 300);
+    });
+    inputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendBtn.click(); } });
+  </script>
+</body>
+</html>

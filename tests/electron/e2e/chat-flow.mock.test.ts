@@ -154,7 +154,7 @@ async function prepareThreePaneBroadcast(appWindow: Page): Promise<void> {
 async function verifySingleProviderFlow(
   electronApp: ElectronApplication,
   appWindow: Page,
-  providerKey: 'chatgpt' | 'grok' | 'gemini',
+  providerKey: 'chatgpt' | 'grok' | 'gemini' | 'claude' | 'perplexity' | 'aistudio',
   urlFragment: string,
   displayName: string,
 ): Promise<void> {
@@ -182,6 +182,18 @@ test.describe('E2E / Chat Flow (Mock)', () => {
 
   test('gemini: single-pane flow uses real inject selectors', async ({ electronApp, appWindow }) => {
     await verifySingleProviderFlow(electronApp, appWindow, 'gemini', 'gemini-simulation.html', 'Gemini');
+  });
+
+  test('claude: single-pane flow uses real inject selectors', async ({ electronApp, appWindow }) => {
+    await verifySingleProviderFlow(electronApp, appWindow, 'claude', 'claude-simulation.html', 'Claude');
+  });
+
+  test('perplexity: single-pane flow uses real inject selectors', async ({ electronApp, appWindow }) => {
+    await verifySingleProviderFlow(electronApp, appWindow, 'perplexity', 'perplexity-simulation.html', 'Perplexity');
+  });
+
+  test('aistudio: single-pane flow uses real inject selectors', async ({ electronApp, appWindow }) => {
+    await verifySingleProviderFlow(electronApp, appWindow, 'aistudio', 'aistudio-simulation.html', 'AI Studio');
   });
 
   test('broadcast prompt reaches all pane providers', async ({ electronApp, appWindow }) => {

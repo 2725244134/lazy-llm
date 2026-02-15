@@ -4,9 +4,7 @@
     "structuralSelectors": [
       "div.ProseMirror#prompt-textarea",
       "button[data-testid='send-button']",
-      "div[data-message-author-role='assistant'] .markdown",
-      "button[aria-label='Stop generating']",
-      "button[data-testid='copy-turn-action-button']"
+      "div[data-message-author-role='assistant'] .markdown"
     ],
     "selectorProbes": [
       { "category": "input", "selector": "div.ProseMirror#prompt-textarea", "required": true },
@@ -24,9 +22,7 @@
     "structuralSelectors": [
       "div.ProseMirror[contenteditable='true']",
       "button[type='submit'][aria-label='Submit']",
-      "div.response-content-markdown.markdown",
-      "button[aria-label='Stop']",
-      "button[aria-label='Copy']"
+      "div.response-content-markdown.markdown"
     ],
     "selectorProbes": [
       { "category": "input", "selector": "div.ProseMirror[contenteditable='true']", "required": true },
@@ -43,8 +39,7 @@
     "structuralSelectors": [
       "rich-textarea .ql-editor",
       "button[aria-label*='Send']",
-      "message-content div.markdown.markdown-main-panel",
-      "button[aria-label='Stop response']"
+      "message-content div.markdown.markdown-main-panel"
     ],
     "selectorProbes": [
       { "category": "input", "selector": "rich-textarea .ql-editor", "required": true },
@@ -56,6 +51,64 @@
       { "category": "streaming", "selector": "button[aria-label='Stop response']", "required": false },
       { "category": "complete", "selector": "model-response:last-of-type message-actions button[aria-label*='Copy']", "required": false },
       { "category": "complete", "selector": "model-response:last-of-type message-actions", "required": false }
+    ]
+  },
+  {
+    "provider": "claude",
+    "structuralSelectors": [
+      "div[contenteditable='true'][data-placeholder]",
+      "button[aria-label*='Send']",
+      ".font-claude-message"
+    ],
+    "selectorProbes": [
+      { "category": "input", "selector": "div[contenteditable='true'][data-placeholder]", "required": true },
+      { "category": "input", "selector": "fieldset div[contenteditable='true']", "required": true },
+      { "category": "input", "selector": "div.ProseMirror[contenteditable='true']", "required": true },
+      { "category": "submit", "selector": "button[aria-label*='Send']", "required": true },
+      { "category": "extract", "selector": ".font-claude-message", "required": true },
+      { "category": "extract", "selector": "div[data-turn-role='assistant']", "required": true },
+      { "category": "streaming", "selector": "button[aria-label*='Stop response']", "required": false },
+      { "category": "streaming", "selector": "[data-testid='stop-button']", "required": false },
+      { "category": "complete", "selector": "button[aria-label*='Copy']", "required": false },
+      { "category": "complete", "selector": "button[aria-label*='Retry']", "required": false }
+    ]
+  },
+  {
+    "provider": "perplexity",
+    "structuralSelectors": [
+      "#ask-input[data-lexical-editor='true']",
+      "button[aria-label='Voice mode']",
+      ".prose"
+    ],
+    "selectorProbes": [
+      { "category": "input", "selector": "#ask-input[data-lexical-editor='true']", "required": true },
+      { "category": "input", "selector": "#ask-input", "required": true },
+      { "category": "submit", "selector": "button[aria-label='Voice mode']", "required": true },
+      { "category": "extract", "selector": "[id^='markdown-content-']", "required": true },
+      { "category": "extract", "selector": ".prose", "required": false },
+      { "category": "streaming", "selector": "button[aria-label='Stop']", "required": false },
+      { "category": "complete", "selector": "button[aria-label='Copy']", "required": false },
+      { "category": "complete", "selector": "button[aria-label='Share']", "required": false },
+      { "category": "complete", "selector": "button[aria-label='Rewrite']", "required": false }
+    ]
+  },
+  {
+    "provider": "aistudio",
+    "structuralSelectors": [
+      "textarea[aria-label='Enter a prompt']",
+      "ms-run-button button",
+      "ms-cmark-node.cmark-node"
+    ],
+    "selectorProbes": [
+      { "category": "input", "selector": "textarea[aria-label='Enter a prompt']", "required": true },
+      { "category": "input", "selector": "ms-prompt-box textarea", "required": true },
+      { "category": "submit", "selector": "ms-run-button button", "required": true },
+      { "category": "extract", "selector": "ms-cmark-node.cmark-node", "required": true },
+      { "category": "extract", "selector": ".turn-content ms-text-chunk", "required": false },
+      { "category": "streaming", "selector": "button[aria-label='Stop']", "required": false },
+      { "category": "complete", "selector": "ms-chat-turn-options", "required": false },
+      { "category": "complete", "selector": "button[aria-label='Good response']", "required": false },
+      { "category": "complete", "selector": "button[aria-label='Copy']", "required": false }
     ]
   }
 ]
