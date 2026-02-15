@@ -17,7 +17,7 @@ interface ParityManifestEntry {
 }
 
 function normalizeSelector(selector: string): string {
-  return selector.replaceAll('"', "'").replace(/\s+/g, ' ').trim();
+  return selector.replace(/"/g, "'").replace(/\s+/g, ' ').trim();
 }
 
 describe('providers-config', () => {
