@@ -20,6 +20,8 @@ export const IPC_CHANNELS = {
   QUICK_PROMPT_RESIZE: 'quickPrompt:resize',
   // Pane channels (main <-> pane)
   PANE_INJECT_PROMPT: 'pane:injectPrompt',
+  PANE_STAGE_PROMPT_IMAGE: 'pane:stagePromptImage',
+  PANE_STAGE_PROMPT_IMAGE_ACK: 'pane:stagePromptImageAck',
   PANE_RESPONSE_READY: 'pane:responseReady',
 } as const;
 
@@ -150,6 +152,18 @@ export interface QuickPromptResizeResponse {
 // Pane injection types
 export interface PaneInjectPromptPayload {
   text: string;
+}
+
+export interface PaneStagePromptImagePayload {
+  requestId: string;
+  image: PromptImagePayload;
+}
+
+export interface PaneStagePromptImageAckPayload {
+  requestId: string;
+  paneIndex: number;
+  success: boolean;
+  reason?: string;
 }
 
 export interface PaneResponseReadyPayload {

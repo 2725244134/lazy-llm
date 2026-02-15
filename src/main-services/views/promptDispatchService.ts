@@ -14,6 +14,7 @@ import {
 export interface PromptDispatchPaneExecutionTarget {
   paneIndex: number;
   executeJavaScript(script: string, userGesture?: boolean): Promise<unknown>;
+  stagePromptImagePayload(image: PromptImagePayload): Promise<void>;
 }
 
 export interface PromptDispatchResult {
@@ -50,6 +51,7 @@ type PanePromptDispatchOutcome =
 
 interface PanePromptDispatchScripts {
   promptEvalScript: string;
+  imagePayload: PromptImagePayload | null;
   imageAttachEvalScript: string | null;
   submitEvalScript: string | null;
 }
@@ -316,12 +318,13 @@ export class PromptDispatchService {
       autoSubmit: !hasImage,
     });
     const submitEvalScript = hasImage ? buildPromptSubmitEvalScript() : null;
-    const imageAttachEvalScript = hasImage && request.image
-      ? buildPromptImageAttachEvalScript(request.image)
+    const imageAttachEvalScript = hasImage
+      ? buildPromptImageAttachEvalScript()
       : null;
 
     return {
       promptEvalScript,
+      imagePayload: request.image,
       imageAttachEvalScript,
       submitEvalScript,
     };
@@ -385,17 +388,29 @@ export class PromptDispatchService {
       };
     }
 
-    if (promptScripts.imageAttachEvalScript) {
-      const imageAttachResult = await this.executePromptEvalScriptOnPane(
-        pane,
-        injectRuntimeScript,
-        promptScripts.imageAttachEvalScript,
-        'prompt image attachment failed'
-      );
-      if (!imageAttachResult.success) {
+    if (promptScripts.imagePayload && promptScripts.imageAttachEvalScript) {
+      let imageStaged = false;
+      try {
+        await pane.stagePromptImagePayload(promptScripts.imagePayload);
+        imageStaged = true;
+      } catch (error) {
         nonBlockingFailures.push(
-          `pane-${pane.paneIndex}: image attach failed (${imageAttachResult.reason ?? 'unknown reason'})`
+          `pane-${pane.paneIndex}: image attach failed (${toFailureReason(error)})`
         );
+      }
+
+      if (imageStaged) {
+        const imageAttachResult = await this.executePromptEvalScriptOnPane(
+          pane,
+          injectRuntimeScript,
+          promptScripts.imageAttachEvalScript,
+          'prompt image attachment failed'
+        );
+        if (!imageAttachResult.success) {
+          nonBlockingFailures.push(
+            `pane-${pane.paneIndex}: image attach failed (${imageAttachResult.reason ?? 'unknown reason'})`
+          );
+        }
       }
     }
 

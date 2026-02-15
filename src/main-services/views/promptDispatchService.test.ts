@@ -1,22 +1,32 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { PromptImagePayload } from '@shared-contracts/ipc/contracts';
 import {
   PromptDispatchService,
   type PromptDispatchPaneExecutionTarget,
 } from './promptDispatchService';
 
 type ExecuteJavaScriptFn = (script: string, userGesture?: boolean) => Promise<unknown>;
+type StagePromptImagePayloadFn = (image: PromptImagePayload) => Promise<void>;
 
-function createPaneTarget(paneIndex: number, executeImpl: ExecuteJavaScriptFn): {
+function createPaneTarget(
+  paneIndex: number,
+  executeImpl: ExecuteJavaScriptFn,
+  stageImageImpl: StagePromptImagePayloadFn = async () => undefined
+): {
   target: PromptDispatchPaneExecutionTarget;
   executeJavaScript: ReturnType<typeof vi.fn<ExecuteJavaScriptFn>>;
+  stagePromptImagePayload: ReturnType<typeof vi.fn<StagePromptImagePayloadFn>>;
 } {
   const executeJavaScript = vi.fn<ExecuteJavaScriptFn>(executeImpl);
+  const stagePromptImagePayload = vi.fn<StagePromptImagePayloadFn>(stageImageImpl);
   return {
     target: {
       paneIndex,
       executeJavaScript,
+      stagePromptImagePayload,
     },
     executeJavaScript,
+    stagePromptImagePayload,
   };
 }
 
@@ -168,6 +178,12 @@ describe('PromptDispatchService', () => {
   it('records image attach failure but still submits text prompt', async () => {
     const injectRuntimeScript = 'inject-runtime-script';
     const executedScripts: string[] = [];
+    const imagePayload: PromptImagePayload = {
+      mimeType: 'image/png',
+      base64Data: 'QUJD',
+      sizeBytes: 3,
+      source: 'clipboard',
+    };
 
     const pane = createPaneTarget(0, async (script) => {
       if (script === injectRuntimeScript) {
@@ -211,20 +227,84 @@ describe('PromptDispatchService', () => {
 
     const result = await service.sendPromptToAll({
       text: 'hello with image',
-      image: {
-        mimeType: 'image/png',
-        base64Data: 'QUJD',
-        sizeBytes: 3,
-        source: 'clipboard',
-      },
+      image: imagePayload,
     });
 
     expect(result).toEqual({
       success: true,
       failures: ['pane-0: image attach failed (paste ignored by page)'],
     });
+    expect(pane.stagePromptImagePayload).toHaveBeenCalledTimes(1);
+    expect(pane.stagePromptImagePayload).toHaveBeenCalledWith(imagePayload);
     expect(executedScripts.some((script) => script.includes('bridge.injectPrompt'))).toBe(true);
     expect(executedScripts.some((script) => script.includes('attachImageFromClipboard'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('clickSubmitButton'))).toBe(true);
+  });
+
+  it('records image stage failure without running image attach script', async () => {
+    const injectRuntimeScript = 'inject-runtime-script';
+    const executedScripts: string[] = [];
+    const imagePayload: PromptImagePayload = {
+      mimeType: 'image/png',
+      base64Data: 'QUJD',
+      sizeBytes: 3,
+      source: 'clipboard',
+    };
+    const pane = createPaneTarget(
+      0,
+      async (script) => {
+        if (script === injectRuntimeScript) {
+          return undefined;
+        }
+
+        if (script.includes('bridge.getStatus')) {
+          return {
+            success: true,
+            provider: 'chatgpt',
+            isStreaming: false,
+            isComplete: true,
+            hasResponse: true,
+          };
+        }
+
+        executedScripts.push(script);
+
+        if (script.includes('clickSubmitButton')) {
+          return { success: true };
+        }
+
+        if (script.includes('bridge.injectPrompt')) {
+          return { success: true };
+        }
+
+        return undefined;
+      },
+      async () => {
+        throw new Error('stage channel unavailable');
+      }
+    );
+
+    const service = new PromptDispatchService({
+      getPaneTargets: () => [pane.target],
+      getInjectRuntimeScript: () => injectRuntimeScript,
+      postSubmitGuardMs: 0,
+      queuePollIntervalMs: 10,
+      queueIdleConfirmations: 2,
+    });
+
+    const result = await service.sendPromptToAll({
+      text: 'hello with image',
+      image: imagePayload,
+    });
+
+    expect(result).toEqual({
+      success: true,
+      failures: ['pane-0: image attach failed (stage channel unavailable)'],
+    });
+    expect(pane.stagePromptImagePayload).toHaveBeenCalledTimes(1);
+    expect(pane.stagePromptImagePayload).toHaveBeenCalledWith(imagePayload);
+    expect(executedScripts.some((script) => script.includes('bridge.injectPrompt'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('attachImageFromClipboard'))).toBe(false);
     expect(executedScripts.some((script) => script.includes('clickSubmitButton'))).toBe(true);
   });
 

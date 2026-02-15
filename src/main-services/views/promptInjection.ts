@@ -1,6 +1,3 @@
-import type { PromptImagePayload } from '@shared-contracts/ipc/contracts';
-import { validatePromptImagePayload } from '@shared-contracts/ipc/promptImage';
-
 export interface PromptInjectionResult {
   success: boolean;
   reason?: string;
@@ -92,14 +89,7 @@ export function buildPromptDraftSyncEvalScript(text: string): string {
 `;
 }
 
-export function buildPromptImageAttachEvalScript(image: PromptImagePayload): string {
-  const validation = validatePromptImagePayload(image);
-  if (!validation.ok) {
-    throw new Error(validation.reason);
-  }
-  const normalizedImage = validation.value;
-  const serializedImage = JSON.stringify(normalizedImage);
-
+export function buildPromptImageAttachEvalScript(): string {
   return `
 (() => {
   const bridge = window.__llmBridge;
@@ -107,7 +97,17 @@ export function buildPromptImageAttachEvalScript(image: PromptImagePayload): str
     return { success: false, reason: "window.__llmBridge.attachImageFromClipboard is unavailable" };
   }
 
-  const result = bridge.attachImageFromClipboard(${serializedImage});
+  const paneAPI = window.paneAPI;
+  if (!paneAPI || typeof paneAPI.consumeStagedPromptImage !== "function") {
+    return { success: false, reason: "window.paneAPI.consumeStagedPromptImage is unavailable" };
+  }
+
+  const image = paneAPI.consumeStagedPromptImage();
+  if (!image) {
+    return { success: false, reason: "no staged prompt image payload is available" };
+  }
+
+  const result = bridge.attachImageFromClipboard(image);
   if (!result || result.success !== true) {
     const reason = result && typeof result.reason === "string"
       ? result.reason

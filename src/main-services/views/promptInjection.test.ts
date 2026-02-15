@@ -58,25 +58,12 @@ describe('buildPromptStatusEvalScript', () => {
 });
 
 describe('buildPromptImageAttachEvalScript', () => {
-  test('rejects invalid image payload', () => {
-    expect(() => buildPromptImageAttachEvalScript({
-      mimeType: '',
-      base64Data: 'abc',
-      sizeBytes: 1,
-      source: 'clipboard',
-    })).toThrow('prompt image mimeType must be a non-empty image/* string');
-  });
-
-  test('serializes image payload and calls bridge attachment API', () => {
-    const script = buildPromptImageAttachEvalScript({
-      mimeType: 'image/png',
-      base64Data: 'QUJD',
-      sizeBytes: 3,
-      source: 'clipboard',
-    });
+  test('consumes staged image payload through pane API before bridge attachment', () => {
+    const script = buildPromptImageAttachEvalScript();
 
     expect(script).toContain('bridge.attachImageFromClipboard');
-    expect(script).toContain('"mimeType":"image/png"');
+    expect(script).toContain('paneAPI.consumeStagedPromptImage');
+    expect(script).toContain('no staged prompt image payload is available');
     expect(script).toContain('return { success: true }');
   });
 });

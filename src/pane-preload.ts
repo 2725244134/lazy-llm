@@ -4,7 +4,13 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '@shared-contracts/ipc/contracts';
+import {
+  IPC_CHANNELS,
+  type PaneStagePromptImageAckPayload,
+  type PaneStagePromptImagePayload,
+  type PromptImagePayload,
+} from '@shared-contracts/ipc/contracts';
+import { normalizePromptImagePayload } from '@shared-contracts/ipc/promptImage';
 
 // Get pane index from additionalArguments (injected by main process via webPreferences)
 function getPaneIndex(): number {
@@ -19,6 +25,39 @@ function getPaneIndex(): number {
 }
 
 const paneIndex = getPaneIndex();
+let stagedPromptImage: PromptImagePayload | null = null;
+
+function sendPromptImageStageAck(payload: PaneStagePromptImageAckPayload): void {
+  ipcRenderer.send(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE_ACK, payload);
+}
+
+ipcRenderer.on(
+  IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE,
+  (_event, payload: PaneStagePromptImagePayload) => {
+    const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+    if (!requestId) {
+      return;
+    }
+
+    const normalizedImage = normalizePromptImagePayload(payload?.image);
+    if (!normalizedImage) {
+      sendPromptImageStageAck({
+        requestId,
+        paneIndex,
+        success: false,
+        reason: 'invalid prompt image payload',
+      });
+      return;
+    }
+
+    stagedPromptImage = normalizedImage;
+    sendPromptImageStageAck({
+      requestId,
+      paneIndex,
+      success: true,
+    });
+  }
+);
 
 const paneAPI = {
   /**
@@ -43,6 +82,15 @@ const paneAPI = {
       paneIndex,
       response,
     });
+  },
+
+  consumeStagedPromptImage: (): PromptImagePayload | null => {
+    if (!stagedPromptImage) {
+      return null;
+    }
+    const image = stagedPromptImage;
+    stagedPromptImage = null;
+    return image;
   },
 };
 
