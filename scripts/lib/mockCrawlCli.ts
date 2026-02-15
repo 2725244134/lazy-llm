@@ -54,6 +54,15 @@ function output<T>(result: CliOutput<T>): never {
   process.exit(result.success ? 0 : 1);
 }
 
+async function navigateToProvider(page: import('@playwright/test').Page, url: string): Promise<void> {
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  try {
+    await page.waitForLoadState('load', { timeout: 10000 });
+  } catch {
+    // Some providers keep long-lived requests; load-state timeout is non-fatal.
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -99,7 +108,7 @@ async function main(): Promise<void> {
   const page = await context.newPage();
 
   try {
-    await page.goto(profile.realUrl, { waitUntil: 'networkidle', timeout: 60000 });
+    await navigateToProvider(page, profile.realUrl);
 
     if (useHeaded) {
       process.stderr.write(
