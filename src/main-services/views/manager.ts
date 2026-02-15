@@ -369,15 +369,18 @@ export class ViewManager {
   }
 
   private attachQuickPromptDebugConsoleHooks(webContents: WebContents): void {
-    webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    webContents.on('console-message', (_event, level, message, line) => {
       if (typeof message !== 'string' || !message.includes('[QuickPromptDebug]')) {
         return;
       }
+      const sanitizedMessage = message
+        .replace(/[\u0000-\u001F\u007F]/g, ' ')
+        .slice(0, 320);
       console.info('[QuickPromptDebug][QuickPromptConsole]', {
         level,
-        message,
+        message: sanitizedMessage,
+        truncated: message.length > 320,
         line,
-        sourceId,
       });
     });
   }
