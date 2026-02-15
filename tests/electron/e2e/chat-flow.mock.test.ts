@@ -12,16 +12,12 @@ type BridgeCompletionResult = {
 const POLL_TIMEOUT = 15000;
 const POLL_INTERVAL = 250;
 
-async function sleep(ms: number): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 async function findMockPage(
   electronApp: ElectronApplication,
   urlFragment: string,
 ): Promise<Page> {
-  const deadline = Date.now() + POLL_TIMEOUT;
-  while (Date.now() < deadline) {
+  let matchedPage: Page | null = null;
+  await expect.poll(async () => {
     const pages = electronApp.context().pages();
     for (const page of pages) {
       if (page.isClosed()) {
@@ -30,17 +26,20 @@ async function findMockPage(
 
       try {
         if (page.url().includes(urlFragment)) {
-          return page;
+          matchedPage = page;
+          return true;
         }
       } catch {
         // Page may still be navigating.
       }
     }
+    return false;
+  }, { timeout: POLL_TIMEOUT, intervals: [POLL_INTERVAL] }).toBe(true);
 
-    await sleep(POLL_INTERVAL);
+  if (!matchedPage) {
+    throw new Error(`Mock page containing "${urlFragment}" not found within ${POLL_TIMEOUT}ms`);
   }
-
-  throw new Error(`Mock page containing "${urlFragment}" not found within ${POLL_TIMEOUT}ms`);
+  return matchedPage;
 }
 
 async function waitForBridgeProvider(page: Page, providerKey: string): Promise<void> {
@@ -61,8 +60,8 @@ async function findPromptInjectedPage(
   urlFragment: string,
   expectedPrompt: string,
 ): Promise<Page> {
-  const deadline = Date.now() + POLL_TIMEOUT;
-  while (Date.now() < deadline) {
+  let matchedPage: Page | null = null;
+  await expect.poll(async () => {
     const pages = electronApp.context().pages();
     for (const page of pages) {
       if (page.isClosed()) {
@@ -78,18 +77,22 @@ async function findPromptInjectedPage(
           return (window as unknown as { __mockLastInput?: string }).__mockLastInput === expected;
         }, expectedPrompt);
         if (hasPrompt) {
-          return page;
+          matchedPage = page;
+          return true;
         }
       } catch {
         // Page may still be navigating or detached.
       }
     }
-    await sleep(POLL_INTERVAL);
-  }
+    return false;
+  }, { timeout: POLL_TIMEOUT, intervals: [POLL_INTERVAL] }).toBe(true);
 
-  throw new Error(
-    `Unable to find injected mock page for "${urlFragment}" with prompt "${expectedPrompt}" within ${POLL_TIMEOUT}ms`,
-  );
+  if (!matchedPage) {
+    throw new Error(
+      `Unable to find injected mock page for "${urlFragment}" with prompt "${expectedPrompt}" within ${POLL_TIMEOUT}ms`,
+    );
+  }
+  return matchedPage;
 }
 
 async function waitForCompletion(page: Page): Promise<BridgeCompletionResult> {
