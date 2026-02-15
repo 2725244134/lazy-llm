@@ -9,6 +9,23 @@ import type {
   QuickPromptResizeResponse,
 } from '@shared-contracts/ipc/contracts';
 
+const QUICK_PROMPT_DEBUG_PREFIX = '[QuickPromptDebug][Preload]';
+
+function logQuickPromptDebug(message: string, details?: Record<string, unknown>): void {
+  if (details === undefined) {
+    console.info(QUICK_PROMPT_DEBUG_PREFIX, message);
+    return;
+  }
+  console.info(QUICK_PROMPT_DEBUG_PREFIX, message, details);
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error && typeof error.message === 'string') {
+    return error.message;
+  }
+  return String(error);
+}
+
 const quickPromptAPI = {
   sendPrompt: (request: PromptRequest): Promise<PromptResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SEND, request);
@@ -23,22 +40,37 @@ const quickPromptAPI = {
     return ipcRenderer.invoke(IPC_CHANNELS.QUICK_PROMPT_RESIZE, { height });
   },
   readClipboardImage: (): PromptImagePayload | null => {
-    const image = clipboard.readImage();
-    if (image.isEmpty()) {
+    logQuickPromptDebug('readClipboardImage invoked');
+    try {
+      const image = clipboard.readImage();
+      if (image.isEmpty()) {
+        logQuickPromptDebug('clipboard.readImage returned empty image');
+        return null;
+      }
+
+      const bytes = image.toPNG();
+      if (!bytes || bytes.byteLength <= 0) {
+        logQuickPromptDebug('clipboard image converted to empty PNG payload');
+        return null;
+      }
+
+      logQuickPromptDebug('clipboard image payload generated', {
+        mimeType: 'image/png',
+        sizeBytes: bytes.byteLength,
+      });
+
+      return {
+        mimeType: 'image/png',
+        base64Data: bytes.toString('base64'),
+        sizeBytes: bytes.byteLength,
+        source: 'clipboard',
+      };
+    } catch (error) {
+      logQuickPromptDebug('readClipboardImage failed', {
+        error: toErrorMessage(error),
+      });
       return null;
     }
-
-    const bytes = image.toPNG();
-    if (!bytes || bytes.byteLength <= 0) {
-      return null;
-    }
-
-    return {
-      mimeType: 'image/png',
-      base64Data: bytes.toString('base64'),
-      sizeBytes: bytes.byteLength,
-      source: 'clipboard',
-    };
   },
 };
 

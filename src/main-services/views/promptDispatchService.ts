@@ -91,6 +91,32 @@ function toFailureReason(error: unknown): string {
   return String(error);
 }
 
+const QUICK_PROMPT_DISPATCH_DEBUG_PREFIX = '[QuickPromptDebug][Dispatch]';
+
+function logQuickPromptDispatchDebug(message: string, details?: Record<string, unknown>): void {
+  if (details === undefined) {
+    console.info(QUICK_PROMPT_DISPATCH_DEBUG_PREFIX, message);
+    return;
+  }
+  console.info(QUICK_PROMPT_DISPATCH_DEBUG_PREFIX, message, details);
+}
+
+function summarizeImagePayload(image: PromptImagePayload | null): Record<string, unknown> {
+  if (!image) {
+    return {
+      hasImage: false,
+    };
+  }
+
+  return {
+    hasImage: true,
+    mimeType: image.mimeType,
+    sizeBytes: image.sizeBytes,
+    source: image.source,
+    base64Length: image.base64Data.length,
+  };
+}
+
 export class PromptDispatchService {
   private readonly getPaneTargets: () => PromptDispatchPaneExecutionTarget[];
   private readonly getInjectRuntimeScript: () => string | null;
@@ -168,6 +194,9 @@ export class PromptDispatchService {
   async sendPromptToAll(input: string | PromptRequest): Promise<PromptDispatchResult> {
     const normalizedRequestResult = this.normalizePromptRequest(input);
     if (!normalizedRequestResult.value) {
+      logQuickPromptDispatchDebug('sendPromptToAll rejected invalid normalized request', {
+        reason: normalizedRequestResult.reason ?? 'invalid-prompt',
+      });
       return {
         success: false,
         failures: [normalizedRequestResult.reason ?? 'invalid-prompt'],
@@ -175,6 +204,10 @@ export class PromptDispatchService {
     }
 
     const normalizedRequest = normalizedRequestResult.value;
+    logQuickPromptDispatchDebug('sendPromptToAll accepted request', {
+      textLength: normalizedRequest.text.length,
+      ...summarizeImagePayload(normalizedRequest.image),
+    });
 
     let promptScripts: PanePromptDispatchScripts;
     try {
@@ -182,6 +215,9 @@ export class PromptDispatchService {
     } catch (error) {
       const message = toFailureReason(error);
       const prefix = message.includes('prompt image') ? 'invalid-prompt-image' : 'invalid-prompt';
+      logQuickPromptDispatchDebug('sendPromptToAll failed to build prompt scripts', {
+        reason: message,
+      });
       return {
         success: false,
         failures: [`${prefix}: ${message}`],
@@ -191,11 +227,18 @@ export class PromptDispatchService {
     const paneTargets = this.getPaneTargets();
     const injectRuntimeScript = this.getInjectRuntimeScript();
     if (!injectRuntimeScript) {
+      logQuickPromptDispatchDebug('sendPromptToAll aborted due to missing inject runtime script', {
+        paneCount: paneTargets.length,
+      });
       return {
         success: false,
         failures: this.buildInjectRuntimeUnavailableFailures(paneTargets),
       };
     }
+    logQuickPromptDispatchDebug('sendPromptToAll dispatching to panes', {
+      paneCount: paneTargets.length,
+      ...summarizeImagePayload(promptScripts.imagePayload),
+    });
 
     const statusEvalScript = buildPromptStatusEvalScript();
     const outcomes = await Promise.all(
@@ -353,9 +396,18 @@ export class PromptDispatchService {
       injectRuntimeScript,
       statusEvalScript
     );
+    logQuickPromptDispatchDebug('pane busy-state evaluated', {
+      paneIndex: pane.paneIndex,
+      busyState,
+    });
 
     if (busyState !== 'idle') {
       this.queueLatestPromptForPane(pane.paneIndex, request);
+      logQuickPromptDispatchDebug('pane queued prompt because pane is not idle', {
+        paneIndex: pane.paneIndex,
+        busyState,
+        textLength: request.text.length,
+      });
       return { kind: 'queued' };
     }
 
@@ -366,6 +418,10 @@ export class PromptDispatchService {
     );
 
     if (!executionResult.success) {
+      logQuickPromptDispatchDebug('pane dispatch failed', {
+        paneIndex: pane.paneIndex,
+        reason: executionResult.reason ?? 'prompt injection failed',
+      });
       return {
         kind: 'failed',
         failure: `pane-${pane.paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`,
@@ -373,6 +429,10 @@ export class PromptDispatchService {
     }
 
     this.markPanePostSubmitGuard(pane.paneIndex);
+    logQuickPromptDispatchDebug('pane dispatch completed', {
+      paneIndex: pane.paneIndex,
+      nonBlockingFailureCount: executionResult.nonBlockingFailures.length,
+    });
     return {
       kind: 'dispatched',
       failures: executionResult.nonBlockingFailures,
@@ -385,6 +445,10 @@ export class PromptDispatchService {
     promptScripts: PanePromptDispatchScripts
   ): Promise<{ success: boolean; reason?: string; nonBlockingFailures: string[] }> {
     const nonBlockingFailures: string[] = [];
+    logQuickPromptDispatchDebug('executePromptDispatchOnPane started', {
+      paneIndex: pane.paneIndex,
+      hasImage: promptScripts.imagePayload !== null,
+    });
 
     const promptInjectionResult = await this.executePromptEvalScriptOnPane(
       pane,
@@ -392,16 +456,31 @@ export class PromptDispatchService {
       promptScripts.promptEvalScript
     );
     if (!promptInjectionResult.success) {
+      logQuickPromptDispatchDebug('prompt injection failed', {
+        paneIndex: pane.paneIndex,
+        reason: promptInjectionResult.reason ?? 'prompt injection failed',
+      });
       return {
         success: false,
         reason: promptInjectionResult.reason ?? 'prompt injection failed',
         nonBlockingFailures,
       };
     }
+    logQuickPromptDispatchDebug('prompt injection succeeded', {
+      paneIndex: pane.paneIndex,
+    });
 
     if (promptScripts.imagePayload) {
       try {
+        logQuickPromptDispatchDebug('staging prompt image payload for pane', {
+          paneIndex: pane.paneIndex,
+          ...summarizeImagePayload(promptScripts.imagePayload),
+        });
         const consumeToken = await pane.stagePromptImagePayload(promptScripts.imagePayload);
+        logQuickPromptDispatchDebug('prompt image payload staged', {
+          paneIndex: pane.paneIndex,
+          consumeTokenLength: consumeToken.length,
+        });
         const imageAttachEvalScript = buildPromptImageAttachEvalScript(consumeToken);
         const imageAttachResult = await this.executePromptEvalScriptOnPane(
           pane,
@@ -410,10 +489,19 @@ export class PromptDispatchService {
           'prompt image attachment failed'
         );
         if (!imageAttachResult.success) {
+          logQuickPromptDispatchDebug('prompt image attach failed', {
+            paneIndex: pane.paneIndex,
+            reason: imageAttachResult.reason ?? 'unknown reason',
+          });
           nonBlockingFailures.push(
             `pane-${pane.paneIndex}: image attach failed (${imageAttachResult.reason ?? 'unknown reason'})`
           );
         } else {
+          logQuickPromptDispatchDebug('prompt image attach succeeded; waiting readiness', {
+            paneIndex: pane.paneIndex,
+            timeoutMs: this.imageReadyWaitTimeoutMs,
+            pollIntervalMs: this.imageReadyPollIntervalMs,
+          });
           const imageReadyWaitScript = buildPromptImageReadyWaitEvalScript(
             this.imageReadyWaitTimeoutMs,
             this.imageReadyPollIntervalMs
@@ -425,12 +513,24 @@ export class PromptDispatchService {
             'prompt image readiness wait failed'
           );
           if (!imageReadyWaitResult.success) {
+            logQuickPromptDispatchDebug('prompt image readiness wait failed', {
+              paneIndex: pane.paneIndex,
+              reason: imageReadyWaitResult.reason ?? 'unknown reason',
+            });
             nonBlockingFailures.push(
               `pane-${pane.paneIndex}: image readiness wait failed (${imageReadyWaitResult.reason ?? 'unknown reason'})`
             );
+          } else {
+            logQuickPromptDispatchDebug('prompt image readiness wait succeeded', {
+              paneIndex: pane.paneIndex,
+            });
           }
         }
       } catch (error) {
+        logQuickPromptDispatchDebug('prompt image staging or attachment threw error', {
+          paneIndex: pane.paneIndex,
+          reason: toFailureReason(error),
+        });
         nonBlockingFailures.push(
           `pane-${pane.paneIndex}: image attach failed (${toFailureReason(error)})`
         );
@@ -445,14 +545,25 @@ export class PromptDispatchService {
         'prompt submit failed'
       );
       if (!submitResult.success) {
+        logQuickPromptDispatchDebug('prompt submit failed', {
+          paneIndex: pane.paneIndex,
+          reason: submitResult.reason ?? 'prompt submit failed',
+        });
         return {
           success: false,
           reason: submitResult.reason ?? 'prompt submit failed',
           nonBlockingFailures,
         };
       }
+      logQuickPromptDispatchDebug('prompt submit succeeded', {
+        paneIndex: pane.paneIndex,
+      });
     }
 
+    logQuickPromptDispatchDebug('executePromptDispatchOnPane finished', {
+      paneIndex: pane.paneIndex,
+      nonBlockingFailureCount: nonBlockingFailures.length,
+    });
     return {
       success: true,
       nonBlockingFailures,
@@ -476,12 +587,22 @@ export class PromptDispatchService {
         return { success: true };
       }
 
+      logQuickPromptDispatchDebug('prompt eval script returned unsuccessful result', {
+        paneIndex: pane.paneIndex,
+        fallbackReason,
+        resultReason: result?.reason ?? null,
+      });
       return {
         success: false,
         reason: result?.reason ?? fallbackReason,
       };
     } catch (error) {
       this.onPaneExecutionError(pane.paneIndex, error);
+      logQuickPromptDispatchDebug('prompt eval script threw error', {
+        paneIndex: pane.paneIndex,
+        fallbackReason,
+        reason: toFailureReason(error),
+      });
       return {
         success: false,
         reason: toFailureReason(error),

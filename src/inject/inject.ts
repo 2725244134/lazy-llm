@@ -76,6 +76,16 @@ function hostnameMatches(hostname: string, ruleHostname: string): boolean {
   return hostname.endsWith(`.${ruleHostname}`);
 }
 
+const QUICK_PROMPT_INJECT_DEBUG_PREFIX = '[QuickPromptDebug][Inject]';
+
+function logInjectDebug(message: string, details?: Record<string, unknown>): void {
+  if (details === undefined) {
+    console.info(QUICK_PROMPT_INJECT_DEBUG_PREFIX, message);
+    return;
+  }
+  console.info(QUICK_PROMPT_INJECT_DEBUG_PREFIX, message, details);
+}
+
 function detectProvider(): string {
   const hostname = normalizeHostname(window.location.hostname);
   for (const rule of providerDetectRules) {
@@ -130,6 +140,7 @@ function waitForImageAttachmentReady(
   pollIntervalMs: number
 ): Promise<WaitImageAttachmentReadyResult> {
   if (!config) {
+    logInjectDebug('waitForImageAttachmentReady: missing provider config', { provider });
     return Promise.resolve({ success: false, reason: 'No config for provider', provider });
   }
 
@@ -140,16 +151,33 @@ function waitForImageAttachmentReady(
     ? pollIntervalMs
     : 120;
   const startedAtMs = Date.now();
+  logInjectDebug('waitForImageAttachmentReady: polling started', {
+    provider,
+    timeoutMs: normalizedTimeoutMs,
+    pollIntervalMs: normalizedPollIntervalMs,
+  });
 
   return new Promise((resolve) => {
+    let pollCount = 0;
     const poll = () => {
+      pollCount += 1;
       const submitElement = findElement(config.submitSelectors);
       if (submitElement && isSubmitButtonReady(submitElement)) {
+        logInjectDebug('waitForImageAttachmentReady: submit is ready', {
+          provider,
+          elapsedMs: Date.now() - startedAtMs,
+          pollCount,
+        });
         resolve({ success: true, provider });
         return;
       }
 
       if (Date.now() - startedAtMs >= normalizedTimeoutMs) {
+        logInjectDebug('waitForImageAttachmentReady: timed out', {
+          provider,
+          elapsedMs: Date.now() - startedAtMs,
+          pollCount,
+        });
         resolve({
           success: false,
           reason: 'Timed out waiting for image attachment readiness',
@@ -199,20 +227,30 @@ function findPromptInputElement(config: ProviderInjectConfig | undefined): HTMLE
 
 function buildClipboardDataTransfer(file: File): DataTransfer | null {
   if (typeof DataTransfer !== 'function') {
+    logInjectDebug('buildClipboardDataTransfer: DataTransfer constructor is unavailable');
     return null;
   }
 
   try {
     const dataTransfer = new DataTransfer();
     dataTransfer.items.add(file);
+    logInjectDebug('buildClipboardDataTransfer: DataTransfer created', {
+      fileType: file.type,
+      fileSizeBytes: file.size,
+    });
     return dataTransfer;
-  } catch (_error) {
+  } catch (error) {
+    logInjectDebug('buildClipboardDataTransfer: failed to build data transfer', {
+      error: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 }
 
 function dispatchSyntheticPaste(target: HTMLElement, dataTransfer: DataTransfer): boolean {
   let dispatched = false;
+  let clipboardEventDispatched = false;
+  let beforeInputDispatched = false;
 
   if (typeof ClipboardEvent === 'function') {
     try {
@@ -223,7 +261,11 @@ function dispatchSyntheticPaste(target: HTMLElement, dataTransfer: DataTransfer)
       });
       target.dispatchEvent(clipboardEvent);
       dispatched = true;
-    } catch (_error) {
+      clipboardEventDispatched = true;
+    } catch (error) {
+      logInjectDebug('dispatchSyntheticPaste: ClipboardEvent dispatch failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       // Best effort; continue to fallback events.
     }
   }
@@ -238,11 +280,21 @@ function dispatchSyntheticPaste(target: HTMLElement, dataTransfer: DataTransfer)
       });
       target.dispatchEvent(beforeInputEvent);
       dispatched = true;
-    } catch (_error) {
+      beforeInputDispatched = true;
+    } catch (error) {
+      logInjectDebug('dispatchSyntheticPaste: beforeinput dispatch failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       // Best effort; continue to fallback events.
     }
   }
 
+  logInjectDebug('dispatchSyntheticPaste: dispatch outcome', {
+    targetTag: target.tagName,
+    clipboardEventDispatched,
+    beforeInputDispatched,
+    dispatched,
+  });
   return dispatched;
 }
 
@@ -280,20 +332,41 @@ function handleAttachImageFromClipboard(
 ): AttachImageResult {
   const normalizedImage = normalizePromptImagePayload(image);
   if (!normalizedImage) {
+    logInjectDebug('handleAttachImageFromClipboard: invalid image payload', { provider });
     return { success: false, reason: 'Invalid clipboard image payload', provider };
   }
+  logInjectDebug('handleAttachImageFromClipboard: payload accepted', {
+    provider,
+    mimeType: normalizedImage.mimeType,
+    sizeBytes: normalizedImage.sizeBytes,
+    base64Length: normalizedImage.base64Data.length,
+  });
 
   const inputElement = findPromptInputElement(config);
   if (!inputElement) {
+    logInjectDebug('handleAttachImageFromClipboard: input element not found', { provider });
     return { success: false, reason: 'Input element not found', provider };
   }
+  logInjectDebug('handleAttachImageFromClipboard: target input resolved', {
+    provider,
+    tagName: inputElement.tagName,
+    isContentEditable: inputElement.isContentEditable,
+  });
 
   inputElement.focus();
 
   let bytes: Uint8Array;
   try {
     bytes = decodeBase64(normalizedImage.base64Data);
-  } catch (_error) {
+    logInjectDebug('handleAttachImageFromClipboard: base64 decoded', {
+      provider,
+      byteLength: bytes.byteLength,
+    });
+  } catch (error) {
+    logInjectDebug('handleAttachImageFromClipboard: base64 decode failed', {
+      provider,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return { success: false, reason: 'Invalid base64 image payload', provider };
   }
 
@@ -303,14 +376,24 @@ function handleAttachImageFromClipboard(
   });
   const dataTransfer = buildClipboardDataTransfer(file);
   if (!dataTransfer) {
+    logInjectDebug('handleAttachImageFromClipboard: DataTransfer unavailable', {
+      provider,
+    });
     return { success: false, reason: 'DataTransfer is unavailable', provider };
   }
 
   const dispatched = dispatchSyntheticPaste(inputElement, dataTransfer);
   if (!dispatched) {
+    logInjectDebug('handleAttachImageFromClipboard: synthetic paste not accepted', {
+      provider,
+    });
     return { success: false, reason: 'Programmatic paste events were ignored', provider };
   }
 
+  logInjectDebug('handleAttachImageFromClipboard: synthetic paste dispatched', {
+    provider,
+    inputTag: inputElement.tagName,
+  });
   return { success: true, provider };
 }
 
@@ -399,6 +482,11 @@ async function waitForComplete(
 (() => {
   const provider = detectProvider();
   const config = providersConfig[provider];
+  logInjectDebug('bridge initialized', {
+    provider,
+    hasConfig: Boolean(config),
+    hostname: window.location.hostname,
+  });
 
   window.__llmBridge = {
     provider,

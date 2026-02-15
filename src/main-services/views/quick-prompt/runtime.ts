@@ -48,6 +48,33 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   let pendingPastedImage: QuickPromptImagePayload | null = null;
   let imageCaptureInFlight: Promise<void> | null = null;
   let imageCaptureToken = 0;
+  const debugPrefix = '[QuickPromptDebug]';
+
+  const toErrorMessage = (error: unknown): string => {
+    if (error instanceof Error && typeof error.message === 'string') {
+      return error.message;
+    }
+    return String(error);
+  };
+
+  const logDebug = (message: string, details?: unknown): void => {
+    if (details === undefined) {
+      console.info(debugPrefix, message);
+      return;
+    }
+    console.info(debugPrefix, message, details);
+  };
+
+  const summarizeClipboardItems = (
+    items: DataTransferItem[]
+  ): Array<{ kind: string; type: string }> => {
+    return items.map((item) => {
+      return {
+        kind: item.kind,
+        type: typeof item.type === 'string' ? item.type : '',
+      };
+    });
+  };
 
   const focusInput = (): void => {
     if (!input) {
@@ -261,17 +288,32 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   };
 
   const attachClipboardImage = async (file: File): Promise<boolean> => {
+    logDebug('attachClipboardImage: started', {
+      type: file?.type ?? 'unknown',
+      sizeBytes: file?.size ?? -1,
+    });
+
     if (typeof file.type !== 'string' || !file.type.startsWith('image/')) {
+      logDebug('attachClipboardImage: skipped non-image file', {
+        type: file.type,
+      });
       return false;
     }
 
     if (!Number.isFinite(file.size) || file.size <= 0) {
       pendingPastedImage = null;
+      logDebug('attachClipboardImage: cleared pending image because size is invalid', {
+        sizeBytes: file.size,
+      });
       return true;
     }
 
     if (file.size > config.maxClipboardImageBytes) {
       pendingPastedImage = null;
+      logDebug('attachClipboardImage: image exceeds size limit and was dropped', {
+        sizeBytes: file.size,
+        maxClipboardImageBytes: config.maxClipboardImageBytes,
+      });
       return true;
     }
 
@@ -283,9 +325,17 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
         sizeBytes: file.size,
         source: 'clipboard',
       };
+      logDebug('attachClipboardImage: image captured from paste event', {
+        mimeType: file.type,
+        sizeBytes: file.size,
+        base64Length: base64Data.length,
+      });
       return true;
-    } catch (_error) {
+    } catch (error) {
       pendingPastedImage = null;
+      logDebug('attachClipboardImage: failed to read image data', {
+        error: toErrorMessage(error),
+      });
       return true;
     }
   };
@@ -323,38 +373,60 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
 
   const captureImageFromSystemClipboard = (): boolean => {
     if (!window.quickPrompt || typeof window.quickPrompt.readClipboardImage !== 'function') {
+      logDebug('captureImageFromSystemClipboard: quickPrompt bridge unavailable');
       return false;
     }
 
     try {
+      logDebug('captureImageFromSystemClipboard: fallback read started');
       const payload = window.quickPrompt.readClipboardImage();
       const normalized = normalizeClipboardImagePayload(payload);
       if (!normalized) {
+        logDebug('captureImageFromSystemClipboard: no valid image payload from clipboard');
         return false;
       }
       pendingPastedImage = normalized;
+      logDebug('captureImageFromSystemClipboard: image captured', {
+        mimeType: normalized.mimeType,
+        sizeBytes: normalized.sizeBytes,
+        base64Length: normalized.base64Data.length,
+      });
       return true;
-    } catch (_error) {
+    } catch (error) {
+      logDebug('captureImageFromSystemClipboard: fallback read failed', {
+        error: toErrorMessage(error),
+      });
       return false;
     }
   };
 
   const trackImageCapture = (task: Promise<boolean>): void => {
     const token = ++imageCaptureToken;
+    logDebug('trackImageCapture: capture task registered', { token });
     imageCaptureInFlight = task.then(() => undefined).finally(() => {
       if (imageCaptureToken === token) {
         imageCaptureInFlight = null;
       }
+      logDebug('trackImageCapture: capture task settled', {
+        token,
+        clearedInFlight: imageCaptureToken === token,
+        hasPendingImage: pendingPastedImage !== null,
+      });
     });
   };
 
   const submit = async (): Promise<void> => {
     if (!input || !window.quickPrompt || typeof window.quickPrompt.sendPrompt !== 'function') {
+      logDebug('submit: skipped because input or bridge is unavailable');
       return;
     }
 
     const prompt = input.value.trim();
     if (!prompt || isSending) {
+      logDebug('submit: skipped due to empty prompt or sending state', {
+        promptLength: prompt.length,
+        isSending,
+      });
       return;
     }
 
@@ -371,17 +443,33 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
 
     try {
       if (imageCaptureInFlight) {
+        logDebug('submit: waiting for image capture task before send');
         await imageCaptureInFlight;
+        logDebug('submit: image capture task completed', {
+          hasPendingImage: pendingPastedImage !== null,
+        });
       }
 
+      logDebug('submit: sending prompt payload', {
+        promptLength: prompt.length,
+        hasImage: pendingPastedImage !== null,
+        imageMimeType: pendingPastedImage?.mimeType ?? null,
+        imageSizeBytes: pendingPastedImage?.sizeBytes ?? null,
+      });
       await window.quickPrompt.sendPrompt({
         text: prompt,
         image: pendingPastedImage ? { ...pendingPastedImage } : null,
       });
+      logDebug('submit: prompt sent successfully');
       input.value = '';
       pendingPastedImage = null;
       syncInputHeight();
       await hide();
+    } catch (error) {
+      logDebug('submit: send failed', {
+        error: toErrorMessage(error),
+      });
+      throw error;
     } finally {
       isSending = false;
       input.disabled = false;
@@ -397,26 +485,57 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     const clipboardItems = event.clipboardData
       ? Array.from(event.clipboardData.items || [])
       : [];
+    logDebug('paste: event received', {
+      clipboardItemCount: clipboardItems.length,
+      clipboardItems: summarizeClipboardItems(clipboardItems),
+      activeElementTag: document.activeElement instanceof HTMLElement
+        ? document.activeElement.tagName
+        : null,
+    });
 
     const imageItem = clipboardItems.find((item) => {
       return item.kind === 'file' && typeof item.type === 'string' && item.type.startsWith('image/');
     });
 
     if (!imageItem) {
+      logDebug('paste: no image item in clipboardData, trying system clipboard fallback');
       if (captureImageFromSystemClipboard()) {
+        logDebug('paste: fallback image captured, preventing default paste behavior');
         event.preventDefault();
+      } else {
+        logDebug('paste: fallback did not return an image payload');
       }
       return;
     }
 
     const file = imageItem.getAsFile();
     if (!file) {
+      logDebug('paste: image clipboard item returned null file');
       return;
     }
 
+    logDebug('paste: image file extracted from clipboardData', {
+      type: file.type,
+      sizeBytes: file.size,
+    });
     event.preventDefault();
     trackImageCapture(attachClipboardImage(file));
   });
+
+  window.addEventListener('paste', (event) => {
+    if (event.target === input) {
+      return;
+    }
+
+    const clipboardItems = event.clipboardData
+      ? Array.from(event.clipboardData.items || [])
+      : [];
+    logDebug('paste: observed outside quick prompt input', {
+      targetTag: event.target instanceof HTMLElement ? event.target.tagName : null,
+      clipboardItemCount: clipboardItems.length,
+      clipboardItems: summarizeClipboardItems(clipboardItems),
+    });
+  }, true);
 
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
@@ -442,6 +561,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     pendingPastedImage = null;
     imageCaptureInFlight = null;
     imageCaptureToken += 1;
+    logDebug('quick-prompt:open reset image capture state');
     syncInputHeight();
     focusInput();
   });
