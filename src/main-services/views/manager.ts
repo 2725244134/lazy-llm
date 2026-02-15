@@ -369,7 +369,8 @@ export class ViewManager {
   }
 
   private attachQuickPromptDebugConsoleHooks(webContents: WebContents): void {
-    webContents.on('console-message', (_event, level, message, line) => {
+    webContents.on('console-message', (details) => {
+      const { level, message, lineNumber } = details;
       if (typeof message !== 'string' || !message.includes('[QuickPromptDebug]')) {
         return;
       }
@@ -380,7 +381,7 @@ export class ViewManager {
         level,
         message: sanitizedMessage,
         truncated: message.length > 320,
-        line,
+        line: lineNumber,
       });
     });
   }

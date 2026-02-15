@@ -57,12 +57,20 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     return String(error);
   };
 
+  const stringifyDebugDetails = (details: unknown): string => {
+    try {
+      return JSON.stringify(details);
+    } catch (_error) {
+      return String(details);
+    }
+  };
+
   const logDebug = (message: string, details?: unknown): void => {
     if (details === undefined) {
-      console.info(debugPrefix, message);
+      console.info(`${debugPrefix} ${message}`);
       return;
     }
-    console.info(debugPrefix, message, details);
+    console.info(`${debugPrefix} ${message} ${stringifyDebugDetails(details)}`);
   };
 
   const summarizeClipboardItems = (

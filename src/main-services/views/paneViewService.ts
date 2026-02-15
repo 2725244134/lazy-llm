@@ -127,7 +127,8 @@ export class PaneViewService {
   }
 
   private attachPaneDebugConsoleHooks(paneIndex: number, webContents: WebContents): void {
-    webContents.on('console-message', (_event, level, message, line) => {
+    webContents.on('console-message', (details) => {
+      const { level, message, lineNumber } = details;
       if (typeof message !== 'string' || !message.includes('[QuickPromptDebug]')) {
         return;
       }
@@ -140,7 +141,7 @@ export class PaneViewService {
         level,
         message: sanitizedMessage,
         truncated: message.length > 320,
-        line,
+        line: lineNumber,
       });
     });
   }

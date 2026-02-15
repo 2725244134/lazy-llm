@@ -80,10 +80,18 @@ const QUICK_PROMPT_INJECT_DEBUG_PREFIX = '[QuickPromptDebug][Inject]';
 
 function logInjectDebug(message: string, details?: Record<string, unknown>): void {
   if (details === undefined) {
-    console.info(QUICK_PROMPT_INJECT_DEBUG_PREFIX, message);
+    console.info(`${QUICK_PROMPT_INJECT_DEBUG_PREFIX} ${message}`);
     return;
   }
-  console.info(QUICK_PROMPT_INJECT_DEBUG_PREFIX, message, details);
+  console.info(`${QUICK_PROMPT_INJECT_DEBUG_PREFIX} ${message} ${stringifyDebugDetails(details)}`);
+}
+
+function stringifyDebugDetails(details: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(details);
+  } catch (_error) {
+    return String(details);
+  }
 }
 
 function detectProvider(): string {

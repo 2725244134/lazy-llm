@@ -13,10 +13,10 @@ const QUICK_PROMPT_DEBUG_PREFIX = '[QuickPromptDebug][Preload]';
 
 function logQuickPromptDebug(message: string, details?: Record<string, unknown>): void {
   if (details === undefined) {
-    console.info(QUICK_PROMPT_DEBUG_PREFIX, message);
+    console.info(`${QUICK_PROMPT_DEBUG_PREFIX} ${message}`);
     return;
   }
-  console.info(QUICK_PROMPT_DEBUG_PREFIX, message, details);
+  console.info(`${QUICK_PROMPT_DEBUG_PREFIX} ${message} ${stringifyDebugDetails(details)}`);
 }
 
 function toErrorMessage(error: unknown): string {
@@ -24,6 +24,14 @@ function toErrorMessage(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function stringifyDebugDetails(details: Record<string, unknown>): string {
+  try {
+    return JSON.stringify(details);
+  } catch (_error) {
+    return String(details);
+  }
 }
 
 const quickPromptAPI = {
