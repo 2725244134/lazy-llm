@@ -711,8 +711,23 @@ export class ViewManager {
       if (mockProvidersFile && mockProvidersFile.trim().length > 0) {
         const mockConfigPath = resolve(process.cwd(), mockProvidersFile);
         if (existsSync(mockConfigPath)) {
-          const mockConfig = readFileSync(mockConfigPath, 'utf8');
-          script = `window.__lazyllm_extra_config = ${mockConfig};\n${script}`;
+          const mockConfigRaw = readFileSync(mockConfigPath, 'utf8');
+          try {
+            const parsedMockConfig = JSON.parse(mockConfigRaw) as unknown;
+            if (
+              typeof parsedMockConfig === 'object' &&
+              parsedMockConfig !== null &&
+              !Array.isArray(parsedMockConfig)
+            ) {
+              script = `window.__lazyllm_extra_config = ${JSON.stringify(parsedMockConfig)};\n${script}`;
+            } else {
+              console.error(
+                `[ViewManager] Mock providers config must be an object: ${mockConfigPath}`
+              );
+            }
+          } catch (error) {
+            console.error(`[ViewManager] Failed to parse mock providers config: ${mockConfigPath}`, error);
+          }
         }
       }
 
