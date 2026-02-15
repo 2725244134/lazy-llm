@@ -34,10 +34,6 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   // injected runtime will fail at execution time in the quick prompt view.
   const input = document.getElementById('quickPromptInput') as HTMLTextAreaElement | null;
   const panel = document.querySelector('.panel') as HTMLElement | null;
-  const attachmentRow = document.getElementById('quickPromptAttachmentRow') as HTMLElement | null;
-  const attachmentLabel = document.getElementById('quickPromptAttachmentLabel') as HTMLElement | null;
-  const attachmentClear = document.getElementById('quickPromptAttachmentClear') as HTMLButtonElement | null;
-  const attachmentError = document.getElementById('quickPromptAttachmentError') as HTMLElement | null;
 
   let isSending = false;
   let resizeRaf = 0;
@@ -48,8 +44,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   let queuedDraftText: string | null = null;
   let lastSyncedDraftText: string | null = null;
   let suppressDraftSyncUntil = 0;
-  let attachedImage: QuickPromptImagePayload | null = null;
-  let attachmentErrorTimer = 0;
+  let pendingPastedImage: QuickPromptImagePayload | null = null;
 
   const focusInput = (): void => {
     if (!input) {
@@ -98,75 +93,6 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
 
     const measured = panel.getBoundingClientRect().height + config.panelHeightSafetyGap;
     pendingViewHeight = Math.max(config.defaultViewHeight, Math.ceil(measured));
-  };
-
-  const clearAttachmentError = (): void => {
-    if (attachmentErrorTimer !== 0) {
-      clearTimeout(attachmentErrorTimer);
-      attachmentErrorTimer = 0;
-    }
-
-    if (!attachmentError) {
-      return;
-    }
-
-    attachmentError.hidden = true;
-    attachmentError.textContent = '';
-  };
-
-  const showAttachmentError = (message: string): void => {
-    if (!attachmentError) {
-      return;
-    }
-
-    clearAttachmentError();
-    attachmentError.hidden = false;
-    attachmentError.textContent = message;
-
-    attachmentErrorTimer = window.setTimeout(() => {
-      attachmentErrorTimer = 0;
-      if (!attachmentError) {
-        return;
-      }
-      attachmentError.hidden = true;
-      attachmentError.textContent = '';
-    }, 2600);
-  };
-
-  const formatFileSize = (sizeBytes: number): string => {
-    if (sizeBytes >= 1024 * 1024) {
-      return `${(sizeBytes / (1024 * 1024)).toFixed(2)} MB`;
-    }
-
-    if (sizeBytes >= 1024) {
-      return `${(sizeBytes / 1024).toFixed(1)} KB`;
-    }
-
-    return `${sizeBytes} B`;
-  };
-
-  const updateAttachmentUi = (): void => {
-    if (!attachmentRow || !attachmentLabel) {
-      return;
-    }
-
-    if (!attachedImage) {
-      attachmentRow.hidden = true;
-      attachmentLabel.textContent = '';
-      syncPanelHeight();
-      scheduleResize();
-      return;
-    }
-
-    attachmentRow.hidden = false;
-    attachmentLabel.textContent = `Image attached (${formatFileSize(attachedImage.sizeBytes)})`;
-    syncPanelHeight();
-    scheduleResize();
-  };
-
-  const clearAttachedImage = (): void => {
-    attachedImage = null;
-    updateAttachmentUi();
   };
 
   const syncInputHeight = (): void => {
@@ -337,28 +263,26 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     }
 
     if (!Number.isFinite(file.size) || file.size <= 0) {
-      showAttachmentError('Pasted image is empty.');
+      pendingPastedImage = null;
       return true;
     }
 
     if (file.size > config.maxClipboardImageBytes) {
-      showAttachmentError('Image must be 8 MB or smaller.');
+      pendingPastedImage = null;
       return true;
     }
 
     try {
       const base64Data = await readImageAsBase64(file);
-      attachedImage = {
+      pendingPastedImage = {
         mimeType: file.type,
         base64Data,
         sizeBytes: file.size,
         source: 'clipboard',
       };
-      clearAttachmentError();
-      updateAttachmentUi();
       return true;
     } catch (_error) {
-      showAttachmentError('Failed to process pasted image.');
+      pendingPastedImage = null;
       return true;
     }
   };
@@ -387,10 +311,10 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     try {
       await window.quickPrompt.sendPrompt({
         text: prompt,
-        image: attachedImage ? { ...attachedImage } : null,
+        image: pendingPastedImage ? { ...pendingPastedImage } : null,
       });
       input.value = '';
-      clearAttachedImage();
+      pendingPastedImage = null;
       syncInputHeight();
       await hide();
     } finally {
@@ -426,12 +350,6 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     void attachClipboardImage(file);
   });
 
-  attachmentClear?.addEventListener('click', () => {
-    clearAttachedImage();
-    clearAttachmentError();
-    focusInput();
-  });
-
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape') {
       event.preventDefault();
@@ -453,8 +371,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     resetDraftSyncState();
     input.disabled = false;
     isSending = false;
-    clearAttachedImage();
-    clearAttachmentError();
+    pendingPastedImage = null;
     syncInputHeight();
     focusInput();
   });
@@ -465,7 +382,6 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   });
 
   observePanelResize();
-  updateAttachmentUi();
   syncInputHeight();
 }
 

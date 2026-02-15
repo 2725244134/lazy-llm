@@ -74,47 +74,6 @@ body {
   opacity: 0.94;
 }
 
-.attachment-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-  padding: 7px 10px;
-  border-radius: 11px;
-  border: 1px solid var(--qp-inner-stroke);
-  background: rgba(255, 255, 255, 0.34);
-}
-
-.attachment-label {
-  color: var(--qp-text);
-  font-size: 13px;
-  line-height: 1.2;
-  font-weight: 500;
-}
-
-.attachment-clear {
-  border: none;
-  background: transparent;
-  color: var(--qp-border-focus);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  cursor: pointer;
-  padding: 0;
-}
-
-.attachment-clear:hover {
-  text-decoration: underline;
-}
-
-.attachment-error {
-  margin: 0 0 8px 0;
-  color: #a61b1b;
-  font-size: 12px;
-  line-height: 1.3;
-}
-
 .input {
   width: 100%;
   border: none;

@@ -17,18 +17,6 @@ export function buildQuickPromptHtml(): string {
   </head>
   <body>
     <div class="panel">
-      <div id="quickPromptAttachmentRow" class="attachment-row" hidden>
-        <span id="quickPromptAttachmentLabel" class="attachment-label"></span>
-        <button
-          id="quickPromptAttachmentClear"
-          class="attachment-clear"
-          type="button"
-          aria-label="Remove attached image"
-        >
-          Remove
-        </button>
-      </div>
-      <p id="quickPromptAttachmentError" class="attachment-error" hidden></p>
       <textarea
         id="quickPromptInput"
         class="input"
