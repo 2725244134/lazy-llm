@@ -862,6 +862,15 @@ export class ViewManager {
   }
 
   /**
+   * Attach prompt image to all panes without submitting
+   */
+  async attachPromptImageToAll(
+    image: PromptImagePayload
+  ): Promise<{ success: boolean; failures: string[] }> {
+    return this.promptDispatchService.attachPromptImageToAll(image);
+  }
+
+  /**
    * Sync prompt draft text to all panes without submitting
    */
   async syncPromptDraftToAll(text: string): Promise<{ success: boolean; failures: string[] }> {

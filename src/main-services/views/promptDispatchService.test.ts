@@ -409,6 +409,76 @@ describe('PromptDispatchService', () => {
     expect(pane.executeJavaScript).not.toHaveBeenCalled();
   });
 
+  it('attaches image payload to panes without injecting text or submitting', async () => {
+    const injectRuntimeScript = 'inject-runtime-script';
+    const executedScripts: string[] = [];
+    const imagePayload: PromptImagePayload = {
+      mimeType: 'image/png',
+      base64Data: 'QUJD',
+      sizeBytes: 3,
+      source: 'clipboard',
+    };
+
+    const pane = createPaneTarget(0, async (script) => {
+      if (script === injectRuntimeScript) {
+        return undefined;
+      }
+
+      executedScripts.push(script);
+
+      if (script.includes('attachImageFromClipboard')) {
+        return { success: true };
+      }
+
+      if (script.includes('waitForImageAttachmentReady')) {
+        return { success: true };
+      }
+
+      return undefined;
+    });
+
+    const service = new PromptDispatchService({
+      getPaneTargets: () => [pane.target],
+      getInjectRuntimeScript: () => injectRuntimeScript,
+      imageReadyWaitTimeoutMs: 3000,
+      imageReadyPollIntervalMs: 120,
+    });
+
+    const result = await service.attachPromptImageToAll(imagePayload);
+
+    expect(result).toEqual({
+      success: true,
+      failures: [],
+    });
+    expect(pane.stagePromptImagePayload).toHaveBeenCalledTimes(1);
+    expect(pane.stagePromptImagePayload).toHaveBeenCalledWith(imagePayload);
+    expect(executedScripts.some((script) => script.includes('attachImageFromClipboard'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('waitForImageAttachmentReady'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('bridge.injectPrompt'))).toBe(false);
+    expect(executedScripts.some((script) => script.includes('clickSubmitButton'))).toBe(false);
+  });
+
+  it('rejects invalid image payload for image-only dispatch', async () => {
+    const pane = createPaneTarget(0, async () => ({ success: true }));
+    const service = new PromptDispatchService({
+      getPaneTargets: () => [pane.target],
+      getInjectRuntimeScript: () => 'inject-runtime-script',
+    });
+
+    const result = await service.attachPromptImageToAll({
+      mimeType: '',
+      base64Data: 'QUJD',
+      sizeBytes: 3,
+      source: 'clipboard',
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.failures).toEqual([
+      'invalid-prompt-image: prompt image mimeType must be a non-empty image/* string',
+    ]);
+    expect(pane.executeJavaScript).not.toHaveBeenCalled();
+  });
+
   it('queues latest prompt while busy and dispatches only the newest prompt after idle', async () => {
     vi.useFakeTimers();
     try {

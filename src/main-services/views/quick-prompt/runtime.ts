@@ -16,7 +16,8 @@ interface QuickPromptImagePayload {
 }
 
 interface QuickPromptBridge {
-  sendPrompt(request: { text: string; image?: QuickPromptImagePayload | null }): Promise<unknown>;
+  sendPrompt(request: { text: string }): Promise<unknown>;
+  attachPromptImage(image: QuickPromptImagePayload): Promise<{ success?: boolean; failures?: string[] }>;
   syncPromptDraft(text: string): Promise<unknown>;
   hide(): Promise<unknown>;
   resize(height: number): Promise<unknown>;
@@ -45,8 +46,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   let queuedDraftText: string | null = null;
   let lastSyncedDraftText: string | null = null;
   let suppressDraftSyncUntil = 0;
-  let pendingPastedImage: QuickPromptImagePayload | null = null;
-  let imageCaptureInFlight: Promise<void> | null = null;
+  const imageCaptureTasks = new Set<Promise<void>>();
   let imageCaptureToken = 0;
   const debugPrefix = '[QuickPromptDebug]';
 
@@ -295,6 +295,47 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     });
   };
 
+  const dispatchClipboardImagePayload = async (
+    payload: QuickPromptImagePayload,
+    source: 'clipboardData' | 'clipboardFallback'
+  ): Promise<boolean> => {
+    if (!window.quickPrompt || typeof window.quickPrompt.attachPromptImage !== 'function') {
+      logDebug('dispatchClipboardImagePayload: quickPrompt.attachPromptImage is unavailable', {
+        source,
+      });
+      return false;
+    }
+
+    try {
+      const dispatchResult = await window.quickPrompt.attachPromptImage(payload);
+      const failures = Array.isArray(dispatchResult?.failures)
+        ? dispatchResult.failures.filter((failure): failure is string => typeof failure === 'string')
+        : [];
+      const success = dispatchResult?.success === true;
+
+      if (success) {
+        logDebug('dispatchClipboardImagePayload: image attached to provider inputs', {
+          source,
+          failureCount: failures.length,
+        });
+      } else {
+        logDebug('dispatchClipboardImagePayload: image attach returned unsuccessful result', {
+          source,
+          failureCount: failures.length,
+          failures,
+        });
+      }
+
+      return true;
+    } catch (error) {
+      logDebug('dispatchClipboardImagePayload: image attach threw error', {
+        source,
+        error: toErrorMessage(error),
+      });
+      return true;
+    }
+  };
+
   const attachClipboardImage = async (file: File): Promise<boolean> => {
     logDebug('attachClipboardImage: started', {
       type: file?.type ?? 'unknown',
@@ -309,15 +350,13 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     }
 
     if (!Number.isFinite(file.size) || file.size <= 0) {
-      pendingPastedImage = null;
-      logDebug('attachClipboardImage: cleared pending image because size is invalid', {
+      logDebug('attachClipboardImage: dropped image because size is invalid', {
         sizeBytes: file.size,
       });
       return true;
     }
 
     if (file.size > config.maxClipboardImageBytes) {
-      pendingPastedImage = null;
       logDebug('attachClipboardImage: image exceeds size limit and was dropped', {
         sizeBytes: file.size,
         maxClipboardImageBytes: config.maxClipboardImageBytes,
@@ -327,7 +366,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
 
     try {
       const base64Data = await readImageAsBase64(file);
-      pendingPastedImage = {
+      const payload: QuickPromptImagePayload = {
         mimeType: file.type,
         base64Data,
         sizeBytes: file.size,
@@ -338,9 +377,8 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
         sizeBytes: file.size,
         base64Length: base64Data.length,
       });
-      return true;
+      return dispatchClipboardImagePayload(payload, 'clipboardData');
     } catch (error) {
-      pendingPastedImage = null;
       logDebug('attachClipboardImage: failed to read image data', {
         error: toErrorMessage(error),
       });
@@ -379,10 +417,10 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     };
   };
 
-  const captureImageFromSystemClipboard = (): boolean => {
+  const captureImageFromSystemClipboard = (): Promise<boolean> | null => {
     if (!window.quickPrompt || typeof window.quickPrompt.readClipboardImage !== 'function') {
       logDebug('captureImageFromSystemClipboard: quickPrompt bridge unavailable');
-      return false;
+      return null;
     }
 
     try {
@@ -391,36 +429,34 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
       const normalized = normalizeClipboardImagePayload(payload);
       if (!normalized) {
         logDebug('captureImageFromSystemClipboard: no valid image payload from clipboard');
-        return false;
+        return null;
       }
-      pendingPastedImage = normalized;
       logDebug('captureImageFromSystemClipboard: image captured', {
         mimeType: normalized.mimeType,
         sizeBytes: normalized.sizeBytes,
         base64Length: normalized.base64Data.length,
       });
-      return true;
+      return dispatchClipboardImagePayload(normalized, 'clipboardFallback');
     } catch (error) {
       logDebug('captureImageFromSystemClipboard: fallback read failed', {
         error: toErrorMessage(error),
       });
-      return false;
+      return null;
     }
   };
 
   const trackImageCapture = (task: Promise<boolean>): void => {
     const token = ++imageCaptureToken;
     logDebug('trackImageCapture: capture task registered', { token });
-    imageCaptureInFlight = task.then(() => undefined).finally(() => {
-      if (imageCaptureToken === token) {
-        imageCaptureInFlight = null;
-      }
+    const trackedTask = task.then(() => undefined).finally(() => {
+      imageCaptureTasks.delete(trackedTask);
       logDebug('trackImageCapture: capture task settled', {
         token,
-        clearedInFlight: imageCaptureToken === token,
-        hasPendingImage: pendingPastedImage !== null,
+        remainingTasks: imageCaptureTasks.size,
+        staleSession: imageCaptureToken !== token,
       });
     });
+    imageCaptureTasks.add(trackedTask);
   };
 
   const submit = async (): Promise<void> => {
@@ -450,27 +486,24 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     input.disabled = true;
 
     try {
-      if (imageCaptureInFlight) {
-        logDebug('submit: waiting for image capture task before send');
-        await imageCaptureInFlight;
-        logDebug('submit: image capture task completed', {
-          hasPendingImage: pendingPastedImage !== null,
+      if (imageCaptureTasks.size > 0) {
+        logDebug('submit: waiting for image attach tasks before send', {
+          taskCount: imageCaptureTasks.size,
         });
+        while (imageCaptureTasks.size > 0) {
+          await Promise.all(Array.from(imageCaptureTasks));
+        }
+        logDebug('submit: image attach tasks completed');
       }
 
       logDebug('submit: sending prompt payload', {
         promptLength: prompt.length,
-        hasImage: pendingPastedImage !== null,
-        imageMimeType: pendingPastedImage?.mimeType ?? null,
-        imageSizeBytes: pendingPastedImage?.sizeBytes ?? null,
       });
       await window.quickPrompt.sendPrompt({
         text: prompt,
-        image: pendingPastedImage ? { ...pendingPastedImage } : null,
       });
       logDebug('submit: prompt sent successfully');
       input.value = '';
-      pendingPastedImage = null;
       syncInputHeight();
       await hide();
     } catch (error) {
@@ -507,9 +540,11 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
 
     if (!imageItem) {
       logDebug('paste: no image item in clipboardData, trying system clipboard fallback');
-      if (captureImageFromSystemClipboard()) {
+      const fallbackCaptureTask = captureImageFromSystemClipboard();
+      if (fallbackCaptureTask) {
         logDebug('paste: fallback image captured, preventing default paste behavior');
         event.preventDefault();
+        trackImageCapture(fallbackCaptureTask);
       } else {
         logDebug('paste: fallback did not return an image payload');
       }
@@ -644,9 +679,8 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     resetDraftSyncState();
     input.disabled = false;
     isSending = false;
-    pendingPastedImage = null;
-    imageCaptureInFlight = null;
     imageCaptureToken += 1;
+    imageCaptureTasks.clear();
     logDebug('quick-prompt:open reset image capture state');
     syncInputHeight();
     focusInput();

@@ -25,7 +25,18 @@ function getPaneIndex(): number {
 }
 
 const paneIndex = getPaneIndex();
-let stagedPromptImage: { image: PromptImagePayload; consumeToken: string } | null = null;
+const stagedPromptImages = new Map<string, PromptImagePayload>();
+const MAX_STAGED_PROMPT_IMAGES = 32;
+
+function trimStagedPromptImages(): void {
+  while (stagedPromptImages.size > MAX_STAGED_PROMPT_IMAGES) {
+    const oldestToken = stagedPromptImages.keys().next().value;
+    if (typeof oldestToken !== 'string') {
+      break;
+    }
+    stagedPromptImages.delete(oldestToken);
+  }
+}
 
 function sendPromptImageStageAck(payload: PaneStagePromptImageAckPayload): void {
   ipcRenderer.send(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE_ACK, payload);
@@ -63,10 +74,8 @@ ipcRenderer.on(
       return;
     }
 
-    stagedPromptImage = {
-      image: normalizedImage,
-      consumeToken,
-    };
+    stagedPromptImages.set(consumeToken, normalizedImage);
+    trimStagedPromptImages();
     sendPromptImageStageAck({
       requestId,
       paneIndex,
@@ -101,16 +110,16 @@ const paneAPI = {
   },
 
   consumeStagedPromptImage: (consumeToken: string): PromptImagePayload | null => {
-    if (!stagedPromptImage) {
+    if (typeof consumeToken !== 'string' || !consumeToken) {
       return null;
     }
 
-    if (stagedPromptImage.consumeToken !== consumeToken) {
+    const image = stagedPromptImages.get(consumeToken);
+    if (!image) {
       return null;
     }
 
-    const image = stagedPromptImage.image;
-    stagedPromptImage = null;
+    stagedPromptImages.delete(consumeToken);
     return image;
   },
 };

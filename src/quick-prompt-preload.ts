@@ -1,6 +1,7 @@
 import { clipboard, contextBridge, ipcRenderer } from 'electron';
 import { IPC_CHANNELS } from '@shared-contracts/ipc/contracts';
 import type {
+  PromptAttachImageResponse,
   PromptImagePayload,
   PromptRequest,
   PromptResponse,
@@ -37,6 +38,9 @@ function stringifyDebugDetails(details: Record<string, unknown>): string {
 const quickPromptAPI = {
   sendPrompt: (request: PromptRequest): Promise<PromptResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SEND, request);
+  },
+  attachPromptImage: (image: PromptImagePayload): Promise<PromptAttachImageResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_ATTACH_IMAGE, { image });
   },
   syncPromptDraft: (text: string): Promise<PromptSyncResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SYNC_DRAFT, { text });
