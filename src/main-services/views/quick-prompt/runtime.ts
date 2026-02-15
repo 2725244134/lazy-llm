@@ -657,6 +657,11 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     syncInputHeight();
   });
 
+  window.addEventListener('quick-prompt:submit', () => {
+    logDebug('quick-prompt:submit event received');
+    void submit();
+  });
+
   observePanelResize();
   syncInputHeight();
 }
