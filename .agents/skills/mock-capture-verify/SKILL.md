@@ -1,179 +1,122 @@
 ---
 name: mock-capture-verify
-description: End-to-end workflow: crawl real provider DOM + styles, detect drift, regenerate mocks, verify parity.
+description: Unified mock maintenance workflow with actionbook-driven browser control and CLI verification.
 type: flow
 ---
 
-# Mock Capture-Verify Workflow
+# Mock Capture Verify (Unified Skill)
 
-End-to-end pipeline for creating, maintaining, and verifying high-fidelity mock
-LLM provider pages used in E2E testing.
+Single entry skill for creating, validating, and maintaining provider mock pages.
+This skill replaces legacy split workflows and standardizes browser interaction on
+`$actionbook`.
 
-## Overview
+## Hard Rule: Browser Control via `$actionbook`
 
-```
-Real site ──crawl──> CrawlSnapshot (DOM + computed styles + CSS vars)
-                          │
-                     transform
-                          │
-                          v
-               Self-contained mock HTML (real styles + mock interaction runtime)
-                          │
-                     parity verify
-                          v
-                   tests/fixtures/mock-site/*.html
-```
+When interacting with real provider websites, always use `$actionbook`:
 
-Two generation paths are available:
+1. `actionbook search "<task>"`
+2. `actionbook get "<area_id>"`
+3. Then run `actionbook browser ...` commands with selectors from the manual
+4. If no manual or selector fails, use `actionbook browser snapshot` fallback
 
-- **Option A — Style-aware (high fidelity):** `mockCrawlCli` → `mockTransformCli`
-  Requires auth/storage-state for logged-in access. Produces visually faithful mocks.
-- **Option B — Template (fast fallback):** `mockGenerateCli`
-  Hand-written templates. No auth needed. Guarantees selector parity only.
-
-## Prerequisites
-
-- **Playwright** installed (`bun install`)
-- **Auth storage state** (Option A only): saved browser state in JSON format
-  (e.g. `auth/chatgpt.json`). Create via `playwright codegen --save-storage`.
+Do not perform ad-hoc website interaction outside `$actionbook` in this skill.
 
 ## Supported Providers
 
-| Key | Name | Real URL |
-|-----|------|----------|
-| `chatgpt` | ChatGPT | chatgpt.com |
-| `grok` | Grok | grok.com |
-| `gemini` | Gemini | gemini.google.com |
-| `claude` | Claude | claude.ai |
-| `perplexity` | Perplexity | perplexity.ai |
-| `aistudio` | AI Studio | aistudio.google.com |
+- `chatgpt`
+- `grok`
+- `gemini`
+- `claude`
+- `perplexity`
+- `aistudio`
 
-## Workflow Steps
+## Workflow A: Fast Template Path (default)
 
-### Step 1 — Crawl (style-aware)
-
-Capture DOM structure + computed styles from the real provider site.
+Use for CI and quick iteration when high visual fidelity is not required.
 
 ```bash
-# Single provider (with auth)
-bun run mock:crawl -- --provider chatgpt --storage-state auth/chatgpt.json > /tmp/chatgpt-crawl.json
+bun run mock:generate
+bun run mock:parity
+```
 
-# Single provider (manual login — opens headed browser)
-bun run mock:crawl -- --provider chatgpt > /tmp/chatgpt-crawl.json
+Pass condition:
+- `mock:generate` returns `success: true`
+- `mock:parity` returns `success: true`
 
-# Override region selectors
+## Workflow B: Live-Site Validation Path (actionbook + capture/crawl/transform)
+
+Use when real provider DOM likely changed.
+
+### Step 1: Inspect the real page with `$actionbook`
+
+```bash
+actionbook search "chatgpt chat input page"
+actionbook get "<area_id>"
+actionbook browser restart
+actionbook browser open "https://chatgpt.com/"
+actionbook browser snapshot
+```
+
+Then use actionbook selectors/snapshot to verify current UI structure before capture.
+
+### Step 2: Capture normalized DOM (for drift check)
+
+```bash
+bun run mock:capture -- --provider chatgpt --storage-state auth/chatgpt.json > /tmp/chatgpt-capture.json
+```
+
+### Step 3: Drift check (capture -> diff)
+
+```bash
+bun run mock:diff -- --capture /tmp/chatgpt-capture.json --manifest tests/fixtures/mock-site/parity-manifest.json
+```
+
+### Step 4: Crawl styled regions (for transform)
+
+```bash
 bun run mock:crawl -- --provider chatgpt --storage-state auth/chatgpt.json \
   --chat-selector 'main [class*="react-scroll-to-bottom"]' \
   --input-selector 'form:has(#prompt-textarea)' > /tmp/chatgpt-crawl.json
 ```
 
-Outputs `CliOutput<CrawlSnapshot>` JSON with:
-- `chatRegionDom` / `inputRegionDom` — styled DOM trees
-- `cssVariables` — `:root` CSS custom properties
-- `fonts` — font URL references
+If the selectors above fail, use actionbook snapshot output and re-run with explicit overrides.
+If crawl output has `success: false`, stop here and fix auth/selectors first.
 
-### Step 2 — Drift Detection
-
-Compare a capture snapshot against the parity manifest to detect selector drift.
-
-```bash
-bun run mock:diff -- \
-  --capture capture.json \
-  --manifest tests/fixtures/mock-site/parity-manifest.json
-```
-
-Outputs `CliOutput<DriftReport>` — lists found vs missing selectors.
-Non-zero exit if any `required` selectors are missing.
-
-### Step 3a — Transform (style-aware generation)
-
-Convert a crawl snapshot into a self-contained mock HTML page.
+### Step 5: Transform (crawl -> mock HTML)
 
 ```bash
 bun run mock:transform -- --provider chatgpt --snapshot /tmp/chatgpt-crawl.json
 ```
 
-The transform step:
-1. Generates `<style>` rules from crawled computed styles
-2. Serializes DOM tree to HTML (without inline styles)
-3. Injects runtime element IDs (`#chat-history`, `#send-btn`, `#streaming-btn`, etc.)
-4. Injects mock interaction runtime (`<script>` block)
-5. Writes `<provider>-simulation.html` and updates `mock-provider-config.json`
+`mock:transform` expects a valid successful `CrawlSnapshot`. Do not pass failed crawl
+envelopes (`{ "success": false, ... }`) into transform.
 
-### Step 3b — Generate (fast fallback)
-
-Generate mock HTML from hand-written templates (no auth needed).
-
-```bash
-# Single provider
-bun scripts/lib/mockGenerateCli.ts --provider chatgpt
-
-# All providers
-bun run mock:generate
-```
-
-### Step 4 — Verify Parity
-
-Run DOM parity checks and selector probes.
+### Step 6: Final verification
 
 ```bash
 bun run mock:parity
 ```
 
-Checks:
-- **DOM parity**: structural selectors exist in mock HTML
-- **Selector probes**: input, submit, streaming, complete, extract categories
-
-## Full Pipeline Examples
-
-### Option A — Style-aware (single provider)
+### Step 7: Cleanup
 
 ```bash
-# 1. Crawl
-bun run mock:crawl -- --provider chatgpt --storage-state auth/chatgpt.json > /tmp/chatgpt-crawl.json
-
-# 2. Check drift (optional)
-bun run mock:diff -- --capture /tmp/chatgpt-capture.json --manifest tests/fixtures/mock-site/parity-manifest.json
-
-# 3. Transform
-bun run mock:transform -- --provider chatgpt --snapshot /tmp/chatgpt-crawl.json
-
-# 4. Verify
-bun run mock:parity
+actionbook browser close
 ```
 
-### Option B — Template fallback (all providers)
+## Decision Guide
 
-```bash
-# 1. Generate all
-bun run mock:generate
+- Choose **Workflow A** when speed and selector-contract validation are enough
+- Choose **Workflow B** when real sites changed and mock fidelity needs refresh
 
-# 2. Verify
-bun run mock:parity
-```
+## Key Files
 
-## Decision Guide: Option A vs B
-
-| | Option A (Style-aware) | Option B (Template) |
-|---|---|---|
-| **Auth required** | Yes | No |
-| **Visual fidelity** | High (real styles) | Low (minimal CSS) |
-| **Selector parity** | Yes | Yes |
-| **When to use** | Updating mocks after real site changes | Quick iteration, CI, no-auth environments |
-| **Maintenance** | Re-crawl when site changes | Manual template updates |
-
-## Files
-
-| Path | Purpose |
-|------|---------|
-| `scripts/lib/mockTypes.ts` | Shared TypeScript types (CrawlSnapshot, StyledDomNode, etc.) |
-| `scripts/lib/mockProfiles.ts` | Built-in provider profiles with region selectors |
-| `scripts/lib/mockRuntime.ts` | Shared mock interaction runtime |
-| `scripts/lib/mockCrawlCli.ts` | Step 1: Style-aware DOM crawl CLI |
-| `scripts/lib/mockTransformCli.ts` | Step 3a: Crawl snapshot → mock HTML transform |
-| `scripts/lib/mockGenerateCli.ts` | Step 3b: Hand-written template generator |
-| `scripts/lib/mockGenerateAll.ts` | Step 3b: Batch generation for all providers |
-| `scripts/lib/mockDiffCli.ts` | Step 2: Drift detection CLI |
-| `scripts/lib/mockParityCli.ts` | Step 4: Parity verification CLI |
-| `scripts/lib/mockCaptureCli.ts` | DOM capture CLI (used by diff step) |
-| `tests/fixtures/mock-site/` | Generated mock HTML + config + manifest |
+- `scripts/lib/mockCrawlCli.ts`
+- `scripts/lib/mockCaptureCli.ts`
+- `scripts/lib/mockDiffCli.ts`
+- `scripts/lib/mockTransformCli.ts`
+- `scripts/lib/mockGenerateCli.ts`
+- `scripts/lib/mockGenerateAll.ts`
+- `scripts/lib/mockParityCli.ts`
+- `scripts/lib/mockRuntime.ts`
+- `scripts/lib/mockProfiles.ts`
+- `tests/fixtures/mock-site/`
