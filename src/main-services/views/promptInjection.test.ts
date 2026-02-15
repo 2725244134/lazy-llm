@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 import {
   buildPromptDraftSyncEvalScript,
   buildPromptImageAttachEvalScript,
+  buildPromptImageReadyWaitEvalScript,
   buildPromptInjectionEvalScript,
   buildPromptSubmitEvalScript,
   buildPromptStatusEvalScript,
@@ -81,5 +82,24 @@ describe('buildPromptSubmitEvalScript', () => {
 
     expect(script).toContain('bridge.clickSubmitButton');
     expect(script).toContain('clickSubmitButton returned an unsuccessful result');
+  });
+});
+
+describe('buildPromptImageReadyWaitEvalScript', () => {
+  test('rejects invalid wait parameters', () => {
+    expect(() => buildPromptImageReadyWaitEvalScript(0, 120)).toThrow(
+      'prompt image readiness timeout must be a positive number'
+    );
+    expect(() => buildPromptImageReadyWaitEvalScript(3000, 0)).toThrow(
+      'prompt image readiness poll interval must be a positive number'
+    );
+  });
+
+  test('calls bridge waitForImageAttachmentReady with serialized values', () => {
+    const script = buildPromptImageReadyWaitEvalScript(3000, 120);
+
+    expect(script).toContain('bridge.waitForImageAttachmentReady');
+    expect(script).toContain('(3000, 120)');
+    expect(script).toContain('waitForImageAttachmentReady returned an unsuccessful result');
   });
 });

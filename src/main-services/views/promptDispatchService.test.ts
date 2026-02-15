@@ -243,6 +243,81 @@ describe('PromptDispatchService', () => {
     expect(executedScripts.some((script) => script.includes('clickSubmitButton'))).toBe(true);
   });
 
+  it('waits for image readiness and degrades to text submit on readiness timeout', async () => {
+    const injectRuntimeScript = 'inject-runtime-script';
+    const executedScripts: string[] = [];
+    const imagePayload: PromptImagePayload = {
+      mimeType: 'image/png',
+      base64Data: 'QUJD',
+      sizeBytes: 3,
+      source: 'clipboard',
+    };
+
+    const pane = createPaneTarget(0, async (script) => {
+      if (script === injectRuntimeScript) {
+        return undefined;
+      }
+
+      if (script.includes('bridge.getStatus')) {
+        return {
+          success: true,
+          provider: 'chatgpt',
+          isStreaming: false,
+          isComplete: true,
+          hasResponse: true,
+        };
+      }
+
+      executedScripts.push(script);
+
+      if (script.includes('waitForImageAttachmentReady')) {
+        return { success: false, reason: 'Timed out waiting for image attachment readiness' };
+      }
+
+      if (script.includes('attachImageFromClipboard')) {
+        return { success: true };
+      }
+
+      if (script.includes('clickSubmitButton')) {
+        return { success: true };
+      }
+
+      if (script.includes('bridge.injectPrompt')) {
+        return { success: true };
+      }
+
+      return undefined;
+    });
+
+    const service = new PromptDispatchService({
+      getPaneTargets: () => [pane.target],
+      getInjectRuntimeScript: () => injectRuntimeScript,
+      postSubmitGuardMs: 0,
+      queuePollIntervalMs: 10,
+      queueIdleConfirmations: 2,
+      imageReadyWaitTimeoutMs: 3000,
+      imageReadyPollIntervalMs: 120,
+    });
+
+    const result = await service.sendPromptToAll({
+      text: 'hello with image',
+      image: imagePayload,
+    });
+
+    expect(result).toEqual({
+      success: true,
+      failures: [
+        'pane-0: image readiness wait failed (Timed out waiting for image attachment readiness)',
+      ],
+    });
+    expect(pane.stagePromptImagePayload).toHaveBeenCalledTimes(1);
+    expect(pane.stagePromptImagePayload).toHaveBeenCalledWith(imagePayload);
+    expect(executedScripts.some((script) => script.includes('attachImageFromClipboard'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('waitForImageAttachmentReady'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('(3000, 120)'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('clickSubmitButton'))).toBe(true);
+  });
+
   it('records image stage failure without running image attach script', async () => {
     const injectRuntimeScript = 'inject-runtime-script';
     const executedScripts: string[] = [];

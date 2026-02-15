@@ -8,6 +8,11 @@ export interface PromptImageAttachResult {
   reason?: string;
 }
 
+export interface PromptImageReadyWaitResult {
+  success: boolean;
+  reason?: string;
+}
+
 export interface PromptStatusEvalResult {
   success: boolean;
   isStreaming?: boolean;
@@ -118,6 +123,45 @@ export function buildPromptImageAttachEvalScript(consumeToken: string): string {
     const reason = result && typeof result.reason === "string"
       ? result.reason
       : "attachImageFromClipboard returned an unsuccessful result";
+    return { success: false, reason };
+  }
+
+  return { success: true };
+})();
+`;
+}
+
+function normalizePositiveWaitValue(value: number, name: string): number {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive number`);
+  }
+  return Math.ceil(value);
+}
+
+export function buildPromptImageReadyWaitEvalScript(timeoutMs: number, pollIntervalMs: number): string {
+  const normalizedTimeoutMs = normalizePositiveWaitValue(
+    timeoutMs,
+    'prompt image readiness timeout'
+  );
+  const normalizedPollIntervalMs = normalizePositiveWaitValue(
+    pollIntervalMs,
+    'prompt image readiness poll interval'
+  );
+  const serializedTimeoutMs = JSON.stringify(normalizedTimeoutMs);
+  const serializedPollIntervalMs = JSON.stringify(normalizedPollIntervalMs);
+
+  return `
+(async () => {
+  const bridge = window.__llmBridge;
+  if (!bridge || typeof bridge.waitForImageAttachmentReady !== "function") {
+    return { success: false, reason: "window.__llmBridge.waitForImageAttachmentReady is unavailable" };
+  }
+
+  const result = await bridge.waitForImageAttachmentReady(${serializedTimeoutMs}, ${serializedPollIntervalMs});
+  if (!result || result.success !== true) {
+    const reason = result && typeof result.reason === "string"
+      ? result.reason
+      : "waitForImageAttachmentReady returned an unsuccessful result";
     return { success: false, reason };
   }
 

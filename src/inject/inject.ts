@@ -28,6 +28,12 @@ interface AttachImageResult {
   provider?: string;
 }
 
+interface WaitImageAttachmentReadyResult {
+  success: boolean;
+  reason?: string;
+  provider?: string;
+}
+
 interface ExtractResult {
   success: boolean;
   response: string | null;
@@ -43,6 +49,10 @@ declare global {
       provider: string;
       injectPrompt: (text: string, autoSubmit?: boolean) => InjectResult;
       attachImageFromClipboard: (image: PromptImagePayload) => AttachImageResult;
+      waitForImageAttachmentReady: (
+        timeoutMs?: number,
+        pollIntervalMs?: number
+      ) => Promise<WaitImageAttachmentReadyResult>;
       clickSubmitButton: () => SubmitResult;
       extractResponse: () => ExtractResult;
       extractAllResponses: () => string[];
@@ -93,6 +103,66 @@ function clickSubmit(config: ProviderInjectConfig | undefined): SubmitResult {
 
   button.click();
   return { success: true };
+}
+
+function isSubmitButtonReady(button: HTMLElement): boolean {
+  if (button instanceof HTMLButtonElement && button.disabled) {
+    return false;
+  }
+
+  const disabledAttribute = button.getAttribute('disabled');
+  if (disabledAttribute !== null) {
+    return false;
+  }
+
+  const ariaDisabled = button.getAttribute('aria-disabled');
+  if (typeof ariaDisabled === 'string' && ariaDisabled.toLowerCase() === 'true') {
+    return false;
+  }
+
+  return true;
+}
+
+function waitForImageAttachmentReady(
+  config: ProviderInjectConfig | undefined,
+  provider: string,
+  timeoutMs: number,
+  pollIntervalMs: number
+): Promise<WaitImageAttachmentReadyResult> {
+  if (!config) {
+    return Promise.resolve({ success: false, reason: 'No config for provider', provider });
+  }
+
+  const normalizedTimeoutMs = Number.isFinite(timeoutMs) && timeoutMs > 0
+    ? timeoutMs
+    : 3000;
+  const normalizedPollIntervalMs = Number.isFinite(pollIntervalMs) && pollIntervalMs > 0
+    ? pollIntervalMs
+    : 120;
+  const startedAtMs = Date.now();
+
+  return new Promise((resolve) => {
+    const poll = () => {
+      const submitElement = findElement(config.submitSelectors);
+      if (submitElement && isSubmitButtonReady(submitElement)) {
+        resolve({ success: true, provider });
+        return;
+      }
+
+      if (Date.now() - startedAtMs >= normalizedTimeoutMs) {
+        resolve({
+          success: false,
+          reason: 'Timed out waiting for image attachment readiness',
+          provider,
+        });
+        return;
+      }
+
+      setTimeout(poll, normalizedPollIntervalMs);
+    };
+
+    poll();
+  });
 }
 
 function decodeBase64(base64Data: string): Uint8Array {
@@ -334,6 +404,8 @@ async function waitForComplete(
     provider,
     injectPrompt: (text, autoSubmit = true) => handleInject(config, text, autoSubmit, provider),
     attachImageFromClipboard: (image) => handleAttachImageFromClipboard(config, image, provider),
+    waitForImageAttachmentReady: (timeoutMs = 3000, pollIntervalMs = 120) =>
+      waitForImageAttachmentReady(config, provider, timeoutMs, pollIntervalMs),
     clickSubmitButton: () => clickSubmit(config),
     extractResponse: () => handleExtractResponse(config, provider),
     extractAllResponses: () => handleExtractAllResponses(config),

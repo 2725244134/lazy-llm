@@ -3,10 +3,12 @@ import { normalizePromptImagePayload, validatePromptImagePayload } from '@shared
 import {
   buildPromptDraftSyncEvalScript,
   buildPromptImageAttachEvalScript,
+  buildPromptImageReadyWaitEvalScript,
   buildPromptInjectionEvalScript,
   buildPromptStatusEvalScript,
   buildPromptSubmitEvalScript,
   type PromptImageAttachResult,
+  type PromptImageReadyWaitResult,
   type PromptInjectionResult,
   type PromptStatusEvalResult,
 } from './promptInjection.js';
@@ -35,12 +37,16 @@ export interface PromptDispatchServiceOptions {
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
   onQueuedDispatchFailure?: (paneIndex: number, promptText: string, failures: string[]) => void;
   onQueueTimeout?: (paneIndex: number, promptText: string, waitedMs: number) => void;
+  imageReadyWaitTimeoutMs?: number;
+  imageReadyPollIntervalMs?: number;
 }
 
 const DEFAULT_QUEUE_POLL_INTERVAL_MS = 350;
 const DEFAULT_QUEUE_MAX_WAIT_MS = 90_000;
 const DEFAULT_QUEUE_IDLE_CONFIRMATIONS = 2;
 const DEFAULT_POST_SUBMIT_GUARD_MS = 2_000;
+const DEFAULT_IMAGE_READY_WAIT_TIMEOUT_MS = 3_000;
+const DEFAULT_IMAGE_READY_POLL_INTERVAL_MS = 120;
 
 type PaneBusyState = 'busy' | 'idle' | 'unknown';
 
@@ -98,6 +104,8 @@ export class PromptDispatchService {
   private readonly clearTimer: (timer: ReturnType<typeof setTimeout>) => void;
   private readonly onQueuedDispatchFailure: (paneIndex: number, promptText: string, failures: string[]) => void;
   private readonly onQueueTimeout: (paneIndex: number, promptText: string, waitedMs: number) => void;
+  private readonly imageReadyWaitTimeoutMs: number;
+  private readonly imageReadyPollIntervalMs: number;
 
   private readonly paneQueueStates = new Map<number, PaneQueueState>();
   private readonly panePostSubmitGuardUntilMs = new Map<number, number>();
@@ -147,6 +155,14 @@ export class PromptDispatchService {
         }
       );
     });
+    this.imageReadyWaitTimeoutMs = Math.max(
+      1,
+      Math.floor(options.imageReadyWaitTimeoutMs ?? DEFAULT_IMAGE_READY_WAIT_TIMEOUT_MS)
+    );
+    this.imageReadyPollIntervalMs = Math.max(
+      1,
+      Math.floor(options.imageReadyPollIntervalMs ?? DEFAULT_IMAGE_READY_POLL_INTERVAL_MS)
+    );
   }
 
   async sendPromptToAll(input: string | PromptRequest): Promise<PromptDispatchResult> {
@@ -397,6 +413,22 @@ export class PromptDispatchService {
           nonBlockingFailures.push(
             `pane-${pane.paneIndex}: image attach failed (${imageAttachResult.reason ?? 'unknown reason'})`
           );
+        } else {
+          const imageReadyWaitScript = buildPromptImageReadyWaitEvalScript(
+            this.imageReadyWaitTimeoutMs,
+            this.imageReadyPollIntervalMs
+          );
+          const imageReadyWaitResult = await this.executePromptEvalScriptOnPane(
+            pane,
+            injectRuntimeScript,
+            imageReadyWaitScript,
+            'prompt image readiness wait failed'
+          );
+          if (!imageReadyWaitResult.success) {
+            nonBlockingFailures.push(
+              `pane-${pane.paneIndex}: image readiness wait failed (${imageReadyWaitResult.reason ?? 'unknown reason'})`
+            );
+          }
         }
       } catch (error) {
         nonBlockingFailures.push(
@@ -438,7 +470,7 @@ export class PromptDispatchService {
       const result = await pane.executeJavaScript(
         promptEvalScript,
         true
-      ) as PromptInjectionResult | PromptImageAttachResult | undefined;
+      ) as PromptInjectionResult | PromptImageAttachResult | PromptImageReadyWaitResult | undefined;
 
       if (result?.success) {
         return { success: true };
