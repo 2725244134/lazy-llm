@@ -12,6 +12,9 @@ contract (selectors + interaction flow) of real provider sites so that the
 - `chatgpt` (ChatGPT — chatgpt.com)
 - `grok` (Grok — grok.com)
 - `gemini` (Gemini — gemini.google.com)
+- `claude` (Claude — claude.ai)
+- `perplexity` (Perplexity — perplexity.ai)
+- `aistudio` (AI Studio — aistudio.google.com)
 
 ## Four-Step Flow
 
@@ -26,6 +29,22 @@ bun scripts/lib/mockCaptureCli.ts --provider <key> [--storage-state <path>]
 - With `--storage-state`: uses saved browser state for authenticated access.
 - Without: opens a headed browser for manual login.
 - Outputs `CaptureSnapshot` JSON (raw HTML + normalized DOM tree).
+
+### Step 1.5 — Drift Check
+
+Compare a capture snapshot against the parity manifest to detect selector drift.
+
+```bash
+bun scripts/lib/mockDiffCli.ts \
+  --capture capture.json \
+  --manifest tests/fixtures/mock-site/parity-manifest.json
+```
+
+- Reads the `CaptureSnapshot` JSON (with `normalizedDom` tree).
+- Reads the parity manifest entry for the matching provider.
+- Performs simplified CSS selector matching against the normalized DOM tree.
+- Outputs `CliOutput<DriftReport>` — marks selectors as found or missing.
+- If any `required` selectors are missing, the exit code is non-zero.
 
 ### Step 2 — Normalize
 
@@ -103,6 +122,8 @@ input → submit → streaming detection → completion detection → response e
 | `scripts/lib/mockTypes.ts` | Shared TypeScript types |
 | `scripts/lib/mockProfiles.ts` | Built-in provider profiles |
 | `scripts/lib/mockCaptureCli.ts` | Step 1: DOM capture CLI |
+| `scripts/lib/mockDiffCli.ts` | Step 1.5: Drift detection CLI |
 | `scripts/lib/mockGenerateCli.ts` | Step 3: Mock generation CLI |
+| `scripts/lib/mockGenerateAll.ts` | Step 3: Batch generation for all providers |
 | `scripts/lib/mockParityCli.ts` | Step 4: Parity verification CLI |
 | `tests/fixtures/mock-site/` | Generated mock HTML + config + manifest |
