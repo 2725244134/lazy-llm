@@ -16,14 +16,18 @@ describe('quick prompt script', () => {
 
   it('sends prompt payload with optional image and clears state after submit', () => {
     expect(QUICK_PROMPT_SCRIPT).toContain('await window.quickPrompt.sendPrompt({');
+    expect(QUICK_PROMPT_SCRIPT).toContain('if (imageCaptureInFlight) {');
+    expect(QUICK_PROMPT_SCRIPT).toContain('await imageCaptureInFlight;');
     expect(QUICK_PROMPT_SCRIPT).toContain('image: pendingPastedImage ? { ...pendingPastedImage } : null');
     expect(QUICK_PROMPT_SCRIPT).toContain('input.value = ""');
     expect(QUICK_PROMPT_SCRIPT).toContain('pendingPastedImage = null;');
   });
 
-  it('supports clipboard image paste with size guard', () => {
+  it('supports clipboard image paste with size guard and system clipboard fallback', () => {
     expect(QUICK_PROMPT_SCRIPT).toContain('input?.addEventListener("paste", (event) => {');
     expect(QUICK_PROMPT_SCRIPT).toContain('maxClipboardImageBytes');
-    expect(QUICK_PROMPT_SCRIPT).toContain('pendingPastedImage = null;');
+    expect(QUICK_PROMPT_SCRIPT).toContain('captureImageFromSystemClipboard');
+    expect(QUICK_PROMPT_SCRIPT).toContain('readClipboardImage');
+    expect(QUICK_PROMPT_SCRIPT).toContain('trackImageCapture(attachClipboardImage(file));');
   });
 });

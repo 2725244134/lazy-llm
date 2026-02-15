@@ -20,6 +20,7 @@ interface QuickPromptBridge {
   syncPromptDraft(text: string): Promise<unknown>;
   hide(): Promise<unknown>;
   resize(height: number): Promise<unknown>;
+  readClipboardImage(): QuickPromptImagePayload | null;
 }
 
 declare global {
@@ -45,6 +46,8 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   let lastSyncedDraftText: string | null = null;
   let suppressDraftSyncUntil = 0;
   let pendingPastedImage: QuickPromptImagePayload | null = null;
+  let imageCaptureInFlight: Promise<void> | null = null;
+  let imageCaptureToken = 0;
 
   const focusInput = (): void => {
     if (!input) {
@@ -287,6 +290,64 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     }
   };
 
+  const normalizeClipboardImagePayload = (
+    payload: QuickPromptImagePayload | null | undefined
+  ): QuickPromptImagePayload | null => {
+    if (!payload) {
+      return null;
+    }
+
+    if (typeof payload.mimeType !== 'string' || !payload.mimeType.startsWith('image/')) {
+      return null;
+    }
+
+    if (!Number.isFinite(payload.sizeBytes) || payload.sizeBytes <= 0) {
+      return null;
+    }
+
+    if (payload.sizeBytes > config.maxClipboardImageBytes) {
+      return null;
+    }
+
+    if (typeof payload.base64Data !== 'string' || payload.base64Data.length === 0) {
+      return null;
+    }
+
+    return {
+      mimeType: payload.mimeType,
+      base64Data: payload.base64Data,
+      sizeBytes: payload.sizeBytes,
+      source: 'clipboard',
+    };
+  };
+
+  const captureImageFromSystemClipboard = (): boolean => {
+    if (!window.quickPrompt || typeof window.quickPrompt.readClipboardImage !== 'function') {
+      return false;
+    }
+
+    try {
+      const payload = window.quickPrompt.readClipboardImage();
+      const normalized = normalizeClipboardImagePayload(payload);
+      if (!normalized) {
+        return false;
+      }
+      pendingPastedImage = normalized;
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  };
+
+  const trackImageCapture = (task: Promise<boolean>): void => {
+    const token = ++imageCaptureToken;
+    imageCaptureInFlight = task.then(() => undefined).finally(() => {
+      if (imageCaptureToken === token) {
+        imageCaptureInFlight = null;
+      }
+    });
+  };
+
   const submit = async (): Promise<void> => {
     if (!input || !window.quickPrompt || typeof window.quickPrompt.sendPrompt !== 'function') {
       return;
@@ -309,6 +370,10 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     input.disabled = true;
 
     try {
+      if (imageCaptureInFlight) {
+        await imageCaptureInFlight;
+      }
+
       await window.quickPrompt.sendPrompt({
         text: prompt,
         image: pendingPastedImage ? { ...pendingPastedImage } : null,
@@ -338,6 +403,9 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     });
 
     if (!imageItem) {
+      if (captureImageFromSystemClipboard()) {
+        event.preventDefault();
+      }
       return;
     }
 
@@ -347,7 +415,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     }
 
     event.preventDefault();
-    void attachClipboardImage(file);
+    trackImageCapture(attachClipboardImage(file));
   });
 
   window.addEventListener('keydown', (event) => {
@@ -372,6 +440,8 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     input.disabled = false;
     isSending = false;
     pendingPastedImage = null;
+    imageCaptureInFlight = null;
+    imageCaptureToken += 1;
     syncInputHeight();
     focusInput();
   });
