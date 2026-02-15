@@ -25,7 +25,7 @@ function getPaneIndex(): number {
 }
 
 const paneIndex = getPaneIndex();
-let stagedPromptImage: PromptImagePayload | null = null;
+let stagedPromptImage: { image: PromptImagePayload; consumeToken: string } | null = null;
 
 function sendPromptImageStageAck(payload: PaneStagePromptImageAckPayload): void {
   ipcRenderer.send(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE_ACK, payload);
@@ -35,7 +35,20 @@ ipcRenderer.on(
   IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE,
   (_event, payload: PaneStagePromptImagePayload) => {
     const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+    const consumeToken = typeof payload?.consumeToken === 'string'
+      ? payload.consumeToken
+      : '';
     if (!requestId) {
+      return;
+    }
+
+    if (!consumeToken) {
+      sendPromptImageStageAck({
+        requestId,
+        paneIndex,
+        success: false,
+        reason: 'invalid prompt image consume token',
+      });
       return;
     }
 
@@ -50,7 +63,10 @@ ipcRenderer.on(
       return;
     }
 
-    stagedPromptImage = normalizedImage;
+    stagedPromptImage = {
+      image: normalizedImage,
+      consumeToken,
+    };
     sendPromptImageStageAck({
       requestId,
       paneIndex,
@@ -84,11 +100,16 @@ const paneAPI = {
     });
   },
 
-  consumeStagedPromptImage: (): PromptImagePayload | null => {
+  consumeStagedPromptImage: (consumeToken: string): PromptImagePayload | null => {
     if (!stagedPromptImage) {
       return null;
     }
-    const image = stagedPromptImage;
+
+    if (stagedPromptImage.consumeToken !== consumeToken) {
+      return null;
+    }
+
+    const image = stagedPromptImage.image;
     stagedPromptImage = null;
     return image;
   },

@@ -6,12 +6,12 @@ import {
 } from './promptDispatchService';
 
 type ExecuteJavaScriptFn = (script: string, userGesture?: boolean) => Promise<unknown>;
-type StagePromptImagePayloadFn = (image: PromptImagePayload) => Promise<void>;
+type StagePromptImagePayloadFn = (image: PromptImagePayload) => Promise<string>;
 
 function createPaneTarget(
   paneIndex: number,
   executeImpl: ExecuteJavaScriptFn,
-  stageImageImpl: StagePromptImagePayloadFn = async () => undefined
+  stageImageImpl: StagePromptImagePayloadFn = async () => 'consume-token'
 ): {
   target: PromptDispatchPaneExecutionTarget;
   executeJavaScript: ReturnType<typeof vi.fn<ExecuteJavaScriptFn>>;
@@ -238,6 +238,8 @@ describe('PromptDispatchService', () => {
     expect(pane.stagePromptImagePayload).toHaveBeenCalledWith(imagePayload);
     expect(executedScripts.some((script) => script.includes('bridge.injectPrompt'))).toBe(true);
     expect(executedScripts.some((script) => script.includes('attachImageFromClipboard'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('"consume-token"'))).toBe(true);
+    expect(executedScripts.some((script) => script.includes('QUJD'))).toBe(false);
     expect(executedScripts.some((script) => script.includes('clickSubmitButton'))).toBe(true);
   });
 

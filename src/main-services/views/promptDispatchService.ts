@@ -14,7 +14,7 @@ import {
 export interface PromptDispatchPaneExecutionTarget {
   paneIndex: number;
   executeJavaScript(script: string, userGesture?: boolean): Promise<unknown>;
-  stagePromptImagePayload(image: PromptImagePayload): Promise<void>;
+  stagePromptImagePayload(image: PromptImagePayload): Promise<string>;
 }
 
 export interface PromptDispatchResult {
@@ -52,7 +52,6 @@ type PanePromptDispatchOutcome =
 interface PanePromptDispatchScripts {
   promptEvalScript: string;
   imagePayload: PromptImagePayload | null;
-  imageAttachEvalScript: string | null;
   submitEvalScript: string | null;
 }
 
@@ -318,14 +317,10 @@ export class PromptDispatchService {
       autoSubmit: !hasImage,
     });
     const submitEvalScript = hasImage ? buildPromptSubmitEvalScript() : null;
-    const imageAttachEvalScript = hasImage
-      ? buildPromptImageAttachEvalScript()
-      : null;
 
     return {
       promptEvalScript,
       imagePayload: request.image,
-      imageAttachEvalScript,
       submitEvalScript,
     };
   }
@@ -388,22 +383,14 @@ export class PromptDispatchService {
       };
     }
 
-    if (promptScripts.imagePayload && promptScripts.imageAttachEvalScript) {
-      let imageStaged = false;
+    if (promptScripts.imagePayload) {
       try {
-        await pane.stagePromptImagePayload(promptScripts.imagePayload);
-        imageStaged = true;
-      } catch (error) {
-        nonBlockingFailures.push(
-          `pane-${pane.paneIndex}: image attach failed (${toFailureReason(error)})`
-        );
-      }
-
-      if (imageStaged) {
+        const consumeToken = await pane.stagePromptImagePayload(promptScripts.imagePayload);
+        const imageAttachEvalScript = buildPromptImageAttachEvalScript(consumeToken);
         const imageAttachResult = await this.executePromptEvalScriptOnPane(
           pane,
           injectRuntimeScript,
-          promptScripts.imageAttachEvalScript,
+          imageAttachEvalScript,
           'prompt image attachment failed'
         );
         if (!imageAttachResult.success) {
@@ -411,6 +398,10 @@ export class PromptDispatchService {
             `pane-${pane.paneIndex}: image attach failed (${imageAttachResult.reason ?? 'unknown reason'})`
           );
         }
+      } catch (error) {
+        nonBlockingFailures.push(
+          `pane-${pane.paneIndex}: image attach failed (${toFailureReason(error)})`
+        );
       }
     }
 

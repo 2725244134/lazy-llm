@@ -89,7 +89,13 @@ export function buildPromptDraftSyncEvalScript(text: string): string {
 `;
 }
 
-export function buildPromptImageAttachEvalScript(): string {
+export function buildPromptImageAttachEvalScript(consumeToken: string): string {
+  const normalizedConsumeToken = consumeToken.trim();
+  if (!normalizedConsumeToken) {
+    throw new Error('prompt image consume token cannot be empty');
+  }
+  const serializedConsumeToken = JSON.stringify(normalizedConsumeToken);
+
   return `
 (() => {
   const bridge = window.__llmBridge;
@@ -102,7 +108,7 @@ export function buildPromptImageAttachEvalScript(): string {
     return { success: false, reason: "window.paneAPI.consumeStagedPromptImage is unavailable" };
   }
 
-  const image = paneAPI.consumeStagedPromptImage();
+  const image = paneAPI.consumeStagedPromptImage(${serializedConsumeToken});
   if (!image) {
     return { success: false, reason: "no staged prompt image payload is available" };
   }

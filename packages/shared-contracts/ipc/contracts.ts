@@ -156,6 +156,7 @@ export interface PaneInjectPromptPayload {
 
 export interface PaneStagePromptImagePayload {
   requestId: string;
+  consumeToken: string;
   image: PromptImagePayload;
 }
 

@@ -58,11 +58,18 @@ describe('buildPromptStatusEvalScript', () => {
 });
 
 describe('buildPromptImageAttachEvalScript', () => {
+  test('rejects empty consume token', () => {
+    expect(() => buildPromptImageAttachEvalScript('   ')).toThrow(
+      'prompt image consume token cannot be empty'
+    );
+  });
+
   test('consumes staged image payload through pane API before bridge attachment', () => {
-    const script = buildPromptImageAttachEvalScript();
+    const script = buildPromptImageAttachEvalScript('consume-token');
 
     expect(script).toContain('bridge.attachImageFromClipboard');
     expect(script).toContain('paneAPI.consumeStagedPromptImage');
+    expect(script).toContain('"consume-token"');
     expect(script).toContain('no staged prompt image payload is available');
     expect(script).toContain('return { success: true }');
   });

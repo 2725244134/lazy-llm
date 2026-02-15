@@ -12,6 +12,7 @@ import {
   WebContentsView,
   webContents,
 } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -179,8 +180,9 @@ export class ViewManager {
   private promptImageStageRequestSeq = 0;
   private readonly pendingPromptImageStageRequests = new Map<string, {
     paneIndex: number;
+    consumeToken: string;
     timer: ReturnType<typeof setTimeout>;
-    resolve: () => void;
+    resolve: (consumeToken: string) => void;
     reject: (error: Error) => void;
   }>();
 
@@ -514,7 +516,7 @@ export class ViewManager {
     }
 
     if (payload.success === true) {
-      pending.resolve();
+      pending.resolve(pending.consumeToken);
       return;
     }
 
@@ -529,18 +531,20 @@ export class ViewManager {
     paneWebContents: WebContents,
     paneIndex: number,
     image: PromptImagePayload
-  ): Promise<void> {
+  ): Promise<string> {
     if (paneWebContents.isDestroyed()) {
       return Promise.reject(new Error('pane webContents is destroyed'));
     }
 
     const requestId = `${paneIndex}:${Date.now()}:${this.promptImageStageRequestSeq++}`;
+    const consumeToken = randomUUID();
     const stagePayload: PaneStagePromptImagePayload = {
       requestId,
+      consumeToken,
       image,
     };
 
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<string>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingPromptImageStageRequests.delete(requestId);
         reject(new Error('timed out while staging prompt image payload'));
@@ -554,6 +558,7 @@ export class ViewManager {
 
       this.pendingPromptImageStageRequests.set(requestId, {
         paneIndex,
+        consumeToken,
         timer,
         resolve,
         reject: (error) => {
