@@ -10,11 +10,12 @@ import {
   WebContentsView,
   webContents,
 } from 'electron';
-import { existsSync, readFileSync } from 'fs';
-import { join, resolve } from 'path';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { APP_CONFIG } from '@shared-config/src/app.js';
 import { type LayoutResult } from './geometry.js';
+import { loadInjectRuntimeScript } from './injectRuntimeLoader.js';
 import { LayoutService } from './layoutService.js';
 import { PaneLoadMonitor, areUrlsEquivalent } from './paneLoadMonitor.js';
 import { PaneViewService, type PaneUserAgentStrategy } from './paneViewService.js';
@@ -102,18 +103,6 @@ const rendererIndexPath = resolveFirstExistingPath([
   join(runtimeDir, '..', 'dist', 'index.html'),
   join(runtimeDir, '..', '..', 'dist', 'index.html'),
   join(process.cwd(), 'dist', 'index.html'),
-]);
-
-const injectRuntimePath = resolveFirstExistingPath([
-  ...(typeof process.resourcesPath === 'string'
-    ? [join(process.resourcesPath, 'inject.js')]
-    : []),
-  join(runtimeDir, 'inject.js'),
-  join(runtimeDir, '..', 'inject.js'),
-  join(runtimeDir, '..', '..', 'inject.js'),
-  join(runtimeDir, '..', '..', 'dist-electron', 'inject.js'),
-  join(process.cwd(), 'dist-electron', 'inject.js'),
-  join(process.cwd(), '.vite', 'build', 'inject.js'),
 ]);
 
 const QUICK_PROMPT_PASSTHROUGH_MODE = APP_CONFIG.layout.quickPrompt.passthroughMode;
@@ -698,45 +687,19 @@ export class ViewManager {
       return this.injectRuntimeScript;
     }
 
-    if (!existsSync(injectRuntimePath)) {
-      console.error(`[ViewManager] Inject runtime not found at ${injectRuntimePath}`);
+    const script = loadInjectRuntimeScript({
+      runtimeDir,
+      cwd: process.cwd(),
+      resourcesPath: process.resourcesPath,
+      mockProvidersFile: process.env.LAZYLLM_MOCK_PROVIDERS_FILE,
+      logger: console,
+    });
+    if (!script) {
       return null;
     }
 
-    try {
-      let script = readFileSync(injectRuntimePath, 'utf8');
-
-      // Prepend mock provider config if available
-      const mockProvidersFile = process.env.LAZYLLM_MOCK_PROVIDERS_FILE;
-      if (mockProvidersFile && mockProvidersFile.trim().length > 0) {
-        const mockConfigPath = resolve(process.cwd(), mockProvidersFile);
-        if (existsSync(mockConfigPath)) {
-          const mockConfigRaw = readFileSync(mockConfigPath, 'utf8');
-          try {
-            const parsedMockConfig = JSON.parse(mockConfigRaw) as unknown;
-            if (
-              typeof parsedMockConfig === 'object' &&
-              parsedMockConfig !== null &&
-              !Array.isArray(parsedMockConfig)
-            ) {
-              script = `window.__lazyllm_extra_config = ${JSON.stringify(parsedMockConfig)};\n${script}`;
-            } else {
-              console.error(
-                `[ViewManager] Mock providers config must be an object: ${mockConfigPath}`
-              );
-            }
-          } catch (error) {
-            console.error(`[ViewManager] Failed to parse mock providers config: ${mockConfigPath}`, error);
-          }
-        }
-      }
-
-      this.injectRuntimeScript = script;
-      return this.injectRuntimeScript;
-    } catch (error) {
-      console.error('[ViewManager] Failed to read inject runtime:', error);
-      return null;
-    }
+    this.injectRuntimeScript = script;
+    return this.injectRuntimeScript;
   }
 
   /**
