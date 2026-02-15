@@ -531,8 +531,17 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   });
 
   input?.addEventListener('keydown', (event) => {
+    const keyboardEvent = event as KeyboardEvent;
+    const keyCode = typeof keyboardEvent.keyCode === 'number' ? keyboardEvent.keyCode : null;
+    const code = typeof keyboardEvent.code === 'string' ? keyboardEvent.code : null;
+    const isEnterLike = event.key === 'Enter'
+      || code === 'Enter'
+      || code === 'NumpadEnter'
+      || keyCode === 13;
     logDebug('input keydown observed', {
       key: event.key,
+      code,
+      keyCode,
       shiftKey: event.shiftKey,
       ctrlKey: event.ctrlKey,
       metaKey: event.metaKey,
@@ -545,10 +554,33 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
       return;
     }
 
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (isEnterLike && !event.shiftKey) {
       event.preventDefault();
       event.stopPropagation();
       logDebug('input keydown triggers submit');
+      void submit();
+    }
+  });
+
+  input?.addEventListener('beforeinput', (event) => {
+    const inputEvent = event as InputEvent;
+    const inputType = typeof inputEvent.inputType === 'string' ? inputEvent.inputType : null;
+    const isComposing = Boolean(inputEvent.isComposing);
+    logDebug('input beforeinput observed', {
+      inputType,
+      isComposing,
+      defaultPrevented: event.defaultPrevented,
+      inputValueLength: input?.value.length ?? 0,
+    });
+
+    if (isComposing) {
+      return;
+    }
+
+    if (inputType === 'insertLineBreak') {
+      event.preventDefault();
+      event.stopPropagation();
+      logDebug('input beforeinput triggers submit');
       void submit();
     }
   });
@@ -569,8 +601,17 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   }, true);
 
   window.addEventListener('keydown', (event) => {
+    const keyboardEvent = event as KeyboardEvent;
+    const keyCode = typeof keyboardEvent.keyCode === 'number' ? keyboardEvent.keyCode : null;
+    const code = typeof keyboardEvent.code === 'string' ? keyboardEvent.code : null;
+    const isEnterLike = event.key === 'Enter'
+      || code === 'Enter'
+      || code === 'NumpadEnter'
+      || keyCode === 13;
     logDebug('window keydown observed', {
       key: event.key,
+      code,
+      keyCode,
       shiftKey: event.shiftKey,
       ctrlKey: event.ctrlKey,
       metaKey: event.metaKey,
@@ -588,7 +629,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
       return;
     }
 
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (isEnterLike && !event.shiftKey) {
       event.preventDefault();
       logDebug('window keydown triggers submit');
       void submit();
