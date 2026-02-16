@@ -17,7 +17,7 @@ export function registerPromptIpcHandlers(context: IpcRuntimeContext): void {
 
     const normalizedRequest: PromptRequest = {
       text: typeof request?.text === 'string' ? request.text : '',
-      image: normalizePromptImagePayload(request?.image),
+      image: normalizePromptImagePayload(request?.image) ?? undefined,
     };
     console.info('[QuickPromptDebug][IPC] PROMPT_SEND received', {
       textLength: normalizedRequest.text.length,
