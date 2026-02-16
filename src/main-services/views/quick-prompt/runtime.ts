@@ -332,7 +332,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
         source,
         error: toErrorMessage(error),
       });
-      return true;
+      return false;
     }
   };
 
@@ -382,7 +382,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
       logDebug('attachClipboardImage: failed to read image data', {
         error: toErrorMessage(error),
       });
-      return true;
+      return false;
     }
   };
 

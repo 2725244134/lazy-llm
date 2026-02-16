@@ -79,7 +79,7 @@ export interface PaneUpdateResponse {
 
 export interface PromptRequest {
   text: string;
-  image?: PromptImagePayload | null;
+  image?: PromptImagePayload;
 }
 
 export interface PromptResponse {
