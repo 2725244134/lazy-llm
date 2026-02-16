@@ -6,10 +6,13 @@ import {
   BaseWindow,
   type Event,
   type Input,
+  ipcMain,
+  type IpcMainEvent,
   type WebContents,
   WebContentsView,
   webContents,
 } from 'electron';
+import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -36,8 +39,13 @@ import { padProviderSequence } from '../ipc-handlers/providerConfig.js';
 import type {
   AppConfig,
   PaneCount,
+  PaneStagePromptImageAckPayload,
+  PaneStagePromptImagePayload,
+  PromptImagePayload,
+  PromptRequest,
   ProviderMeta,
 } from '@shared-contracts/ipc/contracts';
+import { IPC_CHANNELS } from '@shared-contracts/ipc/contracts';
 
 const runtimeDir = fileURLToPath(new URL('.', import.meta.url));
 
@@ -136,6 +144,7 @@ const SIDEBAR_TRANSITION_DURATION_MS = APP_CONFIG.layout.sidebar.transitionDurat
 const SIDEBAR_ANIMATION_TICK_MS = 16;
 const PANE_LOAD_MAX_RETRIES = 2;
 const PANE_LOAD_RETRY_BASE_DELAY_MS = 450;
+const PANE_STAGE_PROMPT_IMAGE_TIMEOUT_MS = 2_000;
 type ManagedShortcutAction = Exclude<ShortcutAction, 'noop'>;
 
 interface ViewManagerOptions {
@@ -168,6 +177,14 @@ export class ViewManager {
   private sidebarWidthAnimationToken = 0;
   private sidebarWidthAnimationTarget: number | null = null;
   private rendererDevServerUrl: string | null;
+  private promptImageStageRequestSeq = 0;
+  private readonly pendingPromptImageStageRequests = new Map<string, {
+    paneIndex: number;
+    consumeToken: string;
+    timer: ReturnType<typeof setTimeout>;
+    resolve: (consumeToken: string) => void;
+    reject: (error: Error) => void;
+  }>();
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -210,12 +227,20 @@ export class ViewManager {
         executeJavaScript: (script: string, userGesture?: boolean) => {
           return pane.view.webContents.executeJavaScript(script, userGesture);
         },
+        stagePromptImagePayload: (image) => {
+          return this.stagePromptImagePayload(
+            pane.view.webContents,
+            pane.paneIndex,
+            image
+          );
+        },
       })),
       getInjectRuntimeScript: () => this.getInjectRuntimeScript(),
       onPaneExecutionError: (paneIndex, error) => {
         console.error(`[ViewManager] Failed to send prompt to pane ${paneIndex}:`, error);
       },
     });
+    ipcMain.on(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE_ACK, this.handlePaneStagePromptImageAck);
     const paneLoadMonitor = new PaneLoadMonitor({
       maxRetries: PANE_LOAD_MAX_RETRIES,
       retryBaseDelayMs: PANE_LOAD_RETRY_BASE_DELAY_MS,
@@ -343,6 +368,58 @@ export class ViewManager {
     webContents.setZoomFactor(this.sidebarZoomFactor);
   }
 
+  private attachQuickPromptDebugConsoleHooks(webContents: WebContents): void {
+    webContents.on('console-message', (details) => {
+      const { level, message, lineNumber } = details;
+      if (typeof message !== 'string' || !message.includes('[QuickPromptDebug]')) {
+        return;
+      }
+      const sanitizedMessage = message
+        .replace(/[\u0000-\u001F\u007F]/g, ' ')
+        .slice(0, 320);
+      console.info('[QuickPromptDebug][QuickPromptConsole]', {
+        level,
+        message: sanitizedMessage,
+        truncated: message.length > 320,
+        line: lineNumber,
+      });
+    });
+  }
+
+  private attachQuickPromptSubmitShortcutHooks(webContents: WebContents): void {
+    webContents.on('before-input-event', (event: Event, input: Input) => {
+      const type = typeof input.type === 'string' ? input.type : '';
+      const isKeyDownLike = type === 'keyDown' || type === 'rawKeyDown';
+      if (!isKeyDownLike || input.isAutoRepeat || input.isComposing) {
+        return;
+      }
+
+      const key = typeof input.key === 'string' ? input.key : '';
+      const keyLower = key.toLowerCase();
+      const isEnterLike = keyLower === 'enter'
+        || keyLower === 'return'
+        || keyLower === 'numpadenter';
+      if (!isEnterLike || input.shift) {
+        return;
+      }
+
+      event.preventDefault();
+      console.info('[QuickPromptDebug][Main] before-input-event triggers quick prompt submit', {
+        key,
+        type,
+        control: Boolean(input.control),
+        meta: Boolean(input.meta),
+        alt: Boolean(input.alt),
+      });
+      webContents.executeJavaScript(
+        `window.dispatchEvent(new Event('quick-prompt:submit'));`,
+        true
+      ).catch((error) => {
+        console.error('[QuickPromptDebug][Main] Failed to dispatch quick-prompt:submit event:', error);
+      });
+    });
+  }
+
   private attachSidebarRuntimePreferenceHooks(webContents: WebContents): void {
     webContents.on('did-finish-load', () => {
       this.applySidebarRuntimePreferences(webContents);
@@ -389,6 +466,8 @@ export class ViewManager {
 
     quickPromptView.setBackgroundColor('#00000000');
     this.attachGlobalShortcutHooks(quickPromptView.webContents);
+    this.attachQuickPromptDebugConsoleHooks(quickPromptView.webContents);
+    this.attachQuickPromptSubmitShortcutHooks(quickPromptView.webContents);
     quickPromptView.webContents.on('did-finish-load', () => {
       this.quickPromptLifecycleService.markReady();
     });
@@ -461,6 +540,100 @@ export class ViewManager {
 
   private notifySidebarToggleShortcut(): void {
     this.sidebarEventBridge.dispatchEvent(SIDEBAR_TOGGLE_SHORTCUT_EVENT);
+  }
+
+  private readonly handlePaneStagePromptImageAck = (
+    _event: IpcMainEvent,
+    payload: PaneStagePromptImageAckPayload
+  ): void => {
+    const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+    if (!requestId) {
+      return;
+    }
+
+    const pending = this.pendingPromptImageStageRequests.get(requestId);
+    if (!pending) {
+      return;
+    }
+
+    this.pendingPromptImageStageRequests.delete(requestId);
+    clearTimeout(pending.timer);
+
+    const responsePaneIndex = typeof payload?.paneIndex === 'number'
+      ? payload.paneIndex
+      : pending.paneIndex;
+    if (responsePaneIndex !== pending.paneIndex) {
+      pending.reject(new Error(
+        `prompt image stage ack pane mismatch: expected ${pending.paneIndex}, got ${responsePaneIndex}`
+      ));
+      return;
+    }
+
+    if (payload.success === true) {
+      pending.resolve(pending.consumeToken);
+      return;
+    }
+
+    pending.reject(new Error(
+      typeof payload.reason === 'string' && payload.reason
+        ? payload.reason
+        : 'failed to stage prompt image payload'
+    ));
+  };
+
+  private stagePromptImagePayload(
+    paneWebContents: WebContents,
+    paneIndex: number,
+    image: PromptImagePayload
+  ): Promise<string> {
+    if (paneWebContents.isDestroyed()) {
+      return Promise.reject(new Error('pane webContents is destroyed'));
+    }
+
+    const requestId = `${paneIndex}:${Date.now()}:${this.promptImageStageRequestSeq++}`;
+    const consumeToken = randomUUID();
+    const stagePayload: PaneStagePromptImagePayload = {
+      requestId,
+      consumeToken,
+      image,
+    };
+
+    return new Promise<string>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.pendingPromptImageStageRequests.delete(requestId);
+        reject(new Error('timed out while staging prompt image payload'));
+      }, PANE_STAGE_PROMPT_IMAGE_TIMEOUT_MS);
+
+      const rejectWithError = (error: unknown): void => {
+        clearTimeout(timer);
+        this.pendingPromptImageStageRequests.delete(requestId);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+
+      this.pendingPromptImageStageRequests.set(requestId, {
+        paneIndex,
+        consumeToken,
+        timer,
+        resolve,
+        reject: (error) => {
+          rejectWithError(error);
+        },
+      });
+
+      try {
+        paneWebContents.send(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE, stagePayload);
+      } catch (error) {
+        rejectWithError(error);
+      }
+    });
+  }
+
+  private rejectPendingPromptImageStageRequests(reason: string): void {
+    for (const [requestId, pending] of this.pendingPromptImageStageRequests) {
+      clearTimeout(pending.timer);
+      pending.reject(new Error(reason));
+      this.pendingPromptImageStageRequests.delete(requestId);
+    }
   }
 
   private clearProviderLoadingTracking(paneIndex: number): void {
@@ -682,8 +855,19 @@ export class ViewManager {
   /**
    * Send prompt to all panes
    */
-  async sendPromptToAll(text: string): Promise<{ success: boolean; failures: string[] }> {
-    return this.promptDispatchService.sendPromptToAll(text);
+  async sendPromptToAll(
+    request: string | PromptRequest
+  ): Promise<{ success: boolean; failures: string[] }> {
+    return this.promptDispatchService.sendPromptToAll(request);
+  }
+
+  /**
+   * Attach prompt image to all panes without submitting
+   */
+  async attachPromptImageToAll(
+    image: PromptImagePayload
+  ): Promise<{ success: boolean; failures: string[] }> {
+    return this.promptDispatchService.attachPromptImageToAll(image);
   }
 
   /**
@@ -732,6 +916,10 @@ export class ViewManager {
    */
   destroy(): void {
     this.stopSidebarWidthAnimation();
+    ipcMain.off(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE_ACK, this.handlePaneStagePromptImageAck);
+    this.rejectPendingPromptImageStageRequests(
+      'view manager destroyed before prompt image staging completed'
+    );
 
     // Close all pane webContents
     for (const pane of this.paneViews) {
