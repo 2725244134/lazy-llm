@@ -21,9 +21,13 @@ test.describe('E2E / Quick Prompt', () => {
     await paneButton3.click();
     await expect(paneButton3).toHaveClass(/active/);
 
-    const reopenAfterBlurResult = await toggleQuickPrompt(appWindow);
-    expect(reopenAfterBlurResult.success).toBe(true);
-    expect(reopenAfterBlurResult.visible).toBe(true);
+    const normalizeHiddenResult = await hideQuickPrompt(appWindow);
+    expect(normalizeHiddenResult.success).toBe(true);
+    expect(normalizeHiddenResult.visible).toBe(false);
+
+    const reopenResult = await toggleQuickPrompt(appWindow);
+    expect(reopenResult.success).toBe(true);
+    expect(reopenResult.visible).toBe(true);
 
     const closeResult = await hideQuickPrompt(appWindow);
     expect(closeResult.success).toBe(true);
