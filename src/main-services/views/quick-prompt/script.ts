@@ -17,6 +17,4 @@ export const QUICK_PROMPT_SCRIPT = buildQuickPromptRuntimeScript({
   draftSyncDebounceMs: interactionConfig.draftSync.debounceMs,
   sendClearSyncGuardMs: interactionConfig.draftSync.sendClearGuardMs,
   maxClipboardImageBytes: PROMPT_IMAGE_MAX_BYTES,
-  submitRequestGuardMs: 80,
-  enableDebugLogs: false,
 });

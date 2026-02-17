@@ -6,8 +6,6 @@ export interface QuickPromptRuntimeConfig {
   draftSyncDebounceMs: number;
   sendClearSyncGuardMs: number;
   maxClipboardImageBytes: number;
-  submitRequestGuardMs: number;
-  enableDebugLogs: boolean;
 }
 
 interface QuickPromptImagePayload {
@@ -40,7 +38,6 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   const panel = document.querySelector('.panel') as HTMLElement | null;
 
   let isSending = false;
-  let lastSubmitRequestAtMs = 0;
   let resizeRaf = 0;
   let lastResizeHeight = 0;
   let pendingViewHeight = config.defaultViewHeight;
@@ -69,10 +66,6 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
   };
 
   const logDebug = (message: string, details?: unknown): void => {
-    if (!config.enableDebugLogs) {
-      return;
-    }
-
     if (details === undefined) {
       console.info(`${debugPrefix} ${message}`);
       return;
@@ -524,22 +517,6 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     }
   };
 
-  const requestSubmit = (source: string): void => {
-    const nowMs = Date.now();
-    if (nowMs - lastSubmitRequestAtMs < config.submitRequestGuardMs) {
-      logDebug('requestSubmit suppressed by guard', {
-        source,
-        elapsedMs: nowMs - lastSubmitRequestAtMs,
-        guardMs: config.submitRequestGuardMs,
-      });
-      return;
-    }
-
-    lastSubmitRequestAtMs = nowMs;
-    logDebug('requestSubmit accepted', { source });
-    void submit();
-  };
-
   input?.addEventListener('input', () => {
     syncInputHeight();
     scheduleDraftSync(input.value);
@@ -615,7 +592,8 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     if (isEnterLike && !event.shiftKey) {
       event.preventDefault();
       event.stopPropagation();
-      requestSubmit('input-keydown');
+      logDebug('input keydown triggers submit');
+      void submit();
     }
   });
 
@@ -637,7 +615,8 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     if (inputType === 'insertLineBreak') {
       event.preventDefault();
       event.stopPropagation();
-      requestSubmit('input-beforeinput');
+      logDebug('input beforeinput triggers submit');
+      void submit();
     }
   });
 
@@ -686,8 +665,9 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
     }
 
     if (isEnterLike && !event.shiftKey) {
-      // Enter handling is delegated to input listeners and quick-prompt:submit bridge.
       event.preventDefault();
+      logDebug('window keydown triggers submit');
+      void submit();
     }
   });
 
@@ -713,7 +693,7 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
 
   window.addEventListener('quick-prompt:submit', () => {
     logDebug('quick-prompt:submit event received');
-    requestSubmit('bridge-submit-event');
+    void submit();
   });
 
   observePanelResize();

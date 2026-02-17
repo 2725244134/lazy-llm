@@ -107,7 +107,6 @@ const SIDEBAR_ANIMATION_TICK_MS = 16;
 const PANE_LOAD_MAX_RETRIES = 2;
 const PANE_LOAD_RETRY_BASE_DELAY_MS = 450;
 const PANE_STAGE_PROMPT_IMAGE_TIMEOUT_MS = 2_000;
-const QUICK_PROMPT_BLUR_HIDE_DELAY_MS = 80;
 type ManagedShortcutAction = Exclude<ShortcutAction, 'noop'>;
 
 interface ViewManagerOptions {
@@ -349,6 +348,40 @@ export class ViewManager {
     });
   }
 
+  private attachQuickPromptSubmitShortcutHooks(webContents: WebContents): void {
+    webContents.on('before-input-event', (event: Event, input: Input) => {
+      const type = typeof input.type === 'string' ? input.type : '';
+      const isKeyDownLike = type === 'keyDown' || type === 'rawKeyDown';
+      if (!isKeyDownLike || input.isAutoRepeat || input.isComposing) {
+        return;
+      }
+
+      const key = typeof input.key === 'string' ? input.key : '';
+      const keyLower = key.toLowerCase();
+      const isEnterLike = keyLower === 'enter'
+        || keyLower === 'return'
+        || keyLower === 'numpadenter';
+      if (!isEnterLike || input.shift) {
+        return;
+      }
+
+      event.preventDefault();
+      console.info('[QuickPromptDebug][Main] before-input-event triggers quick prompt submit', {
+        key,
+        type,
+        control: Boolean(input.control),
+        meta: Boolean(input.meta),
+        alt: Boolean(input.alt),
+      });
+      webContents.executeJavaScript(
+        `window.dispatchEvent(new Event('quick-prompt:submit'));`,
+        true
+      ).catch((error) => {
+        console.error('[QuickPromptDebug][Main] Failed to dispatch quick-prompt:submit event:', error);
+      });
+    });
+  }
+
   private attachSidebarRuntimePreferenceHooks(webContents: WebContents): void {
     webContents.on('did-finish-load', () => {
       this.applySidebarRuntimePreferences(webContents);
@@ -396,27 +429,12 @@ export class ViewManager {
     quickPromptView.setBackgroundColor('#00000000');
     this.attachGlobalShortcutHooks(quickPromptView.webContents);
     this.attachQuickPromptDebugConsoleHooks(quickPromptView.webContents);
+    this.attachQuickPromptSubmitShortcutHooks(quickPromptView.webContents);
     quickPromptView.webContents.on('did-finish-load', () => {
       this.quickPromptLifecycleService.markReady();
     });
     quickPromptView.webContents.on('blur', () => {
-      // Avoid transient focus jitter from immediately closing the overlay.
-      setTimeout(() => {
-        const currentQuickPromptView = this.quickPromptLifecycleService.getView();
-        if (!currentQuickPromptView) {
-          return;
-        }
-        if (currentQuickPromptView.webContents.id !== quickPromptView.webContents.id) {
-          return;
-        }
-        if (currentQuickPromptView.webContents.isDestroyed()) {
-          return;
-        }
-        if (currentQuickPromptView.webContents.isFocused()) {
-          return;
-        }
-        this.quickPromptLifecycleService.hide({ restoreFocus: false });
-      }, QUICK_PROMPT_BLUR_HIDE_DELAY_MS);
+      this.quickPromptLifecycleService.hide({ restoreFocus: false });
     });
     quickPromptView.webContents.loadURL(buildQuickPromptDataUrl());
 
