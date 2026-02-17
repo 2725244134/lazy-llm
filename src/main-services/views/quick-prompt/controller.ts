@@ -12,8 +12,6 @@ import {
   type QuickPromptResizeResult,
 } from './lifecycleService.js';
 
-const QUICK_PROMPT_BLUR_HIDE_DELAY_MS = 80;
-
 export interface QuickPromptControllerOptions {
   quickPromptPreloadPath: string;
   defaultHeight: number;
@@ -139,23 +137,7 @@ export class QuickPromptController {
       this.quickPromptLifecycleService.markReady();
     });
     quickPromptView.webContents.on('blur', () => {
-      // Defer blur-close to avoid transient focus jitter while overlay is opening.
-      setTimeout(() => {
-        const currentQuickPromptView = this.quickPromptLifecycleService.getView();
-        if (!currentQuickPromptView) {
-          return;
-        }
-        if (currentQuickPromptView.webContents.id !== quickPromptView.webContents.id) {
-          return;
-        }
-        if (currentQuickPromptView.webContents.isDestroyed()) {
-          return;
-        }
-        if (currentQuickPromptView.webContents.isFocused()) {
-          return;
-        }
-        this.quickPromptLifecycleService.hide({ restoreFocus: false });
-      }, QUICK_PROMPT_BLUR_HIDE_DELAY_MS);
+      this.quickPromptLifecycleService.hide({ restoreFocus: false });
     });
     quickPromptView.webContents.loadURL(this.options.buildQuickPromptDataUrl());
 
