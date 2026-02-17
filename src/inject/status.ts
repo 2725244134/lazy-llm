@@ -1,10 +1,12 @@
 import { findAllElements, isComplete, isStreaming } from './core';
 import type { ProviderInjectConfig } from './providers-config';
+import { findSendableSubmitButton } from './submit-button';
 
 export interface StatusResult {
   isStreaming: boolean;
   isComplete: boolean;
   hasResponse: boolean;
+  canSubmit: boolean;
   provider: string;
 }
 
@@ -15,7 +17,13 @@ export function resolveStatus(
   provider: string
 ): StatusResult {
   if (!config) {
-    return { isStreaming: false, isComplete: false, hasResponse: false, provider };
+    return {
+      isStreaming: false,
+      isComplete: false,
+      hasResponse: false,
+      canSubmit: false,
+      provider,
+    };
   }
 
   const streamingIndicatorSelectors = config.streamingIndicatorSelectors || [];
@@ -25,11 +33,13 @@ export function resolveStatus(
     config.responseSelectors.length > 0 &&
     findAllElements(config.responseSelectors).length > 0
   );
+  const canSubmit = findSendableSubmitButton(config.submitSelectors) !== null;
 
   return {
     isStreaming: isStreaming(streamingIndicatorSelectors),
     isComplete: isComplete(streamingIndicatorSelectors, completeIndicatorSelectors),
     hasResponse,
+    canSubmit,
     provider,
   };
 }
@@ -37,6 +47,10 @@ export function resolveStatus(
 export function resolveBusyState(status: StatusResult): BusyState {
   if (status.isStreaming) {
     return 'busy';
+  }
+
+  if (status.canSubmit) {
+    return 'idle';
   }
 
   if (status.isComplete) {

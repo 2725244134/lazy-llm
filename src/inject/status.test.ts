@@ -57,6 +57,7 @@ describe('resolveStatus', () => {
       isStreaming: false,
       isComplete: false,
       hasResponse: false,
+      canSubmit: false,
       provider: 'unknown',
     });
     expect(resolveBusyState(status)).toBe('idle');
@@ -183,4 +184,53 @@ describe('resolveStatus', () => {
       }
     }
   );
+
+  it('reports idle when response exists and submit button is sendable', () => {
+    const config: ProviderInjectConfig = {
+      inputSelectors: ['textarea'],
+      submitSelectors: ['button.send'],
+      responseSelectors: ['.response'],
+      streamingIndicatorSelectors: ['.streaming'],
+      completeIndicatorSelectors: ['.complete'],
+    };
+
+    const sendButton = {
+      tagName: 'BUTTON',
+      disabled: false,
+      type: 'button',
+      offsetParent: {} as Element,
+      className: 'send',
+      textContent: 'Send',
+      getAttribute: (name: string) => {
+        if (name === 'aria-disabled') {
+          return 'false';
+        }
+        if (name === 'aria-label') {
+          return 'Send message';
+        }
+        return null;
+      },
+    } as unknown as Element;
+
+    withMockDocument(
+      mockQuerySelector(new Set(['.response'])),
+      (selector) => {
+        if (selector === '.response') {
+          return [{} as Element];
+        }
+        if (selector === 'button.send') {
+          return [sendButton];
+        }
+        return [];
+      },
+    );
+
+    const status = resolveStatus(config, 'gemini');
+
+    expect(status.isStreaming).toBe(false);
+    expect(status.isComplete).toBe(false);
+    expect(status.hasResponse).toBe(true);
+    expect(status.canSubmit).toBe(true);
+    expect(resolveBusyState(status)).toBe('idle');
+  });
 });

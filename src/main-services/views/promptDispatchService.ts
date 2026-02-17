@@ -747,6 +747,12 @@ export class PromptDispatchService {
       return 'busy';
     }
 
+    // Some providers (especially Gemini) can expose stale/missing completion markers.
+    // When submit is explicitly available again, we can safely treat pane as idle.
+    if (result.canSubmit === true) {
+      return 'idle';
+    }
+
     if (result.isComplete === true) {
       return 'idle';
     }

@@ -55,6 +55,7 @@ describe('buildPromptStatusEvalScript', () => {
     expect(script).toContain('typeof status.isStreaming === "boolean"');
     expect(script).toContain('typeof status.isComplete === "boolean"');
     expect(script).toContain('typeof status.hasResponse === "boolean"');
+    expect(script).toContain('typeof status.canSubmit === "boolean"');
   });
 });
 
