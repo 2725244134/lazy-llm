@@ -229,6 +229,47 @@ describe('updatePaneProviderWithLifecycle', () => {
     expect(defaultProviders[0]).toBe('claude');
   });
 
+  it('switches to cached view without reload when cached view is on a conversation URL', () => {
+    const providers = createProvidersMap([
+      ['chatgpt', 'https://chatgpt.com'],
+      ['claude', 'https://claude.ai/new'],
+    ]);
+    const currentView = createTestView('current', 'https://chatgpt.com/c/abc');
+    const cachedClaudeView = createTestView('cached-claude', 'https://claude.ai/chat/xyz');
+    const pane = createPaneState(
+      0,
+      'chatgpt',
+      currentView,
+      'https://chatgpt.com',
+      new Map([
+        ['chatgpt', { view: currentView, url: 'https://chatgpt.com' }],
+        ['claude', { view: cachedClaudeView, url: 'https://claude.ai/new' }],
+      ])
+    );
+    const paneViews = [pane];
+    const defaultProviders = ['chatgpt'];
+    const { callbacks, removed, added, loaded, cleared } = createCallbacks();
+
+    const success = updatePaneProviderWithLifecycle({
+      paneIndex: 0,
+      providerKey: 'claude',
+      paneViews,
+      defaultProviders,
+      providers,
+      callbacks,
+      areUrlsEquivalent: (left, right) => left === right,
+    });
+
+    expect(success).toBe(true);
+    expect(loaded).toHaveLength(0);
+    expect(cleared).toEqual([0]);
+    expect(removed).toEqual(['current']);
+    expect(added).toEqual(['cached-claude']);
+    expect(pane.providerKey).toBe('claude');
+    expect((pane.view as TestView).__id).toBe('cached-claude');
+    expect(defaultProviders[0]).toBe('claude');
+  });
+
   it('creates and loads a new view when target provider is not cached', () => {
     const providers = createProvidersMap([
       ['chatgpt', 'https://chatgpt.com'],

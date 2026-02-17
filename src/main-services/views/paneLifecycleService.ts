@@ -116,9 +116,9 @@ export function updatePaneProviderWithLifecycle(params: UpdatePaneProviderParams
 
   const cachedViewEntry = pane.cachedViews.get(providerKey);
   if (cachedViewEntry) {
-    const cachedCurrentUrl = cachedViewEntry.view.webContents.getURL();
-    const shouldReload = !areUrlsEquivalent(cachedViewEntry.url, provider.url)
-      || !areUrlsEquivalent(cachedCurrentUrl, provider.url);
+    // Preserve cached conversation/navigation state across provider switches.
+    // Reload only when provider home target changes, not when current page differs.
+    const shouldReload = !areUrlsEquivalent(cachedViewEntry.url, provider.url);
 
     if (shouldReload) {
       cachedViewEntry.url = provider.url;
