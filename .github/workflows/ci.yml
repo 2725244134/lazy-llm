@@ -89,5 +89,5 @@ jobs:
       - name: Run unit tests
         run: just test-unit
 
-      - name: Run Electron smoke tests (headless)
-        run: just test-electron-smoke-headless
+      - name: Run Electron E2E tests (headless)
+        run: just test-electron-e2e-headless
