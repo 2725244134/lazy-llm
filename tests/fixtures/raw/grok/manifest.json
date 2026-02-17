@@ -1,0 +1,30 @@
+{
+  "provider": "grok",
+  "generatedAt": "2026-02-17T11:04:29.886Z",
+  "records": [
+    {
+      "state": "idle",
+      "sourceFile": "tests/fixtures/raw/grok/idle.html",
+      "capturedAt": "2026-02-17T11:03:48.643Z",
+      "bytes": 338754
+    },
+    {
+      "state": "send-ready",
+      "sourceFile": "tests/fixtures/raw/grok/send-ready.html",
+      "capturedAt": "2026-02-17T11:03:49.303Z",
+      "bytes": 337300
+    },
+    {
+      "state": "streaming",
+      "sourceFile": "tests/fixtures/raw/grok/streaming.html",
+      "capturedAt": "2026-02-17T10:55:08.427Z",
+      "bytes": 338754
+    },
+    {
+      "state": "complete",
+      "sourceFile": "tests/fixtures/raw/grok/complete.html",
+      "capturedAt": "2026-02-17T10:55:21.572Z",
+      "bytes": 338754
+    }
+  ]
+}

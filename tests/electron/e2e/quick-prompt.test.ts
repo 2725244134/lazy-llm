@@ -2,7 +2,7 @@ import { test, expect } from '../fixtures/electronApp';
 import { hideQuickPrompt, resizeQuickPrompt, toggleQuickPrompt } from '../helpers/lazyllm';
 import { selectors } from '../helpers/selectors';
 
-test.describe('Smoke / Quick Prompt', () => {
+test.describe('E2E / Quick Prompt', () => {
   test('quick prompt shortcut opens centered input', async ({ appWindow }) => {
     const paneButton3 = appWindow.locator(selectors.paneChip3);
 

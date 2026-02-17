@@ -1,0 +1,30 @@
+{
+  "provider": "gemini",
+  "generatedAt": "2026-02-17T11:04:29.885Z",
+  "records": [
+    {
+      "state": "idle",
+      "sourceFile": "tests/fixtures/raw/gemini/idle.html",
+      "capturedAt": "2026-02-17T11:03:38.558Z",
+      "bytes": 1177860
+    },
+    {
+      "state": "send-ready",
+      "sourceFile": "tests/fixtures/raw/gemini/send-ready.html",
+      "capturedAt": "2026-02-17T11:03:38.954Z",
+      "bytes": 1177997
+    },
+    {
+      "state": "streaming",
+      "sourceFile": "tests/fixtures/raw/gemini/streaming.html",
+      "capturedAt": "2026-02-17T10:53:57.855Z",
+      "bytes": 1177841
+    },
+    {
+      "state": "complete",
+      "sourceFile": "tests/fixtures/raw/gemini/complete.html",
+      "capturedAt": "2026-02-17T10:54:13.059Z",
+      "bytes": 1177841
+    }
+  ]
+}

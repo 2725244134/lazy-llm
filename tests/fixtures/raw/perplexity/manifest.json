@@ -1,0 +1,30 @@
+{
+  "provider": "perplexity",
+  "generatedAt": "2026-02-17T11:04:29.886Z",
+  "records": [
+    {
+      "state": "idle",
+      "sourceFile": "tests/fixtures/raw/perplexity/idle.html",
+      "capturedAt": "2026-02-17T11:03:58.592Z",
+      "bytes": 375804
+    },
+    {
+      "state": "send-ready",
+      "sourceFile": "tests/fixtures/raw/perplexity/send-ready.html",
+      "capturedAt": "2026-02-17T11:03:59.169Z",
+      "bytes": 375781
+    },
+    {
+      "state": "streaming",
+      "sourceFile": "tests/fixtures/raw/perplexity/streaming.html",
+      "capturedAt": "2026-02-17T10:56:22.297Z",
+      "bytes": 375804
+    },
+    {
+      "state": "complete",
+      "sourceFile": "tests/fixtures/raw/perplexity/complete.html",
+      "capturedAt": "2026-02-17T10:56:36.856Z",
+      "bytes": 375804
+    }
+  ]
+}

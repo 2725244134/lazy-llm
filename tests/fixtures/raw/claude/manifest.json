@@ -1,0 +1,30 @@
+{
+  "provider": "claude",
+  "generatedAt": "2026-02-17T11:04:29.884Z",
+  "records": [
+    {
+      "state": "idle",
+      "sourceFile": "tests/fixtures/raw/claude/idle.html",
+      "capturedAt": "2026-02-17T11:03:29.842Z",
+      "bytes": 844109
+    },
+    {
+      "state": "send-ready",
+      "sourceFile": "tests/fixtures/raw/claude/send-ready.html",
+      "capturedAt": "2026-02-17T10:59:46.220Z",
+      "bytes": 844109
+    },
+    {
+      "state": "streaming",
+      "sourceFile": "tests/fixtures/raw/claude/streaming.html",
+      "capturedAt": "2026-02-17T10:53:02.830Z",
+      "bytes": 845680
+    },
+    {
+      "state": "complete",
+      "sourceFile": "tests/fixtures/raw/claude/complete.html",
+      "capturedAt": "2026-02-17T10:53:16.746Z",
+      "bytes": 845061
+    }
+  ]
+}

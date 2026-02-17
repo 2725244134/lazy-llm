@@ -1,0 +1,213 @@
+{
+  "provider": "chatgpt",
+  "timestamp": "2026-02-17T11:20:33.664Z",
+  "strict": true,
+  "rawFile": "tests/fixtures/raw/chatgpt/complete.html",
+  "simulationFile": "/home/cctop/Github/lazy-llm-monorepo/worktrees/lazy-llm-mock-capture-e2e-claude/tests/fixtures/mock-site/chatgpt-simulation.html",
+  "status": "pass",
+  "summary": {
+    "input": "pass",
+    "submit": "pass",
+    "response": "pass",
+    "complete": "pass"
+  },
+  "selectors": {
+    "input": {
+      "field": "inputSelectors",
+      "configured": [
+        "div.ProseMirror#prompt-textarea",
+        "div#prompt-textarea[contenteditable=\"true\"]",
+        "#prompt-textarea",
+        "div.ProseMirror[contenteditable=\"true\"]",
+        "textarea#prompt-textarea",
+        "textarea[data-id='root']",
+        "textarea[placeholder*='Message']",
+        "textarea",
+        "div[contenteditable='true']"
+      ],
+      "matched": [
+        "div.ProseMirror#prompt-textarea",
+        "div#prompt-textarea[contenteditable=\"true\"]",
+        "#prompt-textarea",
+        "div.ProseMirror[contenteditable=\"true\"]",
+        "textarea",
+        "div[contenteditable='true']"
+      ],
+      "unmatched": [
+        "textarea#prompt-textarea",
+        "textarea[data-id='root']",
+        "textarea[placeholder*='Message']"
+      ],
+      "probes": [
+        {
+          "selector": "div.ProseMirror#prompt-textarea",
+          "normalizedSelector": "div.ProseMirror#prompt-textarea",
+          "matches": 1
+        },
+        {
+          "selector": "div#prompt-textarea[contenteditable=\"true\"]",
+          "normalizedSelector": "div#prompt-textarea[contenteditable=\"true\"]",
+          "matches": 1
+        },
+        {
+          "selector": "#prompt-textarea",
+          "normalizedSelector": "#prompt-textarea",
+          "matches": 1
+        },
+        {
+          "selector": "div.ProseMirror[contenteditable=\"true\"]",
+          "normalizedSelector": "div.ProseMirror[contenteditable=\"true\"]",
+          "matches": 1
+        },
+        {
+          "selector": "textarea#prompt-textarea",
+          "normalizedSelector": "textarea#prompt-textarea",
+          "matches": 0
+        },
+        {
+          "selector": "textarea[data-id='root']",
+          "normalizedSelector": "textarea[data-id='root']",
+          "matches": 0
+        },
+        {
+          "selector": "textarea[placeholder*='Message']",
+          "normalizedSelector": "textarea[placeholder*='Message']",
+          "matches": 0
+        },
+        {
+          "selector": "textarea",
+          "normalizedSelector": "textarea",
+          "matches": 1
+        },
+        {
+          "selector": "div[contenteditable='true']",
+          "normalizedSelector": "div[contenteditable='true']",
+          "matches": 1
+        }
+      ]
+    },
+    "submit": {
+      "field": "submitSelectors",
+      "configured": [
+        "button.composer-submit-button-color",
+        "button[data-testid='send-button']",
+        "button[data-testid='fruitjuice-send-button']",
+        "button[aria-label*='Send']",
+        "form button[type='submit']",
+        "button[aria-label='Start Voice']"
+      ],
+      "matched": [
+        "button.composer-submit-button-color",
+        "button[aria-label='Start Voice']"
+      ],
+      "unmatched": [
+        "button[data-testid='send-button']",
+        "button[data-testid='fruitjuice-send-button']",
+        "button[aria-label*='Send']",
+        "form button[type='submit']"
+      ],
+      "probes": [
+        {
+          "selector": "button.composer-submit-button-color",
+          "normalizedSelector": "button.composer-submit-button-color",
+          "matches": 1
+        },
+        {
+          "selector": "button[data-testid='send-button']",
+          "normalizedSelector": "button[data-testid='send-button']",
+          "matches": 0
+        },
+        {
+          "selector": "button[data-testid='fruitjuice-send-button']",
+          "normalizedSelector": "button[data-testid='fruitjuice-send-button']",
+          "matches": 0
+        },
+        {
+          "selector": "button[aria-label*='Send']",
+          "normalizedSelector": "button[aria-label*='Send']",
+          "matches": 0
+        },
+        {
+          "selector": "form button[type='submit']",
+          "normalizedSelector": "form button[type='submit']",
+          "matches": 0
+        },
+        {
+          "selector": "button[aria-label='Start Voice']",
+          "normalizedSelector": "button[aria-label='Start Voice']",
+          "matches": 1
+        }
+      ]
+    },
+    "response": {
+      "field": "responseSelectors",
+      "configured": [
+        "div[data-message-author-role='assistant'] .markdown",
+        "article[data-turn='assistant'] .markdown",
+        "div.agent-turn .markdown",
+        ".text-message .markdown.prose"
+      ],
+      "matched": [
+        "div[data-message-author-role='assistant'] .markdown",
+        "article[data-turn='assistant'] .markdown",
+        "div.agent-turn .markdown",
+        ".text-message .markdown.prose"
+      ],
+      "unmatched": [],
+      "probes": [
+        {
+          "selector": "div[data-message-author-role='assistant'] .markdown",
+          "normalizedSelector": "div[data-message-author-role='assistant'] .markdown",
+          "matches": 1
+        },
+        {
+          "selector": "article[data-turn='assistant'] .markdown",
+          "normalizedSelector": "article[data-turn='assistant'] .markdown",
+          "matches": 1
+        },
+        {
+          "selector": "div.agent-turn .markdown",
+          "normalizedSelector": "div.agent-turn .markdown",
+          "matches": 1
+        },
+        {
+          "selector": ".text-message .markdown.prose",
+          "normalizedSelector": ".text-message .markdown.prose",
+          "matches": 1
+        }
+      ]
+    },
+    "complete": {
+      "field": "completeIndicatorSelectors",
+      "configured": [
+        "button[data-testid='copy-turn-action-button']",
+        "button[aria-label='Good response']",
+        "button[aria-label='Bad response']"
+      ],
+      "matched": [
+        "button[data-testid='copy-turn-action-button']",
+        "button[aria-label='Good response']",
+        "button[aria-label='Bad response']"
+      ],
+      "unmatched": [],
+      "probes": [
+        {
+          "selector": "button[data-testid='copy-turn-action-button']",
+          "normalizedSelector": "button[data-testid='copy-turn-action-button']",
+          "matches": 2
+        },
+        {
+          "selector": "button[aria-label='Good response']",
+          "normalizedSelector": "button[aria-label='Good response']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label='Bad response']",
+          "normalizedSelector": "button[aria-label='Bad response']",
+          "matches": 1
+        }
+      ]
+    }
+  },
+  "recommendations": []
+}

@@ -1,0 +1,180 @@
+{
+  "provider": "grok",
+  "timestamp": "2026-02-17T11:20:33.694Z",
+  "strict": true,
+  "rawFile": "tests/fixtures/raw/grok/complete.html",
+  "simulationFile": "/home/cctop/Github/lazy-llm-monorepo/worktrees/lazy-llm-mock-capture-e2e-claude/tests/fixtures/mock-site/grok-simulation.html",
+  "status": "pass",
+  "summary": {
+    "input": "pass",
+    "submit": "pass",
+    "response": "pass",
+    "complete": "pass"
+  },
+  "selectors": {
+    "input": {
+      "field": "inputSelectors",
+      "configured": [
+        "div.ProseMirror[contenteditable=\"true\"]",
+        "div[contenteditable='true'][role='textbox']",
+        "div[contenteditable='true'][data-placeholder*='Ask']",
+        "div[contenteditable='true']",
+        "textarea[placeholder*='Ask']",
+        "textarea"
+      ],
+      "matched": [
+        "div.ProseMirror[contenteditable=\"true\"]",
+        "div[contenteditable='true']",
+        "textarea"
+      ],
+      "unmatched": [
+        "div[contenteditable='true'][role='textbox']",
+        "div[contenteditable='true'][data-placeholder*='Ask']",
+        "textarea[placeholder*='Ask']"
+      ],
+      "probes": [
+        {
+          "selector": "div.ProseMirror[contenteditable=\"true\"]",
+          "normalizedSelector": "div.ProseMirror[contenteditable=\"true\"]",
+          "matches": 1
+        },
+        {
+          "selector": "div[contenteditable='true'][role='textbox']",
+          "normalizedSelector": "div[contenteditable='true'][role='textbox']",
+          "matches": 0
+        },
+        {
+          "selector": "div[contenteditable='true'][data-placeholder*='Ask']",
+          "normalizedSelector": "div[contenteditable='true'][data-placeholder*='Ask']",
+          "matches": 0
+        },
+        {
+          "selector": "div[contenteditable='true']",
+          "normalizedSelector": "div[contenteditable='true']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea[placeholder*='Ask']",
+          "normalizedSelector": "textarea[placeholder*='Ask']",
+          "matches": 0
+        },
+        {
+          "selector": "textarea",
+          "normalizedSelector": "textarea",
+          "matches": 1
+        }
+      ]
+    },
+    "submit": {
+      "field": "submitSelectors",
+      "configured": [
+        "button[type='submit'][aria-label='Submit']",
+        "button[aria-label*='Submit']",
+        "button[aria-label*='Send']",
+        "button[type='submit']",
+        "form button"
+      ],
+      "matched": [
+        "button[type='submit'][aria-label='Submit']",
+        "button[aria-label*='Submit']",
+        "button[type='submit']",
+        "form button"
+      ],
+      "unmatched": [
+        "button[aria-label*='Send']"
+      ],
+      "probes": [
+        {
+          "selector": "button[type='submit'][aria-label='Submit']",
+          "normalizedSelector": "button[type='submit'][aria-label='Submit']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label*='Submit']",
+          "normalizedSelector": "button[aria-label*='Submit']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label*='Send']",
+          "normalizedSelector": "button[aria-label*='Send']",
+          "matches": 0
+        },
+        {
+          "selector": "button[type='submit']",
+          "normalizedSelector": "button[type='submit']",
+          "matches": 1
+        },
+        {
+          "selector": "form button",
+          "normalizedSelector": "form button",
+          "matches": 5
+        }
+      ]
+    },
+    "response": {
+      "field": "responseSelectors",
+      "configured": [
+        "div.response-content-markdown.markdown",
+        ".message-bubble .markdown",
+        "div[data-testid='message-text']"
+      ],
+      "matched": [
+        "div.response-content-markdown.markdown",
+        ".message-bubble .markdown"
+      ],
+      "unmatched": [
+        "div[data-testid='message-text']"
+      ],
+      "probes": [
+        {
+          "selector": "div.response-content-markdown.markdown",
+          "normalizedSelector": "div.response-content-markdown.markdown",
+          "matches": 2
+        },
+        {
+          "selector": ".message-bubble .markdown",
+          "normalizedSelector": ".message-bubble .markdown",
+          "matches": 2
+        },
+        {
+          "selector": "div[data-testid='message-text']",
+          "normalizedSelector": "div[data-testid='message-text']",
+          "matches": 0
+        }
+      ]
+    },
+    "complete": {
+      "field": "completeIndicatorSelectors",
+      "configured": [
+        "button[aria-label='Regenerate']",
+        "button[aria-label='Copy']",
+        "button[aria-label='Read Aloud']"
+      ],
+      "matched": [
+        "button[aria-label='Regenerate']",
+        "button[aria-label='Copy']"
+      ],
+      "unmatched": [
+        "button[aria-label='Read Aloud']"
+      ],
+      "probes": [
+        {
+          "selector": "button[aria-label='Regenerate']",
+          "normalizedSelector": "button[aria-label='Regenerate']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label='Copy']",
+          "normalizedSelector": "button[aria-label='Copy']",
+          "matches": 2
+        },
+        {
+          "selector": "button[aria-label='Read Aloud']",
+          "normalizedSelector": "button[aria-label='Read Aloud']",
+          "matches": 0
+        }
+      ]
+    }
+  },
+  "recommendations": []
+}

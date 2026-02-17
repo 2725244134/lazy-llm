@@ -13,11 +13,12 @@ import {
   webContents,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
-import { existsSync, readFileSync } from 'fs';
+import { existsSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
 import { APP_CONFIG } from '@shared-config/src/app.js';
 import { type LayoutResult } from './geometry.js';
+import { loadInjectRuntimeScript } from './injectRuntimeLoader.js';
 import { LayoutService } from './layoutService.js';
 import { PaneLoadMonitor, areUrlsEquivalent } from './paneLoadMonitor.js';
 import { PaneViewService, type PaneUserAgentStrategy } from './paneViewService.js';
@@ -58,50 +59,23 @@ function resolveFirstExistingPath(candidates: string[]): string {
   return candidates[0];
 }
 
-const sidebarPreloadPath = resolveFirstExistingPath([
-  join(runtimeDir, 'preload.cjs'),
-  join(runtimeDir, 'preload.js'),
-  join(runtimeDir, 'preload.mjs'),
-  join(runtimeDir, '..', 'preload.cjs'),
-  join(runtimeDir, '..', 'preload.js'),
-  join(runtimeDir, '..', 'preload.mjs'),
-  join(runtimeDir, '..', '..', 'preload.cjs'),
-  join(runtimeDir, '..', '..', 'preload.js'),
-  join(runtimeDir, '..', '..', 'preload.mjs'),
-  join(process.cwd(), 'dist-electron', 'preload.cjs'),
-  join(process.cwd(), 'dist-electron', 'preload.js'),
-  join(process.cwd(), 'dist-electron', 'preload.mjs'),
-]);
+const PRELOAD_EXTS = ['.cjs', '.js', '.mjs'] as const;
+const PRELOAD_SEARCH_DIRS = [
+  runtimeDir,
+  join(runtimeDir, '..'),
+  join(runtimeDir, '..', '..'),
+  join(process.cwd(), 'dist-electron'),
+];
 
-const panePreloadPath = resolveFirstExistingPath([
-  join(runtimeDir, 'pane-preload.cjs'),
-  join(runtimeDir, 'pane-preload.js'),
-  join(runtimeDir, 'pane-preload.mjs'),
-  join(runtimeDir, '..', 'pane-preload.cjs'),
-  join(runtimeDir, '..', 'pane-preload.js'),
-  join(runtimeDir, '..', 'pane-preload.mjs'),
-  join(runtimeDir, '..', '..', 'pane-preload.cjs'),
-  join(runtimeDir, '..', '..', 'pane-preload.js'),
-  join(runtimeDir, '..', '..', 'pane-preload.mjs'),
-  join(process.cwd(), 'dist-electron', 'pane-preload.cjs'),
-  join(process.cwd(), 'dist-electron', 'pane-preload.js'),
-  join(process.cwd(), 'dist-electron', 'pane-preload.mjs'),
-]);
+function resolvePreloadPath(baseName: string): string {
+  return resolveFirstExistingPath(
+    PRELOAD_SEARCH_DIRS.flatMap(dir => PRELOAD_EXTS.map(ext => join(dir, baseName + ext)))
+  );
+}
 
-const quickPromptPreloadPath = resolveFirstExistingPath([
-  join(runtimeDir, 'quick-prompt-preload.cjs'),
-  join(runtimeDir, 'quick-prompt-preload.js'),
-  join(runtimeDir, 'quick-prompt-preload.mjs'),
-  join(runtimeDir, '..', 'quick-prompt-preload.cjs'),
-  join(runtimeDir, '..', 'quick-prompt-preload.js'),
-  join(runtimeDir, '..', 'quick-prompt-preload.mjs'),
-  join(runtimeDir, '..', '..', 'quick-prompt-preload.cjs'),
-  join(runtimeDir, '..', '..', 'quick-prompt-preload.js'),
-  join(runtimeDir, '..', '..', 'quick-prompt-preload.mjs'),
-  join(process.cwd(), 'dist-electron', 'quick-prompt-preload.cjs'),
-  join(process.cwd(), 'dist-electron', 'quick-prompt-preload.js'),
-  join(process.cwd(), 'dist-electron', 'quick-prompt-preload.mjs'),
-]);
+const sidebarPreloadPath = resolvePreloadPath('preload');
+const panePreloadPath = resolvePreloadPath('pane-preload');
+const quickPromptPreloadPath = resolvePreloadPath('quick-prompt-preload');
 
 const rendererIndexPath = resolveFirstExistingPath([
   join(runtimeDir, '..', 'renderer', 'main_window', 'index.html'),
@@ -110,18 +84,6 @@ const rendererIndexPath = resolveFirstExistingPath([
   join(runtimeDir, '..', 'dist', 'index.html'),
   join(runtimeDir, '..', '..', 'dist', 'index.html'),
   join(process.cwd(), 'dist', 'index.html'),
-]);
-
-const injectRuntimePath = resolveFirstExistingPath([
-  ...(typeof process.resourcesPath === 'string'
-    ? [join(process.resourcesPath, 'inject.js')]
-    : []),
-  join(runtimeDir, 'inject.js'),
-  join(runtimeDir, '..', 'inject.js'),
-  join(runtimeDir, '..', '..', 'inject.js'),
-  join(runtimeDir, '..', '..', 'dist-electron', 'inject.js'),
-  join(process.cwd(), 'dist-electron', 'inject.js'),
-  join(process.cwd(), '.vite', 'build', 'inject.js'),
 ]);
 
 const QUICK_PROMPT_PASSTHROUGH_MODE = APP_CONFIG.layout.quickPrompt.passthroughMode;
@@ -653,6 +615,22 @@ export class ViewManager {
     this.window.contentView.addChildView(quickPromptView);
   }
 
+  private buildLifecycleCallbacks() {
+    return {
+      createPaneWebContentsView: (paneIndex: number) => this.paneViewService.createPaneWebContentsView(paneIndex),
+      addPaneViewToContent: (view: WebContentsView) => this.window.contentView.addChildView(view),
+      removePaneViewFromContent: (view: WebContentsView) => this.paneViewService.removePaneViewFromContent(view),
+      loadPaneUrl: (paneIndex: number, view: WebContentsView, targetUrl: string, trackLoading: boolean) =>
+        this.paneViewService.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
+      applyPaneRuntimePreferences: (wc: WebContents) => this.paneViewService.applyPaneRuntimePreferences(wc),
+      clearProviderLoadingTracking: (paneIndex: number) => this.clearProviderLoadingTracking(paneIndex),
+      closePane: (pane: PaneViewState) => this.paneViewService.closePane(pane),
+      keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
+      updateLayout: () => this.updateLayout(),
+      setQuickPromptAnchorPaneIndex: (paneIndex: number) => this.setQuickPromptAnchorPaneIndex(paneIndex),
+    };
+  }
+
   /**
    * Set pane count, creating or destroying WebContentsViews as needed
    */
@@ -664,19 +642,7 @@ export class ViewManager {
       defaultProviders: this.defaultProviders,
       providers: this.providers,
       quickPromptAnchorPaneIndex: this.quickPromptAnchorPaneIndex,
-      callbacks: {
-        createPaneWebContentsView: (paneIndex) => this.paneViewService.createPaneWebContentsView(paneIndex),
-        addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
-        removePaneViewFromContent: (view) => this.paneViewService.removePaneViewFromContent(view),
-        loadPaneUrl: (paneIndex, view, targetUrl, trackLoading) =>
-          this.paneViewService.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
-        applyPaneRuntimePreferences: (webContents) => this.paneViewService.applyPaneRuntimePreferences(webContents),
-        clearProviderLoadingTracking: (paneIndex) => this.clearProviderLoadingTracking(paneIndex),
-        closePane: (pane) => this.paneViewService.closePane(pane),
-        keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
-        updateLayout: () => this.updateLayout(),
-        setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
-      },
+      callbacks: this.buildLifecycleCallbacks(),
     });
     this.currentPaneCount = result.currentPaneCount;
     this.quickPromptAnchorPaneIndex = result.quickPromptAnchorPaneIndex;
@@ -693,20 +659,7 @@ export class ViewManager {
       defaultProviders: this.defaultProviders,
       providers: this.providers,
       areUrlsEquivalent,
-      callbacks: {
-        createPaneWebContentsView: (nextPaneIndex) =>
-          this.paneViewService.createPaneWebContentsView(nextPaneIndex),
-        addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
-        removePaneViewFromContent: (view) => this.paneViewService.removePaneViewFromContent(view),
-        loadPaneUrl: (nextPaneIndex, view, targetUrl, trackLoading) =>
-          this.paneViewService.loadPaneUrl(nextPaneIndex, view, targetUrl, trackLoading),
-        applyPaneRuntimePreferences: (webContents) => this.paneViewService.applyPaneRuntimePreferences(webContents),
-        clearProviderLoadingTracking: (nextPaneIndex) => this.clearProviderLoadingTracking(nextPaneIndex),
-        closePane: (pane) => this.paneViewService.closePane(pane),
-        keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
-        updateLayout: () => this.updateLayout(),
-        setQuickPromptAnchorPaneIndex: (nextPaneIndex) => this.setQuickPromptAnchorPaneIndex(nextPaneIndex),
-      },
+      callbacks: this.buildLifecycleCallbacks(),
     });
   }
 
@@ -718,19 +671,7 @@ export class ViewManager {
       paneViews: this.paneViews,
       defaultProviders: this.defaultProviders,
       providers: this.providers,
-      callbacks: {
-        createPaneWebContentsView: (paneIndex) => this.paneViewService.createPaneWebContentsView(paneIndex),
-        addPaneViewToContent: (view) => this.window.contentView.addChildView(view),
-        removePaneViewFromContent: (view) => this.paneViewService.removePaneViewFromContent(view),
-        loadPaneUrl: (paneIndex, view, targetUrl, trackLoading) =>
-          this.paneViewService.loadPaneUrl(paneIndex, view, targetUrl, trackLoading),
-        applyPaneRuntimePreferences: (webContents) => this.paneViewService.applyPaneRuntimePreferences(webContents),
-        clearProviderLoadingTracking: (paneIndex) => this.clearProviderLoadingTracking(paneIndex),
-        closePane: (pane) => this.paneViewService.closePane(pane),
-        keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
-        updateLayout: () => this.updateLayout(),
-        setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
-      },
+      callbacks: this.buildLifecycleCallbacks(),
     });
   }
 
@@ -882,18 +823,19 @@ export class ViewManager {
       return this.injectRuntimeScript;
     }
 
-    if (!existsSync(injectRuntimePath)) {
-      console.error(`[ViewManager] Inject runtime not found at ${injectRuntimePath}`);
+    const script = loadInjectRuntimeScript({
+      runtimeDir,
+      cwd: process.cwd(),
+      resourcesPath: process.resourcesPath,
+      mockProvidersFile: process.env.LAZYLLM_MOCK_PROVIDERS_FILE,
+      logger: console,
+    });
+    if (!script) {
       return null;
     }
 
-    try {
-      this.injectRuntimeScript = readFileSync(injectRuntimePath, 'utf8');
-      return this.injectRuntimeScript;
-    } catch (error) {
-      console.error('[ViewManager] Failed to read inject runtime:', error);
-      return null;
-    }
+    this.injectRuntimeScript = script;
+    return this.injectRuntimeScript;
   }
 
   /**

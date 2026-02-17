@@ -17,6 +17,9 @@
     "test": "bun run test:unit",
     "test:unit": "vitest run",
     "test:electron:smoke": "bun run build:inject && bun run build:app && playwright test tests/electron/",
+    "test:electron:e2e": "bun run build:inject && bun run build:app && playwright test tests/electron/",
+    "mock:capture": "bun scripts/lib/mockCaptureProcess.ts",
+    "mock:capture:process": "bun scripts/lib/mockCaptureProcess.ts",
     "prepare": "echo 'Hooks ready'"
   },
   "dependencies": {

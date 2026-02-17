@@ -9,7 +9,7 @@ The codebase follows a template-aligned split between main-process services and 
 - **Renderer**: React 19 + TypeScript + Vite
 - **Main Build/Packaging**: Electron Forge + `@electron-forge/plugin-vite`
 - **Package Manager**: Bun (enforced)
-- **Testing**: Vitest (unit) + Playwright (Electron smoke)
+- **Testing**: Vitest (unit) + Playwright (Electron E2E)
 - **Styling**: Tailwind CSS
 
 ## Command Entry Points
@@ -23,7 +23,7 @@ just build                                        # Build app package (typecheck
 just package                                      # Create distributables (forge make)
 just check                                        # Type check
 just arch-check                                   # Import boundary check
-just test                                         # Unit tests + Electron smoke tests
+just test                                         # Unit tests + Electron E2E tests
 EXPECTED_VERSION=vX.Y.Z just release-verify-tag  # Validate tag/version contract
 just clean                                        # Remove build artifacts
 just help                                         # Show all recipes
@@ -98,11 +98,12 @@ Before merge:
 1. `just check`
 2. `just test`
 
-### Smoke Test Notes
+### E2E Test Notes
 
-- Electron smoke tests can fail if another LazyLLM instance is running.
-- In this repository, smoke fixtures isolate user data and bypass single-instance lock during tests.
-- If you still see launch conflicts, clear stale local processes before rerunning smoke tests.
+- Electron E2E tests can fail if another LazyLLM instance is running.
+- In this repository, E2E fixtures isolate user data and bypass single-instance lock during tests.
+- If you still see launch conflicts, clear stale local processes before rerunning E2E tests.
+- Mock-based E2E tests use `LAZYLLM_MOCK_PROVIDERS_FILE` to inject local mock provider pages.
 
 ## Version Contract
 

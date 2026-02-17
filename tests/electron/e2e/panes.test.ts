@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/electronApp';
 import { selectors } from '../helpers/selectors';
 
-test.describe('Smoke / Panes', () => {
+test.describe('E2E / Panes', () => {
   test('pane selector works', async ({ appWindow }) => {
     const paneButton3 = appWindow.locator(selectors.paneChip3);
     await paneButton3.click();

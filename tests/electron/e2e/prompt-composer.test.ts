@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/electronApp';
 import { selectors } from '../helpers/selectors';
 
-test.describe('Smoke / Prompt Composer', () => {
+test.describe('E2E / Prompt Composer', () => {
   test('prompt composer is visible and functional', async ({ appWindow }) => {
     const textarea = appWindow.locator(selectors.promptTextarea);
     const sendButton = appWindow.locator(selectors.promptSendButton);

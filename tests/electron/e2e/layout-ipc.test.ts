@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/electronApp';
 import { getHealthCheck, resetAllPanes } from '../helpers/lazyllm';
 
-test.describe('Smoke / IPC', () => {
+test.describe('E2E / IPC', () => {
   test('IPC health check works', async ({ appWindow }) => {
     const health = await getHealthCheck(appWindow);
 

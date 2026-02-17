@@ -1,0 +1,26 @@
+{
+  "chatgpt": {
+    "url": "file://./tests/fixtures/mock-site/chatgpt-simulation.html",
+    "urlPattern": "chatgpt-simulation.html"
+  },
+  "grok": {
+    "url": "file://./tests/fixtures/mock-site/grok-simulation.html",
+    "urlPattern": "grok-simulation.html"
+  },
+  "gemini": {
+    "url": "file://./tests/fixtures/mock-site/gemini-simulation.html",
+    "urlPattern": "gemini-simulation.html"
+  },
+  "claude": {
+    "url": "file://./tests/fixtures/mock-site/claude-simulation.html",
+    "urlPattern": "claude-simulation.html"
+  },
+  "perplexity": {
+    "url": "file://./tests/fixtures/mock-site/perplexity-simulation.html",
+    "urlPattern": "perplexity-simulation.html"
+  },
+  "aistudio": {
+    "url": "file://./tests/fixtures/mock-site/aistudio-simulation.html",
+    "urlPattern": "aistudio-simulation.html"
+  }
+}

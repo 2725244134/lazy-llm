@@ -10,6 +10,7 @@ import {
   extractAllResponses,
 } from './core';
 import { resolveStatus, type StatusResult } from './status';
+import { findSendableSubmitButton } from './submit-button';
 
 interface InjectResult {
   success: boolean;
@@ -62,6 +63,7 @@ declare global {
         pollIntervalMs?: number
       ) => Promise<ExtractResult>;
     };
+    __lazyllm_extra_config?: Record<string, ProviderInjectConfig>;
   }
 }
 
@@ -95,6 +97,15 @@ function stringifyDebugDetails(details: Record<string, unknown>): string {
 }
 
 function detectProvider(): string {
+  // Check extra (mock) configs first — urlPattern matching takes priority
+  if (window.__lazyllm_extra_config) {
+    for (const [key, config] of Object.entries(window.__lazyllm_extra_config)) {
+      if (config.urlPattern && window.location.href.includes(config.urlPattern)) {
+        return key;
+      }
+    }
+  }
+
   const hostname = normalizeHostname(window.location.hostname);
   for (const rule of providerDetectRules) {
     const ruleHostname = normalizeHostname(rule.hostname);
@@ -110,9 +121,9 @@ function clickSubmit(config: ProviderInjectConfig | undefined): SubmitResult {
     return { success: false, reason: 'No config' };
   }
 
-  const button = findElement(config.submitSelectors) as HTMLButtonElement | null;
+  const button = findSendableSubmitButton(config.submitSelectors);
   if (!button) {
-    return { success: false, reason: 'Submit button not found' };
+    return { success: false, reason: 'No sendable submit button found' };
   }
 
   if (button.disabled) {
@@ -460,34 +471,35 @@ async function waitForComplete(
   timeoutMs: number,
   pollIntervalMs: number
 ): Promise<ExtractResult> {
-  const startTime = Date.now();
+  const deadline = Date.now() + timeoutMs;
 
-  return new Promise((resolve) => {
-    const poll = () => {
-      const result = handleExtractResponse(config, provider);
-
-      if (result.isComplete) {
-        resolve(result);
-        return;
-      }
-
-      if (Date.now() - startTime > timeoutMs) {
-        resolve({
-          ...result,
-          success: false,
-          reason: 'Timeout waiting for response completion',
-        });
-        return;
-      }
-
-      setTimeout(poll, pollIntervalMs);
-    };
-
-    poll();
-  });
+  while (true) {
+    const result = handleExtractResponse(config, provider);
+    if (result.isComplete) {
+      return result;
+    }
+    if (Date.now() > deadline) {
+      return { ...result, success: false, reason: 'Timeout waiting for response completion' };
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
 }
 
 (() => {
+  // Merge extra (mock) provider configs into the providers map.
+  // Per-key spread ensures mock config only needs to specify overrides
+  // (e.g. url + urlPattern) while real selectors from providers/*/inject.ts
+  // are preserved for any field not explicitly overridden.
+  if (window.__lazyllm_extra_config) {
+    for (const [key, extraConfig] of Object.entries(window.__lazyllm_extra_config)) {
+      if (providersConfig[key]) {
+        providersConfig[key] = { ...providersConfig[key], ...extraConfig };
+      } else {
+        providersConfig[key] = extraConfig;
+      }
+    }
+  }
+
   const provider = detectProvider();
   const config = providersConfig[provider];
   logInjectDebug('bridge initialized', {

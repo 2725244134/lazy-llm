@@ -1,5 +1,24 @@
 import { reportFrontendError, toErrorMessage } from './error';
 
+function isIndicatorVisible(element: Element): boolean {
+  if (element.classList?.contains?.('hidden')) {
+    return false;
+  }
+  if (element.hasAttribute?.('hidden') || element.getAttribute?.('aria-hidden') === 'true') {
+    return false;
+  }
+
+  if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
+    return true;
+  }
+
+  const computed = window.getComputedStyle(element);
+  return computed.display !== 'none'
+    && computed.visibility !== 'hidden'
+    && computed.visibility !== 'collapse'
+    && computed.opacity !== '0';
+}
+
 export function isStreaming(indicatorSelectors: string[]): boolean {
   if (!indicatorSelectors || indicatorSelectors.length === 0) {
     return false;
@@ -7,7 +26,8 @@ export function isStreaming(indicatorSelectors: string[]): boolean {
 
   for (const selector of indicatorSelectors) {
     try {
-      if (document.querySelector(selector)) {
+      const indicator = document.querySelector(selector);
+      if (indicator && isIndicatorVisible(indicator)) {
         return true;
       }
     } catch (error) {
@@ -30,7 +50,8 @@ export function isComplete(streamingIndicators: string[], completeIndicators: st
   if (completeIndicators && completeIndicators.length > 0) {
     for (const selector of completeIndicators) {
       try {
-        if (document.querySelector(selector)) {
+        const indicator = document.querySelector(selector);
+        if (indicator && isIndicatorVisible(indicator)) {
           return true;
         }
       } catch (error) {

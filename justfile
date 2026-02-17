@@ -52,27 +52,27 @@ arch-check *args:
   @bun scripts/check_import_boundaries.ts {{args}}
 
 # Run all test suites.
-test: test-unit test-electron-smoke
+test: test-unit test-electron-e2e
 
 # Run unit tests with vitest.
 test-unit:
   @echo "==> Running unit tests"
   @bun run test:unit
 
-# Build production artifacts required by Electron smoke tests.
-test-electron-smoke-prepare:
-  @echo "==> Building artifacts for Electron smoke tests"
+# Build production artifacts required by Electron E2E tests.
+test-electron-e2e-prepare:
+  @echo "==> Building artifacts for Electron E2E tests"
   @bun run build:inject
   @bun run build:app
 
-# Run Electron smoke tests with Playwright.
-test-electron-smoke: test-electron-smoke-prepare
-  @echo "==> Running Electron smoke tests"
+# Run Electron E2E tests with Playwright.
+test-electron-e2e: test-electron-e2e-prepare
+  @echo "==> Running Electron E2E tests"
   @bunx playwright test tests/electron/
 
-# Run Electron smoke tests in headless Linux (xvfb).
-test-electron-smoke-headless: test-electron-smoke-prepare
-  @echo "==> Running Electron smoke tests (headless)"
+# Run Electron E2E tests in headless Linux (xvfb).
+test-electron-e2e-headless: test-electron-e2e-prepare
+  @echo "==> Running Electron E2E tests (headless)"
   @xvfb-run -a bunx playwright test tests/electron/
 
 # Validate package version against EXPECTED_VERSION (supports vX.Y.Z or X.Y.Z).
