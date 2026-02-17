@@ -13,6 +13,9 @@ export interface SidebarContextValue {
   setProvider: (paneIndex: number, providerKey: string) => Promise<void>;
   syncPromptDraft: (text: string) => Promise<void>;
   sendPrompt: (text: string) => Promise<void>;
+  removeQueuedPromptItem: (queueItemId: string) => Promise<number>;
+  removeQueuedPromptRound: (roundId: number) => Promise<number>;
+  clearQueuedPrompts: () => Promise<number>;
 }
 
 const SidebarContext = createContext<SidebarContextValue | null>(null);

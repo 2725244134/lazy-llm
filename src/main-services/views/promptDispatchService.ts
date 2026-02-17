@@ -73,6 +73,8 @@ interface NormalizedPromptRequest {
 }
 
 interface QueuedPromptItem {
+  queueItemId: string;
+  roundId: number;
   request: NormalizedPromptRequest;
   queuedAtMs: number;
 }
@@ -146,6 +148,8 @@ export class PromptDispatchService {
 
   private readonly paneQueueStates = new Map<number, PaneQueueState>();
   private readonly panePostSubmitGuardUntilMs = new Map<number, number>();
+  private nextRoundId = 1;
+  private nextQueueItemId = 1;
 
   constructor(options: PromptDispatchServiceOptions) {
     this.getPaneTargets = options.getPaneTargets;
@@ -216,8 +220,11 @@ export class PromptDispatchService {
     }
 
     const normalizedRequest = normalizedRequestResult.value;
+    const roundId = this.nextRoundId;
+    this.nextRoundId += 1;
     logQuickPromptDispatchDebug('sendPromptToAll accepted request', {
       textLength: normalizedRequest.text.length,
+      roundId,
       ...summarizeImagePayload(normalizedRequest.image),
     });
 
@@ -258,6 +265,7 @@ export class PromptDispatchService {
         this.dispatchPromptToPane(
           pane,
           normalizedRequest,
+          roundId,
           promptScripts,
           injectRuntimeScript,
           statusEvalScript
@@ -388,6 +396,27 @@ export class PromptDispatchService {
     };
   }
 
+  removeQueuedPromptItem(queueItemId: string): number {
+    const normalizedQueueItemId = queueItemId.trim();
+    if (!normalizedQueueItemId) {
+      return 0;
+    }
+
+    return this.mutateQueuedPrompts((queued) => queued.queueItemId === normalizedQueueItemId);
+  }
+
+  removeQueuedPromptRound(roundId: number): number {
+    if (!Number.isInteger(roundId) || roundId <= 0) {
+      return 0;
+    }
+
+    return this.mutateQueuedPrompts((queued) => queued.roundId === roundId);
+  }
+
+  clearQueuedPrompts(): number {
+    return this.mutateQueuedPrompts(() => true);
+  }
+
   private normalizePromptRequest(input: string | PromptRequest): NormalizationResult<NormalizedPromptRequest> {
     const request = typeof input === 'string' ? { text: input } : input;
     const text = typeof request?.text === 'string' ? request.text : '';
@@ -453,6 +482,7 @@ export class PromptDispatchService {
   private async dispatchPromptToPane(
     pane: PromptDispatchPaneExecutionTarget,
     request: NormalizedPromptRequest,
+    roundId: number,
     promptScripts: PanePromptDispatchScripts,
     injectRuntimeScript: string,
     statusEvalScript: string
@@ -468,10 +498,11 @@ export class PromptDispatchService {
     });
 
     if (busyState !== 'idle') {
-      this.enqueuePromptForPane(pane.paneIndex, request);
+      this.enqueuePromptForPane(pane.paneIndex, request, roundId);
       logQuickPromptDispatchDebug('pane queued prompt because pane is not idle', {
         paneIndex: pane.paneIndex,
         busyState,
+        roundId,
         textLength: request.text.length,
       });
       return { kind: 'queued' };
@@ -809,6 +840,8 @@ export class PromptDispatchService {
     for (const [paneIndex, state] of paneQueueEntries) {
       for (const queued of state.queuedPromptRequests) {
         entries.push({
+          queueItemId: queued.queueItemId,
+          roundId: queued.roundId,
           paneIndex,
           text: queued.request.text,
           queuedAtMs: queued.queuedAtMs,
@@ -823,15 +856,64 @@ export class PromptDispatchService {
     this.onQueueStateChanged(this.buildQueueSnapshot());
   }
 
-  private enqueuePromptForPane(paneIndex: number, request: NormalizedPromptRequest): void {
+  private enqueuePromptForPane(
+    paneIndex: number,
+    request: NormalizedPromptRequest,
+    roundId: number
+  ): void {
     const state = this.getPaneQueueState(paneIndex);
     state.queuedPromptRequests.push({
+      queueItemId: `q-${this.nextQueueItemId}`,
+      roundId,
       request,
       queuedAtMs: this.now(),
     });
+    this.nextQueueItemId += 1;
     state.idleStreak = 0;
     this.notifyQueueStateChanged();
     this.schedulePaneQueueDrain(paneIndex, state);
+  }
+
+  private mutateQueuedPrompts(
+    shouldRemove: (queued: QueuedPromptItem) => boolean
+  ): number {
+    const touchedStates = new Map<number, PaneQueueState>();
+    let removedCount = 0;
+
+    for (const [paneIndex, state] of this.paneQueueStates.entries()) {
+      const retained: QueuedPromptItem[] = [];
+      for (const queued of state.queuedPromptRequests) {
+        if (shouldRemove(queued)) {
+          removedCount += 1;
+          continue;
+        }
+        retained.push(queued);
+      }
+      if (retained.length === state.queuedPromptRequests.length) {
+        continue;
+      }
+
+      state.queuedPromptRequests = retained;
+      state.idleStreak = 0;
+      touchedStates.set(paneIndex, state);
+    }
+
+    if (removedCount === 0) {
+      return 0;
+    }
+
+    for (const [paneIndex, state] of touchedStates.entries()) {
+      if (state.queuedPromptRequests.length === 0) {
+        this.clearPaneQueueTimer(state);
+        this.maybeCleanupPaneQueueState(paneIndex, state);
+        continue;
+      }
+
+      this.schedulePaneQueueDrain(paneIndex, state);
+    }
+
+    this.notifyQueueStateChanged();
+    return removedCount;
   }
 
   private schedulePaneQueueDrain(

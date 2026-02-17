@@ -10,6 +10,9 @@ import type {
   PaneUpdateResponse,
   PromptRequest,
   PromptResponse,
+  PromptQueueMutationResponse,
+  PromptQueueRemoveItemRequest,
+  PromptQueueRemoveRoundRequest,
   PromptSyncRequest,
   PromptSyncResponse,
   LayoutUpdateRequest,
@@ -57,6 +60,25 @@ const lazyllmAPI = {
   // Sync prompt draft to all panes without submitting
   syncPromptDraft: (request: PromptSyncRequest): Promise<PromptSyncResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_SYNC_DRAFT, request);
+  },
+
+  // Remove one queued prompt item by queueItemId
+  removeQueuedPromptItem: (
+    request: PromptQueueRemoveItemRequest
+  ): Promise<PromptQueueMutationResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_QUEUE_REMOVE_ITEM, request);
+  },
+
+  // Remove all queued prompt items from a specific dispatch round
+  removeQueuedPromptRound: (
+    request: PromptQueueRemoveRoundRequest
+  ): Promise<PromptQueueMutationResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_QUEUE_REMOVE_ROUND, request);
+  },
+
+  // Clear all queued prompt items
+  clearQueuedPrompts: (): Promise<PromptQueueMutationResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.PROMPT_QUEUE_CLEAR);
   },
 
   // Update layout

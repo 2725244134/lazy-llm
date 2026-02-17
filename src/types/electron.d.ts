@@ -8,6 +8,9 @@ import type {
   PaneUpdateResponse,
   PromptRequest,
   PromptResponse,
+  PromptQueueMutationResponse,
+  PromptQueueRemoveItemRequest,
+  PromptQueueRemoveRoundRequest,
   PromptSyncRequest,
   PromptSyncResponse,
   LayoutUpdateRequest,
@@ -28,6 +31,9 @@ export interface LazyLLMAPI {
   updateProvider: (request: PaneUpdateRequest) => Promise<PaneUpdateResponse>;
   sendPrompt: (request: PromptRequest) => Promise<PromptResponse>;
   syncPromptDraft: (request: PromptSyncRequest) => Promise<PromptSyncResponse>;
+  removeQueuedPromptItem: (request: PromptQueueRemoveItemRequest) => Promise<PromptQueueMutationResponse>;
+  removeQueuedPromptRound: (request: PromptQueueRemoveRoundRequest) => Promise<PromptQueueMutationResponse>;
+  clearQueuedPrompts: () => Promise<PromptQueueMutationResponse>;
   updateLayout: (request: LayoutUpdateRequest) => Promise<LayoutUpdateResponse>;
   updateSidebarWidth: (request: SidebarWidthRequest) => Promise<SidebarWidthResponse>;
   toggleQuickPrompt: () => Promise<QuickPromptToggleResponse>;

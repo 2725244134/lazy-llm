@@ -14,6 +14,9 @@ function stubWindowLazyllm(overrides: Partial<Window['lazyllm']> = {}) {
     updateProvider: vi.fn().mockResolvedValue({ success: true, paneIndex: 0 }),
     sendPrompt: vi.fn().mockResolvedValue({ success: true }),
     syncPromptDraft: vi.fn().mockResolvedValue({ success: true }),
+    removeQueuedPromptItem: vi.fn().mockResolvedValue({ success: true, removedCount: 1 }),
+    removeQueuedPromptRound: vi.fn().mockResolvedValue({ success: true, removedCount: 2 }),
+    clearQueuedPrompts: vi.fn().mockResolvedValue({ success: true, removedCount: 3 }),
     updateLayout: vi.fn().mockResolvedValue({ success: true }),
     updateSidebarWidth: vi.fn().mockResolvedValue({ success: true }),
     toggleQuickPrompt: vi.fn().mockResolvedValue({ success: true, visible: true }),
@@ -100,5 +103,38 @@ describe('createElectronRuntime', () => {
     await runtime.syncPromptDraft('draft value');
 
     expect(syncPromptDraft).toHaveBeenCalledWith({ text: 'draft value' });
+  });
+
+  it('forwards queued prompt removal by item id', async () => {
+    const removeQueuedPromptItem = vi.fn().mockResolvedValue({ success: true, removedCount: 2 });
+    stubWindowLazyllm({ removeQueuedPromptItem });
+    const runtime = createElectronRuntime();
+
+    const removedCount = await runtime.removeQueuedPromptItem('q-12');
+
+    expect(removeQueuedPromptItem).toHaveBeenCalledWith({ queueItemId: 'q-12' });
+    expect(removedCount).toBe(2);
+  });
+
+  it('forwards queued prompt removal by round id', async () => {
+    const removeQueuedPromptRound = vi.fn().mockResolvedValue({ success: true, removedCount: 4 });
+    stubWindowLazyllm({ removeQueuedPromptRound });
+    const runtime = createElectronRuntime();
+
+    const removedCount = await runtime.removeQueuedPromptRound(8);
+
+    expect(removeQueuedPromptRound).toHaveBeenCalledWith({ roundId: 8 });
+    expect(removedCount).toBe(4);
+  });
+
+  it('forwards clear queued prompts', async () => {
+    const clearQueuedPrompts = vi.fn().mockResolvedValue({ success: true, removedCount: 7 });
+    stubWindowLazyllm({ clearQueuedPrompts });
+    const runtime = createElectronRuntime();
+
+    const removedCount = await runtime.clearQueuedPrompts();
+
+    expect(clearQueuedPrompts).toHaveBeenCalledWith();
+    expect(removedCount).toBe(7);
   });
 });

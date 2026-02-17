@@ -236,6 +236,42 @@ export function Sidebar() {
     [runtime],
   );
 
+  const removeQueuedPromptItem = useCallback(
+    async (queueItemId: string) => {
+      try {
+        return await runtime.removeQueuedPromptItem(queueItemId);
+      } catch (error) {
+        console.error('[Sidebar] removeQueuedPromptItem error:', error);
+        throw error;
+      }
+    },
+    [runtime],
+  );
+
+  const removeQueuedPromptRound = useCallback(
+    async (roundId: number) => {
+      try {
+        return await runtime.removeQueuedPromptRound(roundId);
+      } catch (error) {
+        console.error('[Sidebar] removeQueuedPromptRound error:', error);
+        throw error;
+      }
+    },
+    [runtime],
+  );
+
+  const clearQueuedPrompts = useCallback(
+    async () => {
+      try {
+        return await runtime.clearQueuedPrompts();
+      } catch (error) {
+        console.error('[Sidebar] clearQueuedPrompts error:', error);
+        throw error;
+      }
+    },
+    [runtime],
+  );
+
   useEffect(() => {
     const handleWindowResize = () => {
       scheduleResizeLayoutSync();
@@ -350,8 +386,23 @@ export function Sidebar() {
       setProvider,
       syncPromptDraft,
       sendPrompt,
+      removeQueuedPromptItem,
+      removeQueuedPromptRound,
+      clearQueuedPrompts,
     };
-  }, [activeProviders, newAll, paneCount, providerLoadingByPane, sendPrompt, setPaneCount, setProvider, syncPromptDraft]);
+  }, [
+    activeProviders,
+    clearQueuedPrompts,
+    newAll,
+    paneCount,
+    providerLoadingByPane,
+    removeQueuedPromptItem,
+    removeQueuedPromptRound,
+    sendPrompt,
+    setPaneCount,
+    setProvider,
+    syncPromptDraft,
+  ]);
 
   return (
     <SidebarContextProvider value={contextValue}>

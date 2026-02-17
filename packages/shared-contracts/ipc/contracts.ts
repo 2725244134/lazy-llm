@@ -13,6 +13,9 @@ export const IPC_CHANNELS = {
   PROMPT_SEND: 'prompt:send',
   PROMPT_ATTACH_IMAGE: 'prompt:attachImage',
   PROMPT_SYNC_DRAFT: 'prompt:syncDraft',
+  PROMPT_QUEUE_REMOVE_ITEM: 'promptQueue:removeItem',
+  PROMPT_QUEUE_REMOVE_ROUND: 'promptQueue:removeRound',
+  PROMPT_QUEUE_CLEAR: 'promptQueue:clear',
   // Layout channels
   LAYOUT_UPDATE: 'layout:update',
   SIDEBAR_UPDATE_WIDTH: 'sidebar:updateWidth',
@@ -105,7 +108,23 @@ export interface PromptSyncResponse {
   failures?: string[];
 }
 
+export interface PromptQueueRemoveItemRequest {
+  queueItemId: string;
+}
+
+export interface PromptQueueRemoveRoundRequest {
+  roundId: number;
+}
+
+export interface PromptQueueMutationResponse {
+  success: boolean;
+  removedCount: number;
+  failures?: string[];
+}
+
 export interface QuickPromptQueueEntry {
+  queueItemId: string;
+  roundId: number;
   paneIndex: number;
   text: string;
   queuedAtMs: number;
@@ -232,6 +251,18 @@ export interface IPCContract {
   [IPC_CHANNELS.PROMPT_SYNC_DRAFT]: {
     request: PromptSyncRequest;
     response: PromptSyncResponse;
+  };
+  [IPC_CHANNELS.PROMPT_QUEUE_REMOVE_ITEM]: {
+    request: PromptQueueRemoveItemRequest;
+    response: PromptQueueMutationResponse;
+  };
+  [IPC_CHANNELS.PROMPT_QUEUE_REMOVE_ROUND]: {
+    request: PromptQueueRemoveRoundRequest;
+    response: PromptQueueMutationResponse;
+  };
+  [IPC_CHANNELS.PROMPT_QUEUE_CLEAR]: {
+    request: void;
+    response: PromptQueueMutationResponse;
   };
   [IPC_CHANNELS.LAYOUT_UPDATE]: {
     request: LayoutUpdateRequest;

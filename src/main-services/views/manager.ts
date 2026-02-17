@@ -45,6 +45,7 @@ import { padProviderSequence } from '../ipc-handlers/providerConfig.js';
 import type {
   AppConfig,
   PaneCount,
+  PromptQueueMutationResponse,
   PromptImagePayload,
   QuickPromptQueueSnapshot,
   PromptRequest,
@@ -615,6 +616,27 @@ export class ViewManager {
    */
   async syncPromptDraftToAll(text: string): Promise<{ success: boolean; failures: string[] }> {
     return this.promptDispatchService.syncPromptDraftToAll(text);
+  }
+
+  removeQueuedPromptItem(queueItemId: string): PromptQueueMutationResponse {
+    return {
+      success: true,
+      removedCount: this.promptDispatchService.removeQueuedPromptItem(queueItemId),
+    };
+  }
+
+  removeQueuedPromptRound(roundId: number): PromptQueueMutationResponse {
+    return {
+      success: true,
+      removedCount: this.promptDispatchService.removeQueuedPromptRound(roundId),
+    };
+  }
+
+  clearQueuedPrompts(): PromptQueueMutationResponse {
+    return {
+      success: true,
+      removedCount: this.promptDispatchService.clearQueuedPrompts(),
+    };
   }
 
   private getInjectRuntimeScript(): string | null {

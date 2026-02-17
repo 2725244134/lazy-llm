@@ -16,6 +16,9 @@ export interface SidebarRuntime {
   }): Promise<void>;
   syncPromptDraft(text: string): Promise<void>;
   sendPrompt(text: string): Promise<void>;
+  removeQueuedPromptItem(queueItemId: string): Promise<number>;
+  removeQueuedPromptRound(roundId: number): Promise<number>;
+  clearQueuedPrompts(): Promise<number>;
 }
 
 export type { AppConfig };

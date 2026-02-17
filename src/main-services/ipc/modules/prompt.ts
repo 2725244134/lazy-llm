@@ -1,6 +1,8 @@
 import { ipcMain } from 'electron';
 import type {
   PromptAttachImageRequest,
+  PromptQueueRemoveItemRequest,
+  PromptQueueRemoveRoundRequest,
   PromptRequest,
   PromptSyncRequest,
 } from '@shared-contracts/ipc/contracts';
@@ -69,5 +71,72 @@ export function registerPromptIpcHandlers(context: IpcRuntimeContext): void {
 
     const text = typeof request?.text === 'string' ? request.text : '';
     return viewManager.syncPromptDraftToAll(text);
+  });
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROMPT_QUEUE_REMOVE_ITEM,
+    async (_event, request: PromptQueueRemoveItemRequest) => {
+      const viewManager = context.getViewManager();
+      if (!viewManager) {
+        return {
+          success: false,
+          removedCount: 0,
+          failures: ['no-view-manager'],
+        };
+      }
+
+      const queueItemId = typeof request?.queueItemId === 'string'
+        ? request.queueItemId.trim()
+        : '';
+      if (!queueItemId) {
+        return {
+          success: false,
+          removedCount: 0,
+          failures: ['invalid-queue-item-id'],
+        };
+      }
+
+      return viewManager.removeQueuedPromptItem(queueItemId);
+    }
+  );
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROMPT_QUEUE_REMOVE_ROUND,
+    async (_event, request: PromptQueueRemoveRoundRequest) => {
+      const viewManager = context.getViewManager();
+      if (!viewManager) {
+        return {
+          success: false,
+          removedCount: 0,
+          failures: ['no-view-manager'],
+        };
+      }
+
+      const roundId = typeof request?.roundId === 'number'
+        ? Math.floor(request.roundId)
+        : Number.NaN;
+      if (!Number.isInteger(roundId) || roundId <= 0) {
+        return {
+          success: false,
+          removedCount: 0,
+          failures: ['invalid-round-id'],
+        };
+      }
+
+      return viewManager.removeQueuedPromptRound(roundId);
+    }
+  );
+
+  ipcMain.handle(IPC_CHANNELS.PROMPT_QUEUE_CLEAR, async () => {
+    const viewManager = context.getViewManager();
+    if (!viewManager) {
+      return {
+        success: false,
+        removedCount: 0,
+        failures: ['no-view-manager'],
+      };
+    }
+
+    return viewManager.clearQueuedPrompts();
   });
 }

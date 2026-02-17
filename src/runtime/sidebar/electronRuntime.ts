@@ -70,5 +70,35 @@ export function createElectronRuntime(): SidebarRuntime {
         );
       }
     },
+
+    async removeQueuedPromptItem(queueItemId: string): Promise<number> {
+      const result = await lazyllm.removeQueuedPromptItem({ queueItemId });
+      if (!result.success) {
+        throw new Error(
+          `Failed to remove queued prompt item: ${result.failures?.join(', ') ?? 'unknown error'}`
+        );
+      }
+      return result.removedCount;
+    },
+
+    async removeQueuedPromptRound(roundId: number): Promise<number> {
+      const result = await lazyllm.removeQueuedPromptRound({ roundId });
+      if (!result.success) {
+        throw new Error(
+          `Failed to remove queued prompt round: ${result.failures?.join(', ') ?? 'unknown error'}`
+        );
+      }
+      return result.removedCount;
+    },
+
+    async clearQueuedPrompts(): Promise<number> {
+      const result = await lazyllm.clearQueuedPrompts();
+      if (!result.success) {
+        throw new Error(
+          `Failed to clear queued prompts: ${result.failures?.join(', ') ?? 'unknown error'}`
+        );
+      }
+      return result.removedCount;
+    },
   };
 }
