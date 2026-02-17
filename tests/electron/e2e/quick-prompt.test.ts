@@ -3,12 +3,12 @@ import { hideQuickPrompt, resizeQuickPrompt, toggleQuickPrompt } from '../helper
 import { selectors } from '../helpers/selectors';
 
 test.describe('E2E / Quick Prompt', () => {
-  test('quick prompt shortcut opens centered input', async ({ appWindow }) => {
+  test('quick prompt auto-opens and supports toggle + resize', async ({ appWindow }) => {
     const paneButton3 = appWindow.locator(selectors.paneChip3);
 
-    const hideResult = await hideQuickPrompt(appWindow);
-    expect(hideResult.success).toBe(true);
-    expect(hideResult.visible).toBe(false);
+    const closeStartupOverlayResult = await toggleQuickPrompt(appWindow);
+    expect(closeStartupOverlayResult.success).toBe(true);
+    expect(closeStartupOverlayResult.visible).toBe(false);
 
     const openResult = await toggleQuickPrompt(appWindow);
     expect(openResult.success).toBe(true);

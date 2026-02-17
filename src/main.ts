@@ -55,6 +55,7 @@ function createWindow(): void {
 
   viewManager.initSidebar();
   viewManager.setPaneCount(settings.config.provider.pane_count as PaneCount);
+  viewManager.showQuickPrompt();
 
   mainWindow.on('resize', () => {
     viewManager?.updateLayout();
@@ -98,7 +99,18 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BaseWindow.getAllWindows().length === 0) {
       createWindow();
+      return;
     }
+
+    if (!mainWindow) {
+      return;
+    }
+
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+    viewManager?.showQuickPrompt();
   });
 });
 
@@ -117,4 +129,5 @@ app.on('second-instance', () => {
     mainWindow.restore();
   }
   mainWindow.focus();
+  viewManager?.showQuickPrompt();
 });
