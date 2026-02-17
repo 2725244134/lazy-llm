@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calculateQuickPromptBounds } from './quickPromptGeometry';
+import { calculateQuickPromptBounds } from './geometry';
 
 describe('calculateQuickPromptBounds', () => {
   it('fills the viewport when passthrough mode is disabled', () => {

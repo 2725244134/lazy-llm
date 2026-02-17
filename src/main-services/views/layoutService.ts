@@ -1,6 +1,6 @@
 import type { PaneCount, ViewRect } from '@shared-contracts/ipc/contracts';
 import { calculateLayout, type LayoutResult } from './geometry.js';
-import { calculateQuickPromptBounds } from './quickPromptGeometry.js';
+import { calculateQuickPromptBounds } from './quick-prompt/geometry.js';
 
 export interface ContentSize {
   width: number;

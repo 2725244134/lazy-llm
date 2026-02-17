@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WebContentsView } from 'electron';
 import type { ViewRect } from '@shared-contracts/ipc/contracts';
-import { QuickPromptLifecycleService } from './quickPromptLifecycleService';
+import { QuickPromptLifecycleService } from './lifecycleService';
 
 type TestView = WebContentsView & {
   __id: string;

@@ -4,7 +4,7 @@ import {
   computeSidebarWidthTweenFrame,
   easeOutCubic,
   normalizeSidebarWidth,
-} from './sidebarWidthTween';
+} from './widthTween';
 
 describe('sidebarWidthTween', () => {
   it('normalizes sidebar width into finite positive integers', () => {

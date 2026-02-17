@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calculateLayout } from './geometry';
-import { calculateQuickPromptBounds } from './quickPromptGeometry';
+import { calculateQuickPromptBounds } from './quick-prompt/geometry';
 import {
   LayoutService,
   calculateLayoutFromContentBounds,

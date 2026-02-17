@@ -5,7 +5,7 @@ import {
   SidebarEventBridge,
   type ProviderLoadingTrackedWebContents,
   type SidebarScriptExecutionTarget,
-} from './sidebarEventBridge';
+} from './eventBridge';
 
 type LoadingEventName = 'did-stop-loading' | 'did-fail-load';
 

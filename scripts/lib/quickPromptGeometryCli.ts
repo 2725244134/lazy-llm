@@ -2,7 +2,7 @@ import type { ViewRect } from '../../packages/shared-contracts/ipc/contracts.js'
 import {
   calculateQuickPromptBounds,
   type QuickPromptGeometryInput,
-} from '../../src/main-services/views/quickPromptGeometry.js';
+} from '../../src/main-services/views/quick-prompt/geometry.js';
 import {
   expectRecord,
   readBoolean,
