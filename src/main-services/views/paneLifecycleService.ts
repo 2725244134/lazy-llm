@@ -20,6 +20,8 @@ interface PaneLifecycleCallbacks {
   applyPaneRuntimePreferences(webContents: WebContents): void;
   clearProviderLoadingTracking(paneIndex: number): void;
   closePane(pane: PaneViewState): void;
+  stashPane?(pane: PaneViewState): void;
+  takeStashedPane?(paneIndex: number): PaneViewState | null;
   updateLayout(): void;
 }
 
@@ -65,7 +67,12 @@ export function setPaneCountWithLifecycle(params: SetPaneCountParams): SetPaneCo
   while (paneViews.length > count) {
     const pane = paneViews.pop()!;
     callbacks.clearProviderLoadingTracking(pane.paneIndex);
-    callbacks.closePane(pane);
+    if (callbacks.stashPane) {
+      callbacks.removePaneViewFromContent(pane.view);
+      callbacks.stashPane(pane);
+    } else {
+      callbacks.closePane(pane);
+    }
   }
 
   while (paneViews.length < count) {
@@ -73,8 +80,48 @@ export function setPaneCountWithLifecycle(params: SetPaneCountParams): SetPaneCo
     const providerKey = defaultProviders[paneIndex] ?? fallbackProviderKey;
     const provider = providers.get(providerKey);
     const url = provider?.url ?? 'about:blank';
-    const view = callbacks.createPaneWebContentsView(paneIndex);
+    const stashedPane = callbacks.takeStashedPane?.(paneIndex);
+    if (stashedPane) {
+      stashedPane.paneIndex = paneIndex;
+      const cachedEntry = stashedPane.cachedViews.get(providerKey);
 
+      if (cachedEntry) {
+        if (stashedPane.view !== cachedEntry.view) {
+          callbacks.removePaneViewFromContent(stashedPane.view);
+          callbacks.addPaneViewToContent(cachedEntry.view);
+        } else {
+          callbacks.addPaneViewToContent(stashedPane.view);
+        }
+
+        const shouldReload = cachedEntry.url !== url;
+        if (shouldReload) {
+          cachedEntry.url = url;
+          callbacks.applyPaneRuntimePreferences(cachedEntry.view.webContents);
+          callbacks.loadPaneUrl(paneIndex, cachedEntry.view, url, true);
+        } else {
+          callbacks.clearProviderLoadingTracking(paneIndex);
+        }
+
+        stashedPane.view = cachedEntry.view;
+        stashedPane.providerKey = providerKey;
+        stashedPane.url = cachedEntry.url;
+        callbacks.applyPaneRuntimePreferences(stashedPane.view.webContents);
+        paneViews.push(stashedPane);
+        continue;
+      }
+
+      const nextView = callbacks.createPaneWebContentsView(paneIndex);
+      callbacks.addPaneViewToContent(nextView);
+      callbacks.loadPaneUrl(paneIndex, nextView, url, true);
+      stashedPane.cachedViews.set(providerKey, { view: nextView, url });
+      stashedPane.view = nextView;
+      stashedPane.providerKey = providerKey;
+      stashedPane.url = url;
+      paneViews.push(stashedPane);
+      continue;
+    }
+
+    const view = callbacks.createPaneWebContentsView(paneIndex);
     callbacks.addPaneViewToContent(view);
     callbacks.loadPaneUrl(paneIndex, view, url, false);
 

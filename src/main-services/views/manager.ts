@@ -125,6 +125,7 @@ interface ViewManagerOptions {
 export class ViewManager {
   private window: BaseWindow;
   private paneViews: PaneViewState[] = [];
+  private stashedPaneViews = new Map<number, PaneViewState>();
   private currentPaneCount: PaneCount = 1;
   private currentSidebarWidth: number;
   private providers: Map<string, ProviderMeta>;
@@ -411,8 +412,27 @@ export class ViewManager {
       applyPaneRuntimePreferences: (wc: WebContents) => this.paneViewService.applyPaneRuntimePreferences(wc),
       clearProviderLoadingTracking: (paneIndex: number) => this.clearProviderLoadingTracking(paneIndex),
       closePane: (pane: PaneViewState) => this.paneViewService.closePane(pane),
+      stashPane: (pane: PaneViewState) => this.stashPane(pane),
+      takeStashedPane: (paneIndex: number) => this.takeStashedPane(paneIndex),
       updateLayout: () => this.updateLayout(),
     };
+  }
+
+  private stashPane(pane: PaneViewState): void {
+    const existing = this.stashedPaneViews.get(pane.paneIndex);
+    if (existing && existing !== pane) {
+      this.paneViewService.closePane(existing);
+    }
+    this.stashedPaneViews.set(pane.paneIndex, pane);
+  }
+
+  private takeStashedPane(paneIndex: number): PaneViewState | null {
+    const pane = this.stashedPaneViews.get(paneIndex) ?? null;
+    if (!pane) {
+      return null;
+    }
+    this.stashedPaneViews.delete(paneIndex);
+    return pane;
   }
 
   /**
@@ -695,6 +715,15 @@ export class ViewManager {
       }
     }
     this.paneViews = [];
+    for (const pane of this.stashedPaneViews.values()) {
+      try {
+        this.clearProviderLoadingTracking(pane.paneIndex);
+        this.paneViewService.closePane(pane);
+      } catch (e) {
+        console.error(`[ViewManager] Error closing stashed pane ${pane.paneIndex}:`, e);
+      }
+    }
+    this.stashedPaneViews.clear();
     this.paneViewService.clearAllPaneLoadState();
     this.lastLayout = null;
 

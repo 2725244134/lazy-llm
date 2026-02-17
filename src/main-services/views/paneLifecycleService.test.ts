@@ -185,6 +185,62 @@ describe('setPaneCountWithLifecycle', () => {
     expect(closed).toEqual([2, 1]);
     expect(cleared).toEqual([2, 1]);
   });
+
+  it('reuses stashed panes when pane count grows again', () => {
+    const providers = createProvidersMap([
+      ['chatgpt', 'https://chatgpt.com'],
+      ['claude', 'https://claude.ai/new'],
+    ]);
+    const pane0 = createPaneState(0, 'chatgpt', createTestView('pane-0', 'https://chatgpt.com'), 'https://chatgpt.com');
+    const pane1 = createPaneState(1, 'claude', createTestView('pane-1', 'https://claude.ai/chat/thread'), 'https://claude.ai/new');
+    const paneViews: PaneViewState[] = [pane0, pane1];
+    const defaultProviders = ['chatgpt', 'claude'];
+    const { callbacks, loaded, added, removed, closed, cleared, created } = createCallbacks();
+    const stash = new Map<number, PaneViewState>();
+
+    const callbacksWithStash = {
+      ...callbacks,
+      stashPane: (pane: PaneViewState) => {
+        stash.set(pane.paneIndex, pane);
+      },
+      takeStashedPane: (paneIndex: number) => {
+        const pane = stash.get(paneIndex) ?? null;
+        if (pane) {
+          stash.delete(paneIndex);
+        }
+        return pane;
+      },
+    };
+
+    setPaneCountWithLifecycle({
+      count: 1 as PaneCount,
+      paneViews,
+      defaultProviders,
+      providers,
+      callbacks: callbacksWithStash,
+    });
+
+    expect(paneViews).toHaveLength(1);
+    expect(stash.has(1)).toBe(true);
+    expect(closed).toEqual([]);
+    expect(cleared).toEqual([1]);
+    expect(removed).toEqual(['pane-1']);
+
+    setPaneCountWithLifecycle({
+      count: 2 as PaneCount,
+      paneViews,
+      defaultProviders,
+      providers,
+      callbacks: callbacksWithStash,
+    });
+
+    expect(paneViews).toHaveLength(2);
+    expect((paneViews[1].view as TestView).__id).toBe('pane-1');
+    expect(stash.size).toBe(0);
+    expect(loaded).toEqual([]);
+    expect(created).toEqual([]);
+    expect(added).toContain('pane-1');
+  });
 });
 
 describe('updatePaneProviderWithLifecycle', () => {
