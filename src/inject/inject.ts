@@ -11,6 +11,7 @@ import {
 } from './core';
 import { resolveStatus, type StatusResult } from './status';
 import { findSendableSubmitButton } from './submit-button';
+import { scheduleAutoSubmit } from './auto-submit';
 
 interface InjectResult {
   success: boolean;
@@ -338,7 +339,16 @@ function handleInject(
   }
 
   if (autoSubmit) {
-    setTimeout(() => clickSubmit(config), 300);
+    scheduleAutoSubmit(
+      () => clickSubmit(config),
+      ({ attempts, lastReason }) => {
+        logInjectDebug('auto submit retries exhausted', {
+          provider,
+          attempts,
+          lastReason: lastReason ?? null,
+        });
+      },
+    );
   }
 
   return { success: true, provider };
