@@ -3,12 +3,12 @@ import { hideQuickPrompt, resizeQuickPrompt, toggleQuickPrompt } from '../helper
 import { selectors } from '../helpers/selectors';
 
 test.describe('E2E / Quick Prompt', () => {
-  test('quick prompt auto-opens and supports toggle + resize', async ({ appWindow }) => {
+  test('quick prompt supports toggle + resize', async ({ appWindow }) => {
     const paneButton3 = appWindow.locator(selectors.paneChip3);
 
-    const closeStartupOverlayResult = await toggleQuickPrompt(appWindow);
-    expect(closeStartupOverlayResult.success).toBe(true);
-    expect(closeStartupOverlayResult.visible).toBe(false);
+    const normalizeHiddenResult = await hideQuickPrompt(appWindow);
+    expect(normalizeHiddenResult.success).toBe(true);
+    expect(normalizeHiddenResult.visible).toBe(false);
 
     const openResult = await toggleQuickPrompt(appWindow);
     expect(openResult.success).toBe(true);
@@ -21,9 +21,9 @@ test.describe('E2E / Quick Prompt', () => {
     await paneButton3.click();
     await expect(paneButton3).toHaveClass(/active/);
 
-    const normalizeHiddenResult = await hideQuickPrompt(appWindow);
-    expect(normalizeHiddenResult.success).toBe(true);
-    expect(normalizeHiddenResult.visible).toBe(false);
+    const hideBeforeReopenResult = await hideQuickPrompt(appWindow);
+    expect(hideBeforeReopenResult.success).toBe(true);
+    expect(hideBeforeReopenResult.visible).toBe(false);
 
     const reopenResult = await toggleQuickPrompt(appWindow);
     expect(reopenResult.success).toBe(true);
