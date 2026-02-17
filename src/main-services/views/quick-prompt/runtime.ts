@@ -499,13 +499,13 @@ function quickPromptRuntimeEntry(config: QuickPromptRuntimeConfig): void {
       logDebug('submit: sending prompt payload', {
         promptLength: prompt.length,
       });
+      input.value = '';
+      syncInputHeight();
+      void hide();
       await window.quickPrompt.sendPrompt({
         text: prompt,
       });
       logDebug('submit: prompt sent successfully');
-      input.value = '';
-      syncInputHeight();
-      await hide();
     } catch (error) {
       logDebug('submit: send failed', {
         error: toErrorMessage(error),
