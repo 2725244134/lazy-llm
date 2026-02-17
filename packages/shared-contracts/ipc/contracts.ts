@@ -10,6 +10,8 @@ export const IPC_CHANNELS = {
   PANE_SET_COUNT: 'pane:setCount',
   PANE_RESET_ALL: 'pane:resetAll',
   PANE_UPDATE_PROVIDER: 'pane:updateProvider',
+  SIDEBAR_ACTIVATE_TAB: 'sidebar:activateTab',
+  SIDEBAR_CLOSE_TAB: 'sidebar:closeTab',
   PROMPT_SEND: 'prompt:send',
   PROMPT_ATTACH_IMAGE: 'prompt:attachImage',
   PROMPT_SYNC_DRAFT: 'prompt:syncDraft',
@@ -78,6 +80,24 @@ export interface PaneUpdateRequest {
 export interface PaneUpdateResponse {
   success: boolean;
   paneIndex: number;
+}
+
+export interface SidebarActivateTabRequest {
+  tabId: string;
+  paneCount: PaneCount;
+  paneProviders: string[];
+}
+
+export interface SidebarActivateTabResponse {
+  success: boolean;
+}
+
+export interface SidebarCloseTabRequest {
+  tabId: string;
+}
+
+export interface SidebarCloseTabResponse {
+  success: boolean;
 }
 
 export interface PromptRequest {
@@ -239,6 +259,14 @@ export interface IPCContract {
   [IPC_CHANNELS.PANE_UPDATE_PROVIDER]: {
     request: PaneUpdateRequest;
     response: PaneUpdateResponse;
+  };
+  [IPC_CHANNELS.SIDEBAR_ACTIVATE_TAB]: {
+    request: SidebarActivateTabRequest;
+    response: SidebarActivateTabResponse;
+  };
+  [IPC_CHANNELS.SIDEBAR_CLOSE_TAB]: {
+    request: SidebarCloseTabRequest;
+    response: SidebarCloseTabResponse;
   };
   [IPC_CHANNELS.PROMPT_SEND]: {
     request: PromptRequest;

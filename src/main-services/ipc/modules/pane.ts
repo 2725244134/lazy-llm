@@ -3,6 +3,8 @@ import type {
   PaneCountRequest,
   PaneUpdateRequest,
   PaneResponseReadyPayload,
+  SidebarActivateTabRequest,
+  SidebarCloseTabRequest,
 } from '@shared-contracts/ipc/contracts';
 import { IPC_CHANNELS } from '@shared-contracts/ipc/contracts';
 import type { IpcRuntimeContext } from '../context.js';
@@ -50,6 +52,45 @@ export function registerPaneIpcHandlers(context: IpcRuntimeContext): void {
     }
 
     return { success, paneIndex };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SIDEBAR_ACTIVATE_TAB, (_event, request: SidebarActivateTabRequest) => {
+    const viewManager = context.getViewManager();
+    if (!viewManager) {
+      return { success: false };
+    }
+
+    const tabId = typeof request?.tabId === 'string' ? request.tabId.trim() : '';
+    if (tabId.length === 0) {
+      return { success: false };
+    }
+
+    const paneCount = validatePaneCount(request?.paneCount);
+    const paneProviders = Array.isArray(request?.paneProviders)
+      ? request.paneProviders
+          .map((providerKey) => (typeof providerKey === 'string' ? providerKey.trim() : ''))
+          .filter((providerKey) => providerKey.length > 0)
+      : [];
+
+    return {
+      success: viewManager.activateTabSession(tabId, paneCount, paneProviders),
+    };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.SIDEBAR_CLOSE_TAB, (_event, request: SidebarCloseTabRequest) => {
+    const viewManager = context.getViewManager();
+    if (!viewManager) {
+      return { success: false };
+    }
+
+    const tabId = typeof request?.tabId === 'string' ? request.tabId.trim() : '';
+    if (tabId.length === 0) {
+      return { success: false };
+    }
+
+    return {
+      success: viewManager.closeTabSession(tabId),
+    };
   });
 
   ipcMain.on(IPC_CHANNELS.PANE_RESPONSE_READY, (_event, payload: PaneResponseReadyPayload) => {

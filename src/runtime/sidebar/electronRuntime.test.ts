@@ -9,6 +9,8 @@ function stubWindowLazyllm(overrides: Partial<Window['lazyllm']> = {}) {
       sidebar: { expanded_width: 280, collapsed_width: 48 },
       quick_prompt: { default_height: 74 },
     }),
+    activateTab: vi.fn().mockResolvedValue({ success: true }),
+    closeTab: vi.fn().mockResolvedValue({ success: true }),
     setPaneCount: vi.fn().mockResolvedValue({ success: true }),
     resetAllPanes: vi.fn().mockResolvedValue({ success: true }),
     updateProvider: vi.fn().mockResolvedValue({ success: true, paneIndex: 0 }),
@@ -58,6 +60,31 @@ describe('createElectronRuntime', () => {
     });
   });
 
+  it('forwards tab activation with pane snapshot', async () => {
+    const activateTab = vi.fn().mockResolvedValue({ success: true });
+    stubWindowLazyllm({ activateTab });
+    const runtime = createElectronRuntime();
+
+    await runtime.activateTab('tab-3', 2, ['chatgpt', 'claude']);
+
+    expect(activateTab).toHaveBeenCalledWith({
+      tabId: 'tab-3',
+      paneCount: 2,
+      paneProviders: ['chatgpt', 'claude'],
+    });
+  });
+
+  it('throws when tab activation fails', async () => {
+    stubWindowLazyllm({
+      activateTab: vi.fn().mockResolvedValue({ success: false }),
+    });
+    const runtime = createElectronRuntime();
+
+    await expect(runtime.activateTab('tab-1', 1, ['chatgpt'])).rejects.toThrow(
+      'Failed to activate tab: tab-1'
+    );
+  });
+
   it('throws when setPaneCount returns unsuccessful result', async () => {
     stubWindowLazyllm({
       setPaneCount: vi.fn().mockResolvedValue({ success: false }),
@@ -75,6 +102,16 @@ describe('createElectronRuntime', () => {
     await runtime.resetAllPanes();
 
     expect(resetAllPanes).toHaveBeenCalled();
+  });
+
+  it('forwards tab close to Electron bridge', async () => {
+    const closeTab = vi.fn().mockResolvedValue({ success: true });
+    stubWindowLazyllm({ closeTab });
+    const runtime = createElectronRuntime();
+
+    await runtime.closeTab('tab-7');
+
+    expect(closeTab).toHaveBeenCalledWith({ tabId: 'tab-7' });
   });
 
   it('throws when resetAllPanes returns unsuccessful result', async () => {

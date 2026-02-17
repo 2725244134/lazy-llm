@@ -122,6 +122,15 @@ interface ViewManagerOptions {
   paneUserAgentStrategy: PaneUserAgentStrategy;
 }
 
+interface TabPaneSession {
+  paneViews: PaneViewState[];
+  stashedPaneViews: Map<number, PaneViewState>;
+  paneCount: PaneCount;
+  defaultProviders: string[];
+}
+
+const DEFAULT_TAB_SESSION_ID = 'tab-1';
+
 export class ViewManager {
   private window: BaseWindow;
   private paneViews: PaneViewState[] = [];
@@ -144,6 +153,8 @@ export class ViewManager {
   private sidebarWidthAnimationToken = 0;
   private sidebarWidthAnimationTarget: number | null = null;
   private rendererDevServerUrl: string | null;
+  private activeTabSessionId = DEFAULT_TAB_SESSION_ID;
+  private tabPaneSessions = new Map<string, TabPaneSession>();
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -156,6 +167,12 @@ export class ViewManager {
       options.config.provider.panes,
       options.config.provider.pane_count
     );
+    this.tabPaneSessions.set(this.activeTabSessionId, {
+      paneViews: this.paneViews,
+      stashedPaneViews: this.stashedPaneViews,
+      paneCount: this.currentPaneCount,
+      defaultProviders: this.defaultProviders,
+    });
     this.layoutService = new LayoutService(QUICK_PROMPT_LAYOUT_CONFIG);
     this.sidebarController = new SidebarController({
       hostWindow: this.window,
@@ -392,6 +409,35 @@ export class ViewManager {
     this.quickPromptController.keepOnTop();
   }
 
+  private syncActiveTabSessionState(): void {
+    const session = this.tabPaneSessions.get(this.activeTabSessionId);
+    if (!session) {
+      return;
+    }
+    session.paneCount = this.currentPaneCount;
+    session.defaultProviders = this.defaultProviders;
+    session.paneViews = this.paneViews;
+    session.stashedPaneViews = this.stashedPaneViews;
+  }
+
+  private bindActiveTabSession(tabId: string, session: TabPaneSession): void {
+    this.activeTabSessionId = tabId;
+    this.paneViews = session.paneViews;
+    this.stashedPaneViews = session.stashedPaneViews;
+    this.currentPaneCount = session.paneCount;
+    this.defaultProviders = session.defaultProviders;
+  }
+
+  private stashActiveSessionPaneViews(): void {
+    while (this.paneViews.length > 0) {
+      const pane = this.paneViews.pop()!;
+      this.clearProviderLoadingTracking(pane.paneIndex);
+      this.paneViewService.removePaneViewFromContent(pane.view);
+      this.stashPane(pane);
+    }
+    this.syncActiveTabSessionState();
+  }
+
   private clampQuickPromptAnchorPaneIndex(): void {
     const paneCount = this.paneViews.length;
     const currentAnchor = this.quickPromptController.getAnchorPaneIndex();
@@ -435,6 +481,92 @@ export class ViewManager {
     return pane;
   }
 
+  activateTabSession(tabId: string, paneCount: PaneCount, paneProviders: readonly string[]): boolean {
+    const normalizedTabId = tabId.trim();
+    if (normalizedTabId.length === 0) {
+      return false;
+    }
+
+    try {
+      const normalizedProviders = padProviderSequence(paneProviders, paneCount);
+      if (normalizedTabId !== this.activeTabSessionId) {
+        this.stashActiveSessionPaneViews();
+
+        const session = this.tabPaneSessions.get(normalizedTabId) ?? {
+          paneViews: [],
+          stashedPaneViews: new Map<number, PaneViewState>(),
+          paneCount,
+          defaultProviders: normalizedProviders,
+        };
+        session.defaultProviders = padProviderSequence(normalizedProviders, paneCount);
+        this.tabPaneSessions.set(normalizedTabId, session);
+        this.bindActiveTabSession(normalizedTabId, session);
+      } else {
+        this.defaultProviders = padProviderSequence(this.defaultProviders, paneCount);
+      }
+
+      this.currentPaneCount = paneCount;
+      this.defaultProviders = padProviderSequence(normalizedProviders, paneCount);
+      this.setPaneCount(paneCount);
+
+      for (let paneIndex = 0; paneIndex < paneCount; paneIndex += 1) {
+        const targetProvider = this.defaultProviders[paneIndex];
+        if (!targetProvider) {
+          continue;
+        }
+        if (this.paneViews[paneIndex]?.providerKey === targetProvider) {
+          continue;
+        }
+        if (!this.updatePaneProvider(paneIndex, targetProvider)) {
+          return false;
+        }
+      }
+
+      this.syncActiveTabSessionState();
+      this.clampQuickPromptAnchorPaneIndex();
+      this.keepQuickPromptOnTop();
+      return true;
+    } catch (error) {
+      console.error(`[ViewManager] Failed to activate tab session ${normalizedTabId}:`, error);
+      return false;
+    }
+  }
+
+  closeTabSession(tabId: string): boolean {
+    const normalizedTabId = tabId.trim();
+    if (normalizedTabId.length === 0) {
+      return false;
+    }
+    if (normalizedTabId === this.activeTabSessionId) {
+      return false;
+    }
+
+    const session = this.tabPaneSessions.get(normalizedTabId);
+    if (!session) {
+      return true;
+    }
+
+    const uniquePanes = new Set<PaneViewState>();
+    for (const pane of session.paneViews) {
+      uniquePanes.add(pane);
+    }
+    for (const pane of session.stashedPaneViews.values()) {
+      uniquePanes.add(pane);
+    }
+
+    for (const pane of uniquePanes) {
+      try {
+        this.clearProviderLoadingTracking(pane.paneIndex);
+        this.paneViewService.closePane(pane);
+      } catch (error) {
+        console.error(`[ViewManager] Error closing pane for tab ${normalizedTabId}:`, error);
+      }
+    }
+
+    this.tabPaneSessions.delete(normalizedTabId);
+    return true;
+  }
+
   /**
    * Set pane count, creating or destroying WebContentsViews as needed
    */
@@ -448,6 +580,7 @@ export class ViewManager {
       callbacks: this.buildLifecycleCallbacks(),
     });
     this.currentPaneCount = result.currentPaneCount;
+    this.syncActiveTabSessionState();
     this.clampQuickPromptAnchorPaneIndex();
     this.keepQuickPromptOnTop();
   }
@@ -478,6 +611,7 @@ export class ViewManager {
       callbacks: this.buildLifecycleCallbacks(),
     });
     if (success) {
+      this.syncActiveTabSessionState();
       this.keepQuickPromptOnTop();
     }
     return success;
@@ -495,6 +629,7 @@ export class ViewManager {
       providers: this.providers,
       callbacks: this.buildLifecycleCallbacks(),
     });
+    this.syncActiveTabSessionState();
     this.keepQuickPromptOnTop();
     return success;
   }
@@ -705,25 +840,27 @@ export class ViewManager {
       'view manager destroyed before prompt image staging completed'
     );
 
-    // Close all pane webContents
-    for (const pane of this.paneViews) {
+    // Close all pane webContents across tab sessions
+    const uniquePanes = new Set<PaneViewState>();
+    for (const session of this.tabPaneSessions.values()) {
+      for (const pane of session.paneViews) {
+        uniquePanes.add(pane);
+      }
+      for (const pane of session.stashedPaneViews.values()) {
+        uniquePanes.add(pane);
+      }
+    }
+    for (const pane of uniquePanes) {
       try {
         this.clearProviderLoadingTracking(pane.paneIndex);
         this.paneViewService.closePane(pane);
-      } catch (e) {
-        console.error(`[ViewManager] Error closing pane ${pane.paneIndex}:`, e);
+      } catch (error) {
+        console.error(`[ViewManager] Error closing pane ${pane.paneIndex}:`, error);
       }
     }
     this.paneViews = [];
-    for (const pane of this.stashedPaneViews.values()) {
-      try {
-        this.clearProviderLoadingTracking(pane.paneIndex);
-        this.paneViewService.closePane(pane);
-      } catch (e) {
-        console.error(`[ViewManager] Error closing stashed pane ${pane.paneIndex}:`, e);
-      }
-    }
     this.stashedPaneViews.clear();
+    this.tabPaneSessions.clear();
     this.paneViewService.clearAllPaneLoadState();
     this.lastLayout = null;
 

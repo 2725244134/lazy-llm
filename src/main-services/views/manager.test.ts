@@ -19,6 +19,7 @@ interface ResetHarness {
   manager: ViewManager;
   clearQueuedPrompts: ReturnType<typeof vi.fn>;
   keepQuickPromptOnTop: ReturnType<typeof vi.fn>;
+  syncActiveTabSessionState: ReturnType<typeof vi.fn>;
   buildLifecycleCallbacks: ReturnType<typeof vi.fn>;
   paneViews: unknown[];
   defaultProviders: string[];
@@ -28,6 +29,7 @@ interface ResetHarness {
 function createResetHarness(): ResetHarness {
   const clearQueuedPrompts = vi.fn();
   const keepQuickPromptOnTop = vi.fn();
+  const syncActiveTabSessionState = vi.fn();
   const lifecycleCallbacks = { marker: true };
   const buildLifecycleCallbacks = vi.fn(() => lifecycleCallbacks);
   const paneViews: unknown[] = [];
@@ -43,12 +45,14 @@ function createResetHarness(): ResetHarness {
     providers,
     buildLifecycleCallbacks,
     keepQuickPromptOnTop,
+    syncActiveTabSessionState,
   } as unknown as ViewManager;
 
   return {
     manager,
     clearQueuedPrompts,
     keepQuickPromptOnTop,
+    syncActiveTabSessionState,
     buildLifecycleCallbacks,
     paneViews,
     defaultProviders,
@@ -75,6 +79,7 @@ describe('ViewManager.resetAllPanesToProviderHome', () => {
       providers: harness.providers,
       callbacks: { marker: true },
     });
+    expect(harness.syncActiveTabSessionState).toHaveBeenCalledTimes(1);
     expect(harness.keepQuickPromptOnTop).toHaveBeenCalledTimes(1);
     expect(harness.clearQueuedPrompts.mock.invocationCallOrder[0]).toBeLessThan(
       mockedResetAllPanesToProviderHomeWithLifecycle.mock.invocationCallOrder[0]
@@ -89,6 +94,7 @@ describe('ViewManager.resetAllPanesToProviderHome', () => {
 
     expect(success).toBe(false);
     expect(harness.clearQueuedPrompts).toHaveBeenCalledTimes(1);
+    expect(harness.syncActiveTabSessionState).toHaveBeenCalledTimes(1);
     expect(harness.keepQuickPromptOnTop).toHaveBeenCalledTimes(1);
   });
 });

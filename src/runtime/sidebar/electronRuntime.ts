@@ -12,6 +12,24 @@ export function createElectronRuntime(): SidebarRuntime {
       return lazyllm.getConfig();
     },
 
+    async activateTab(tabId: string, paneCount: PaneCount, paneProviders: readonly string[]): Promise<void> {
+      const result = await lazyllm.activateTab({
+        tabId,
+        paneCount,
+        paneProviders: [...paneProviders],
+      });
+      if (!result.success) {
+        throw new Error(`Failed to activate tab: ${tabId}`);
+      }
+    },
+
+    async closeTab(tabId: string): Promise<void> {
+      const result = await lazyllm.closeTab({ tabId });
+      if (!result.success) {
+        throw new Error(`Failed to close tab session: ${tabId}`);
+      }
+    },
+
     async setPaneCount(count: PaneCount): Promise<void> {
       const result = await lazyllm.setPaneCount({ count });
       if (!result.success) {

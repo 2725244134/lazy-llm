@@ -6,6 +6,10 @@ import type {
   PaneResetAllResponse,
   PaneUpdateRequest,
   PaneUpdateResponse,
+  SidebarActivateTabRequest,
+  SidebarActivateTabResponse,
+  SidebarCloseTabRequest,
+  SidebarCloseTabResponse,
   PromptRequest,
   PromptResponse,
   PromptQueueMutationResponse,
@@ -29,6 +33,8 @@ export interface LazyLLMAPI {
   setPaneCount: (request: PaneCountRequest) => Promise<PaneCountResponse>;
   resetAllPanes: () => Promise<PaneResetAllResponse>;
   updateProvider: (request: PaneUpdateRequest) => Promise<PaneUpdateResponse>;
+  activateTab: (request: SidebarActivateTabRequest) => Promise<SidebarActivateTabResponse>;
+  closeTab: (request: SidebarCloseTabRequest) => Promise<SidebarCloseTabResponse>;
   sendPrompt: (request: PromptRequest) => Promise<PromptResponse>;
   syncPromptDraft: (request: PromptSyncRequest) => Promise<PromptSyncResponse>;
   removeQueuedPromptItem: (request: PromptQueueRemoveItemRequest) => Promise<PromptQueueMutationResponse>;

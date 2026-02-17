@@ -33,27 +33,11 @@ import {
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
 
-const DEFAULT_PROVIDER_KEY = APP_CONFIG.providers.defaultPaneKeys[0]
-  ?? APP_CONFIG.providers.defaultActiveKeys[0]
-  ?? 'chatgpt';
-
 const DEFAULT_INITIAL_TAB = createSidebarTabState({
   id: 'tab-1',
   paneCount: APP_CONFIG.layout.pane.defaultCount,
   paneProviders: APP_CONFIG.providers.defaultActiveKeys,
 });
-
-interface ActivePaneSnapshot {
-  paneCount: PaneCount;
-  paneProviders: string[];
-}
-
-function resolveProviderForPane(providerKey: string | undefined): string {
-  if (typeof providerKey === 'string' && providerKey.trim().length > 0) {
-    return providerKey;
-  }
-  return DEFAULT_PROVIDER_KEY;
-}
 
 function isEditableElement(node: EventTarget | null): boolean {
   if (!(node instanceof HTMLElement)) {
@@ -203,20 +187,8 @@ export function Sidebar() {
   }, []);
 
   const applyTabToRuntime = useCallback(
-    async (tab: SidebarTabState, previousSnapshot?: ActivePaneSnapshot) => {
-      const shouldUpdatePaneCount = !previousSnapshot || previousSnapshot.paneCount !== tab.paneCount;
-      if (shouldUpdatePaneCount) {
-        await runtime.setPaneCount(tab.paneCount);
-      }
-
-      for (let paneIndex = 0; paneIndex < tab.paneCount; paneIndex += 1) {
-        const targetProvider = resolveProviderForPane(tab.paneProviders[paneIndex]);
-        const previousProvider = previousSnapshot?.paneProviders[paneIndex];
-        if (!shouldUpdatePaneCount && previousProvider === targetProvider) {
-          continue;
-        }
-        await runtime.updateProvider(paneIndex, targetProvider);
-      }
+    async (tab: SidebarTabState) => {
+      await runtime.activateTab(tab.id, tab.paneCount, tab.paneProviders);
     },
     [runtime],
   );
@@ -235,20 +207,35 @@ export function Sidebar() {
       return;
     }
 
-    const activeTab = findSidebarTab(currentTabs, activeTabIdRef.current);
-    const nextTab = createNextSidebarTab(currentTabs, activeTab);
+    const previousTab = findSidebarTab(currentTabs, activeTabIdRef.current);
+    const nextTab = createNextSidebarTab(currentTabs, previousTab);
     const nextTabs = [...currentTabs, nextTab];
 
     updateTabsState(nextTabs);
     setActiveTabState(nextTab);
     trimProviderLoadingState(nextTab.paneCount);
-    persistUiSettings({
-      tabs: nextTabs,
-      activeTabId: nextTab.id,
-    });
+    try {
+      await applyTabToRuntime(nextTab);
+      persistUiSettings({
+        tabs: nextTabs,
+        activeTabId: nextTab.id,
+      });
+    } catch (error) {
+      console.error('[Sidebar] createTab error:', error);
+      updateTabsState(currentTabs);
+      setActiveTabState(previousTab);
+      trimProviderLoadingState(previousTab.paneCount);
+
+      try {
+        await applyTabToRuntime(previousTab);
+      } catch (restoreError) {
+        console.error('[Sidebar] createTab rollback error:', restoreError);
+      }
+    }
 
     await enqueueLayoutSync();
   }, [
+    applyTabToRuntime,
     enqueueLayoutSync,
     persistUiSettings,
     setActiveTabState,
@@ -270,19 +257,11 @@ export function Sidebar() {
       }
 
       const previousTab = findSidebarTab(currentTabs, currentActiveTabId);
-      const previousSnapshot: ActivePaneSnapshot = {
-        paneCount: paneCountRef.current,
-        paneProviders: normalizePaneProviderSequence(
-          activeProvidersRef.current,
-          paneCountRef.current,
-        ),
-      };
-
       setActiveTabState(targetTab);
       trimProviderLoadingState(targetTab.paneCount);
 
       try {
-        await applyTabToRuntime(targetTab, previousSnapshot);
+        await applyTabToRuntime(targetTab);
         persistUiSettings({
           tabs: currentTabs,
           activeTabId: targetTab.id,
@@ -320,14 +299,6 @@ export function Sidebar() {
       }
 
       const previousTab = findSidebarTab(currentTabs, currentActiveTabId);
-      const previousSnapshot: ActivePaneSnapshot = {
-        paneCount: paneCountRef.current,
-        paneProviders: normalizePaneProviderSequence(
-          activeProvidersRef.current,
-          paneCountRef.current,
-        ),
-      };
-
       updateTabsState(removal.tabs);
 
       if (removal.activeTabId === currentActiveTabId) {
@@ -335,6 +306,11 @@ export function Sidebar() {
           tabs: removal.tabs,
           activeTabId: removal.activeTabId,
         });
+        try {
+          await runtime.closeTab(tabId);
+        } catch (error) {
+          console.error('[Sidebar] closeTab cleanup error:', error);
+        }
         return;
       }
 
@@ -343,7 +319,12 @@ export function Sidebar() {
       trimProviderLoadingState(nextActiveTab.paneCount);
 
       try {
-        await applyTabToRuntime(nextActiveTab, previousSnapshot);
+        await applyTabToRuntime(nextActiveTab);
+        try {
+          await runtime.closeTab(tabId);
+        } catch (cleanupError) {
+          console.error('[Sidebar] closeTab cleanup error:', cleanupError);
+        }
         persistUiSettings({
           tabs: removal.tabs,
           activeTabId: removal.activeTabId,
@@ -367,6 +348,7 @@ export function Sidebar() {
       applyTabToRuntime,
       enqueueLayoutSync,
       persistUiSettings,
+      runtime,
       setActiveTabState,
       trimProviderLoadingState,
       updateTabsState,
@@ -617,19 +599,7 @@ export function Sidebar() {
         updateTabsState(startupState.tabs);
         setActiveTabState(startupActiveTab);
         trimProviderLoadingState(startupActiveTab.paneCount);
-
-        const currentConfigPaneCount = clampPaneCount(config.provider.pane_count);
-        if (startupActiveTab.paneCount !== currentConfigPaneCount) {
-          await runtime.setPaneCount(startupActiveTab.paneCount);
-        }
-
-        for (let paneIndex = 0; paneIndex < startupActiveTab.paneCount; paneIndex += 1) {
-          const targetProvider = resolveProviderForPane(startupActiveTab.paneProviders[paneIndex]);
-          const currentProvider = resolveProviderForPane(config.provider.panes[paneIndex]);
-          if (targetProvider !== currentProvider) {
-            await runtime.updateProvider(paneIndex, targetProvider);
-          }
-        }
+        await applyTabToRuntime(startupActiveTab);
 
         persistUiSettings({
           tabs: startupState.tabs,
@@ -665,6 +635,7 @@ export function Sidebar() {
   }, [
     createTab,
     closeTab,
+    applyTabToRuntime,
     cancelPendingFrames,
     enqueueLayoutSync,
     persistUiSettings,

@@ -4,6 +4,8 @@ export type PaneCount = 1 | 2 | 3 | 4;
 
 export interface SidebarRuntime {
   getConfig(): Promise<AppConfig>;
+  activateTab(tabId: string, paneCount: PaneCount, paneProviders: readonly string[]): Promise<void>;
+  closeTab(tabId: string): Promise<void>;
   setPaneCount(count: PaneCount): Promise<void>;
   resetAllPanes(): Promise<void>;
   updateProvider(paneIndex: number, providerKey: string): Promise<void>;

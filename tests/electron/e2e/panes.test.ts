@@ -55,4 +55,56 @@ test.describe('E2E / Panes', () => {
     await expect(tabs).toHaveCount(2);
     await expect(tabs.nth(1)).toHaveClass(/active/);
   });
+
+  test('new tab creates an independent pane webcontents session', async ({ appWindow, electronApp }) => {
+    const tabs = appWindow.locator('.tab-chip');
+
+    const setupResult = await appWindow.evaluate(async () => {
+      const paneCountResult = await window.lazyllm.setPaneCount({ count: 1 });
+      const providerResult = await window.lazyllm.updateProvider({ paneIndex: 0, providerKey: 'chatgpt' });
+      return {
+        paneCountSuccess: paneCountResult.success,
+        providerSuccess: providerResult.success,
+      };
+    });
+    expect(setupResult).toEqual({ paneCountSuccess: true, providerSuccess: true });
+
+    await expect.poll(async () => {
+      let count = 0;
+      for (const page of electronApp.context().pages()) {
+        if (page.isClosed()) {
+          continue;
+        }
+        try {
+          if (page.url().includes('chatgpt-simulation.html')) {
+            count += 1;
+          }
+        } catch {
+          // Page may still be navigating.
+        }
+      }
+      return count;
+    }).toBe(1);
+
+    await appWindow.keyboard.press('Control+T');
+    await expect(tabs).toHaveCount(2);
+    await expect(tabs.nth(1)).toHaveClass(/active/);
+
+    await expect.poll(async () => {
+      let count = 0;
+      for (const page of electronApp.context().pages()) {
+        if (page.isClosed()) {
+          continue;
+        }
+        try {
+          if (page.url().includes('chatgpt-simulation.html')) {
+            count += 1;
+          }
+        } catch {
+          // Page may still be navigating.
+        }
+      }
+      return count;
+    }).toBe(2);
+  });
 });

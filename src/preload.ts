@@ -8,6 +8,10 @@ import type {
   PaneResetAllResponse,
   PaneUpdateRequest,
   PaneUpdateResponse,
+  SidebarActivateTabRequest,
+  SidebarActivateTabResponse,
+  SidebarCloseTabRequest,
+  SidebarCloseTabResponse,
   PromptRequest,
   PromptResponse,
   PromptQueueMutationResponse,
@@ -50,6 +54,16 @@ const lazyllmAPI = {
   // Update provider for a pane
   updateProvider: (request: PaneUpdateRequest): Promise<PaneUpdateResponse> => {
     return ipcRenderer.invoke(IPC_CHANNELS.PANE_UPDATE_PROVIDER, request);
+  },
+
+  // Activate a sidebar tab session
+  activateTab: (request: SidebarActivateTabRequest): Promise<SidebarActivateTabResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.SIDEBAR_ACTIVATE_TAB, request);
+  },
+
+  // Close an inactive sidebar tab session
+  closeTab: (request: SidebarCloseTabRequest): Promise<SidebarCloseTabResponse> => {
+    return ipcRenderer.invoke(IPC_CHANNELS.SIDEBAR_CLOSE_TAB, request);
   },
 
   // Send prompt to all panes
