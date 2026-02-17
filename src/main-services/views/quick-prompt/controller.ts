@@ -76,19 +76,12 @@ export class QuickPromptController {
   }
 
   toggleQuickPrompt(): boolean {
-    const quickPromptView = this.quickPromptLifecycleService.getView();
-    if (
-      this.quickPromptLifecycleService.isVisible()
-      && quickPromptView
-      && !quickPromptView.webContents.isDestroyed()
-    ) {
-      const overlayLostFocus = !quickPromptView.webContents.isFocused();
-      if (overlayLostFocus) {
-        this.quickPromptLifecycleService.hide({ restoreFocus: false });
-      }
+    if (this.quickPromptLifecycleService.isVisible()) {
+      this.quickPromptLifecycleService.hide();
+      return false;
     }
 
-    return this.quickPromptLifecycleService.toggle();
+    return this.quickPromptLifecycleService.show();
   }
 
   showQuickPrompt(): boolean {
@@ -148,6 +141,7 @@ export class QuickPromptController {
     if (quickPromptView.webContents.isDestroyed()) {
       return;
     }
+    quickPromptView.webContents.focus();
     quickPromptView.webContents.executeJavaScript(
       `window.dispatchEvent(new Event('quick-prompt:open'));`,
       true,
