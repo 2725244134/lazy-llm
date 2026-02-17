@@ -10,7 +10,6 @@ import {
   type IpcMainEvent,
   type WebContents,
   WebContentsView,
-  webContents,
 } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'fs';
@@ -31,11 +30,11 @@ import {
 import {
   computeSidebarWidthTweenFrame,
   normalizeSidebarWidth,
-  SidebarEventBridge,
+  SidebarController,
 } from './sidebar/index.js';
 import { PromptDispatchService } from './promptDispatchService.js';
 import {
-  QuickPromptLifecycleService,
+  QuickPromptController,
   buildQuickPromptDataUrl,
 } from './quick-prompt/index.js';
 import { resolveShortcutAction, type ShortcutAction } from './shortcutDispatcher.js';
@@ -124,7 +123,6 @@ interface ViewManagerOptions {
 
 export class ViewManager {
   private window: BaseWindow;
-  private sidebarView: WebContentsView | null = null;
   private paneViews: PaneViewState[] = [];
   private currentPaneCount: PaneCount = 1;
   private currentSidebarWidth: number;
@@ -133,12 +131,11 @@ export class ViewManager {
   private paneZoomFactor: number;
   private sidebarZoomFactor: number;
   private defaultProviders: string[];
-  private quickPromptAnchorPaneIndex = 0;
   private lastLayout: LayoutResult | null = null;
   private paneViewService: PaneViewService;
   private layoutService: LayoutService;
-  private quickPromptLifecycleService: QuickPromptLifecycleService;
-  private sidebarEventBridge: SidebarEventBridge;
+  private sidebarController: SidebarController;
+  private quickPromptController: QuickPromptController;
   private promptDispatchService: PromptDispatchService;
   private sidebarWidthAnimationTimer: ReturnType<typeof setTimeout> | null = null;
   private sidebarWidthAnimationToken = 0;
@@ -165,28 +162,28 @@ export class ViewManager {
       options.config.provider.pane_count
     );
     this.layoutService = new LayoutService(QUICK_PROMPT_LAYOUT_CONFIG);
-    this.quickPromptLifecycleService = new QuickPromptLifecycleService(
-      {
-        defaultHeight: options.config.quick_prompt.default_height,
-        minHeight: QUICK_PROMPT_MIN_HEIGHT,
-        maxHeight: QUICK_PROMPT_MAX_HEIGHT,
-      },
-      {
-        createQuickPromptView: () => this.createQuickPromptView(),
-        addQuickPromptViewToContent: (view) => this.window.contentView.addChildView(view),
-        removeQuickPromptViewFromContent: (view) => this.window.contentView.removeChildView(view),
-        getQuickPromptBounds: (height) => this.getQuickPromptBounds(height),
-        focusQuickPromptView: (view) => view.webContents.focus(),
-        focusSidebarIfAvailable: () => this.focusSidebarIfAvailable(),
-        notifyQuickPromptOpened: (view) => this.notifyQuickPromptOpened(view),
-        closeQuickPromptView: (view) => view.webContents.close(),
-        updateQuickPromptAnchorFromFocusedWebContents: () =>
-          this.updateQuickPromptAnchorFromFocusedWebContents(),
-      }
-    );
-    this.sidebarEventBridge = new SidebarEventBridge({
-      getSidebarTarget: () => this.sidebarView?.webContents ?? null,
+    this.sidebarController = new SidebarController({
+      hostWindow: this.window,
+      sidebarPreloadPath,
+      rendererDevServerUrl: this.rendererDevServerUrl,
+      rendererIndexPath,
       providerLoadingEventName: PROVIDER_LOADING_EVENT,
+      sidebarZoomFactor: this.sidebarZoomFactor,
+      attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
+    });
+    this.quickPromptController = new QuickPromptController({
+      hostWindow: this.window,
+      quickPromptPreloadPath,
+      defaultHeight: options.config.quick_prompt.default_height,
+      minHeight: QUICK_PROMPT_MIN_HEIGHT,
+      maxHeight: QUICK_PROMPT_MAX_HEIGHT,
+      resolveBounds: (requestedHeight, anchorPaneIndex) =>
+        this.getQuickPromptBounds(requestedHeight, anchorPaneIndex),
+      resolvePaneIndexByWebContents: (webContents) =>
+        this.findPaneIndexByWebContents(webContents),
+      focusSidebarIfAvailable: () => this.sidebarController.focusIfAvailable(),
+      attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
+      buildQuickPromptDataUrl: () => buildQuickPromptDataUrl(),
     });
     this.promptDispatchService = new PromptDispatchService({
       getPaneTargets: () => this.paneViews.map((pane) => ({
@@ -239,7 +236,7 @@ export class ViewManager {
       paneLoadMonitor,
       onPaneShortcutAction: (action, sourceWebContents) =>
         this.handleShortcutAction(action, sourceWebContents),
-      setQuickPromptAnchorPaneIndex: (paneIndex) => this.setQuickPromptAnchorPaneIndex(paneIndex),
+      setQuickPromptAnchorPaneIndex: (paneIndex) => this.quickPromptController.setAnchorPaneIndex(paneIndex),
       beginProviderLoadingTracking: (paneIndex, webContents) =>
         this.beginProviderLoadingTracking(paneIndex, webContents),
       removePaneViewFromContent: (view) => this.window.contentView.removeChildView(view),
@@ -249,21 +246,17 @@ export class ViewManager {
     });
   }
 
-  private getQuickPromptBounds(requestedHeight: number): { x: number; y: number; width: number; height: number } {
+  private getQuickPromptBounds(
+    requestedHeight: number,
+    anchorPaneIndex: number,
+  ): { x: number; y: number; width: number; height: number } {
     return this.layoutService.computeQuickPromptBounds({
       contentBounds: this.window.getContentBounds(),
       sidebarWidth: this.currentSidebarWidth,
       lastLayout: this.lastLayout,
-      anchorPaneIndex: this.quickPromptAnchorPaneIndex,
+      anchorPaneIndex,
       requestedHeight,
     });
-  }
-
-  private setQuickPromptAnchorPaneIndex(paneIndex: number): void {
-    if (!Number.isInteger(paneIndex) || paneIndex < 0) {
-      return;
-    }
-    this.quickPromptAnchorPaneIndex = paneIndex;
   }
 
   private findPaneIndexByWebContents(webContents: WebContents): number | null {
@@ -275,25 +268,6 @@ export class ViewManager {
     return null;
   }
 
-  private updateQuickPromptAnchorFromFocusedWebContents(): void {
-    const focused = webContents.getFocusedWebContents();
-    if (!focused) {
-      return;
-    }
-    const paneIndex = this.findPaneIndexByWebContents(focused);
-    if (paneIndex !== null) {
-      this.setQuickPromptAnchorPaneIndex(paneIndex);
-    }
-  }
-
-  private updateQuickPromptAnchorFromSource(sourceWebContents: WebContents): void {
-    const paneIndex = this.findPaneIndexByWebContents(sourceWebContents);
-    if (paneIndex !== null) {
-      this.setQuickPromptAnchorPaneIndex(paneIndex);
-      return;
-    }
-    this.updateQuickPromptAnchorFromFocusedWebContents();
-  }
 
   private attachGlobalShortcutHooks(webContents: WebContents): void {
     webContents.on('before-input-event', (event: Event, input: Input) => {
@@ -318,12 +292,11 @@ export class ViewManager {
 
   private handleShortcutAction(action: ManagedShortcutAction, sourceWebContents: WebContents): void {
     if (action === 'toggleQuickPrompt') {
-      this.updateQuickPromptAnchorFromSource(sourceWebContents);
-      this.toggleQuickPrompt(sourceWebContents);
+      this.quickPromptController.toggleQuickPrompt(sourceWebContents);
       return;
     }
     if (action === 'notifySidebarToggle') {
-      this.notifySidebarToggleShortcut();
+      this.sidebarController.dispatchShortcutEvent(SIDEBAR_TOGGLE_SHORTCUT_EVENT);
       return;
     }
     if (action === 'resetAllPanes') {
@@ -331,182 +304,34 @@ export class ViewManager {
     }
   }
 
-  private applySidebarRuntimePreferences(webContents: WebContents): void {
-    webContents.setZoomFactor(this.sidebarZoomFactor);
-  }
-
-  private attachQuickPromptDebugConsoleHooks(webContents: WebContents): void {
-    webContents.on('console-message', (details) => {
-      const { level, message, lineNumber } = details;
-      if (typeof message !== 'string' || !message.includes('[QuickPromptDebug]')) {
-        return;
-      }
-      const sanitizedMessage = message
-        .replace(/[\u0000-\u001F\u007F]/g, ' ')
-        .slice(0, 320);
-      console.info('[QuickPromptDebug][QuickPromptConsole]', {
-        level,
-        message: sanitizedMessage,
-        truncated: message.length > 320,
-        line: lineNumber,
-      });
-    });
-  }
-
-  private attachQuickPromptSubmitShortcutHooks(webContents: WebContents): void {
-    webContents.on('before-input-event', (event: Event, input: Input) => {
-      const type = typeof input.type === 'string' ? input.type : '';
-      const isKeyDownLike = type === 'keyDown' || type === 'rawKeyDown';
-      if (!isKeyDownLike || input.isAutoRepeat || input.isComposing) {
-        return;
-      }
-
-      const key = typeof input.key === 'string' ? input.key : '';
-      const keyLower = key.toLowerCase();
-      const isEnterLike = keyLower === 'enter'
-        || keyLower === 'return'
-        || keyLower === 'numpadenter';
-      if (!isEnterLike || input.shift) {
-        return;
-      }
-
-      event.preventDefault();
-      console.info('[QuickPromptDebug][Main] before-input-event triggers quick prompt submit', {
-        key,
-        type,
-        control: Boolean(input.control),
-        meta: Boolean(input.meta),
-        alt: Boolean(input.alt),
-      });
-      webContents.executeJavaScript(
-        `window.dispatchEvent(new Event('quick-prompt:submit'));`,
-        true
-      ).catch((error) => {
-        console.error('[QuickPromptDebug][Main] Failed to dispatch quick-prompt:submit event:', error);
-      });
-    });
-  }
-
-  private attachSidebarRuntimePreferenceHooks(webContents: WebContents): void {
-    webContents.on('did-finish-load', () => {
-      this.applySidebarRuntimePreferences(webContents);
-    });
-  }
-
   /**
    * Initialize sidebar WebContentsView
    */
   initSidebar(): WebContentsView {
-    this.sidebarView = new WebContentsView({
-      webPreferences: {
-        preload: sidebarPreloadPath,
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-
-    this.window.contentView.addChildView(this.sidebarView);
-    this.attachGlobalShortcutHooks(this.sidebarView.webContents);
-    this.attachSidebarRuntimePreferenceHooks(this.sidebarView.webContents);
-    this.applySidebarRuntimePreferences(this.sidebarView.webContents);
-
-    // Load sidebar content
-    if (this.rendererDevServerUrl) {
-      this.sidebarView.webContents.loadURL(this.rendererDevServerUrl);
-    } else {
-      this.sidebarView.webContents.loadFile(rendererIndexPath);
-    }
-
-    return this.sidebarView;
-  }
-
-  private createQuickPromptView(): WebContentsView {
-    const quickPromptView = new WebContentsView({
-      webPreferences: {
-        preload: quickPromptPreloadPath,
-        contextIsolation: true,
-        nodeIntegration: false,
-        sandbox: true,
-      },
-    });
-
-    quickPromptView.setBackgroundColor('#00000000');
-    this.attachGlobalShortcutHooks(quickPromptView.webContents);
-    this.attachQuickPromptDebugConsoleHooks(quickPromptView.webContents);
-    this.attachQuickPromptSubmitShortcutHooks(quickPromptView.webContents);
-    quickPromptView.webContents.on('did-finish-load', () => {
-      this.quickPromptLifecycleService.markReady();
-    });
-    quickPromptView.webContents.on('blur', () => {
-      this.quickPromptLifecycleService.hide({ restoreFocus: false });
-    });
-    quickPromptView.webContents.loadURL(buildQuickPromptDataUrl());
-
-    return quickPromptView;
+    return this.sidebarController.initSidebar();
   }
 
   /**
    * Initialize global quick prompt overlay view
    */
   initQuickPrompt(): WebContentsView {
-    return this.quickPromptLifecycleService.ensureView();
+    return this.quickPromptController.initQuickPrompt();
   }
 
   toggleQuickPrompt(sourceWebContents?: WebContents): boolean {
-    const quickPromptView = this.quickPromptLifecycleService.getView();
-    if (
-      this.quickPromptLifecycleService.isVisible() &&
-      quickPromptView &&
-      !quickPromptView.webContents.isDestroyed()
-    ) {
-      const sourceIsDifferentView = Boolean(
-        sourceWebContents && sourceWebContents.id !== quickPromptView.webContents.id
-      );
-      const overlayLostFocusWithoutExplicitSource = !sourceWebContents && !quickPromptView.webContents.isFocused();
-      if (sourceIsDifferentView || overlayLostFocusWithoutExplicitSource) {
-        this.quickPromptLifecycleService.hide({ restoreFocus: false });
-      }
-    }
-    return this.quickPromptLifecycleService.toggle();
+    return this.quickPromptController.toggleQuickPrompt(sourceWebContents);
   }
 
   showQuickPrompt(): boolean {
-    return this.quickPromptLifecycleService.show();
+    return this.quickPromptController.showQuickPrompt();
   }
 
   hideQuickPrompt(): boolean {
-    return this.quickPromptLifecycleService.hide();
+    return this.quickPromptController.hideQuickPrompt();
   }
 
   resizeQuickPrompt(nextHeight: number): { visible: boolean; height: number } {
-    return this.quickPromptLifecycleService.resize(nextHeight);
-  }
-
-  private focusSidebarIfAvailable(): void {
-    if (!this.sidebarView) {
-      return;
-    }
-    const sidebarContents = this.sidebarView.webContents;
-    if (!sidebarContents.isDestroyed()) {
-      sidebarContents.focus();
-    }
-  }
-
-  private notifyQuickPromptOpened(quickPromptView: WebContentsView): void {
-    if (quickPromptView.webContents.isDestroyed()) {
-      return;
-    }
-    quickPromptView.webContents.executeJavaScript(
-      `window.dispatchEvent(new Event('quick-prompt:open'));`,
-      true
-    ).catch((error) => {
-      console.error('[ViewManager] Failed to focus quick prompt overlay:', error);
-    });
-  }
-
-  private notifySidebarToggleShortcut(): void {
-    this.sidebarEventBridge.dispatchEvent(SIDEBAR_TOGGLE_SHORTCUT_EVENT);
+    return this.quickPromptController.resizeQuickPrompt(nextHeight);
   }
 
   private readonly handlePaneStagePromptImageAck = (
@@ -604,20 +429,15 @@ export class ViewManager {
   }
 
   private clearProviderLoadingTracking(paneIndex: number): void {
-    this.sidebarEventBridge.clearProviderLoadingTracking(paneIndex);
+    this.sidebarController.clearProviderLoadingTracking(paneIndex);
   }
 
   private beginProviderLoadingTracking(paneIndex: number, webContents: WebContents): void {
-    this.sidebarEventBridge.beginProviderLoadingTracking(paneIndex, webContents);
+    this.sidebarController.beginProviderLoadingTracking(paneIndex, webContents);
   }
 
   private keepQuickPromptOnTop(): void {
-    const quickPromptView = this.quickPromptLifecycleService.getView();
-    if (!quickPromptView || !this.quickPromptLifecycleService.isVisible()) {
-      return;
-    }
-    this.window.contentView.removeChildView(quickPromptView);
-    this.window.contentView.addChildView(quickPromptView);
+    this.quickPromptController.keepOnTop();
   }
 
   private buildLifecycleCallbacks() {
@@ -632,7 +452,8 @@ export class ViewManager {
       closePane: (pane: PaneViewState) => this.paneViewService.closePane(pane),
       keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
       updateLayout: () => this.updateLayout(),
-      setQuickPromptAnchorPaneIndex: (paneIndex: number) => this.setQuickPromptAnchorPaneIndex(paneIndex),
+      setQuickPromptAnchorPaneIndex: (paneIndex: number) =>
+        this.quickPromptController.setAnchorPaneIndex(paneIndex),
     };
   }
 
@@ -646,11 +467,11 @@ export class ViewManager {
       paneViews: this.paneViews,
       defaultProviders: this.defaultProviders,
       providers: this.providers,
-      quickPromptAnchorPaneIndex: this.quickPromptAnchorPaneIndex,
+      quickPromptAnchorPaneIndex: this.quickPromptController.getAnchorPaneIndex(),
       callbacks: this.buildLifecycleCallbacks(),
     });
     this.currentPaneCount = result.currentPaneCount;
-    this.quickPromptAnchorPaneIndex = result.quickPromptAnchorPaneIndex;
+    this.quickPromptController.setAnchorPaneIndex(result.quickPromptAnchorPaneIndex);
   }
 
   /**
@@ -758,9 +579,7 @@ export class ViewManager {
     this.lastLayout = layout;
 
     // Apply sidebar bounds
-    if (this.sidebarView) {
-      this.sidebarView.setBounds(layout.sidebar);
-    }
+    this.sidebarController.setBounds(layout.sidebar);
 
     // Apply pane bounds
     for (let i = 0; i < this.paneViews.length; i++) {
@@ -770,7 +589,7 @@ export class ViewManager {
     }
 
     // Keep quick prompt pinned to its computed bounds.
-    this.quickPromptLifecycleService.relayout();
+    this.quickPromptController.relayout();
   }
 
   /**
@@ -882,18 +701,10 @@ export class ViewManager {
     this.lastLayout = null;
 
     // Close quick prompt webContents
-    this.quickPromptLifecycleService.destroy();
+    this.quickPromptController.destroy();
 
     // Close sidebar webContents
-    if (this.sidebarView) {
-      try {
-        this.window.contentView.removeChildView(this.sidebarView);
-        this.sidebarView.webContents.close();
-      } catch (e) {
-        console.error('[ViewManager] Error closing sidebar:', e);
-      }
-      this.sidebarView = null;
-    }
+    this.sidebarController.destroy();
   }
 }
 

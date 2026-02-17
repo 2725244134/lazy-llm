@@ -9,3 +9,4 @@ export {
   easeOutCubic,
   normalizeSidebarWidth,
 } from './widthTween.js';
+export { SidebarController, type SidebarControllerOptions } from './controller.js';

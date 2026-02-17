@@ -12,3 +12,4 @@ export {
   type QuickPromptHideOptions,
   type QuickPromptResizeResult,
 } from './lifecycleService.js';
+export { QuickPromptController, type QuickPromptControllerOptions } from './controller.js';
