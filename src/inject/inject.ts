@@ -475,7 +475,10 @@ async function waitForComplete(
 
   while (true) {
     const result = handleExtractResponse(config, provider);
-    if (result.isComplete) {
+    // Some providers expose completion markers before text is fully populated.
+    // Keep polling until we have a non-empty response payload.
+    const hasNonEmptyResponse = typeof result.response === 'string' && result.response.trim().length > 0;
+    if (result.isComplete && hasNonEmptyResponse) {
       return result;
     }
     if (Date.now() > deadline) {
