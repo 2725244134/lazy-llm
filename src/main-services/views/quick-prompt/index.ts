@@ -12,4 +12,8 @@ export {
   type QuickPromptHideOptions,
   type QuickPromptResizeResult,
 } from './lifecycleService.js';
+export {
+  QuickPromptAnchorTracker,
+  type QuickPromptAnchorTrackerOptions,
+} from './anchorTracker.js';
 export { QuickPromptController, type QuickPromptControllerOptions } from './controller.js';

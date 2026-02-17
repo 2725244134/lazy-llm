@@ -3,10 +3,10 @@ import {
   type Input,
   type WebContents,
   WebContentsView,
-  webContents,
   type BaseWindow,
 } from 'electron';
 import type { ViewRect } from '@shared-contracts/ipc/contracts';
+import { QuickPromptAnchorTracker } from './anchorTracker.js';
 import {
   QuickPromptLifecycleService,
   type QuickPromptHideOptions,
@@ -20,7 +20,7 @@ export interface QuickPromptControllerOptions {
   minHeight: number;
   maxHeight: number;
   resolveBounds(requestedHeight: number, anchorPaneIndex: number): ViewRect;
-  resolvePaneIndexByWebContents(webContents: WebContents): number | null;
+  anchorTracker: QuickPromptAnchorTracker;
   focusSidebarIfAvailable(): void;
   attachGlobalShortcutHooks(webContents: WebContents): void;
   buildQuickPromptDataUrl(): string;
@@ -28,7 +28,6 @@ export interface QuickPromptControllerOptions {
 
 export class QuickPromptController {
   private readonly quickPromptLifecycleService: QuickPromptLifecycleService;
-  private quickPromptAnchorPaneIndex = 0;
 
   constructor(private readonly options: QuickPromptControllerOptions) {
     this.quickPromptLifecycleService = new QuickPromptLifecycleService(
@@ -41,12 +40,16 @@ export class QuickPromptController {
         createQuickPromptView: () => this.createQuickPromptView(),
         addQuickPromptViewToContent: (view) => this.options.hostWindow.contentView.addChildView(view),
         removeQuickPromptViewFromContent: (view) => this.options.hostWindow.contentView.removeChildView(view),
-        getQuickPromptBounds: (height) => this.options.resolveBounds(height, this.quickPromptAnchorPaneIndex),
+        getQuickPromptBounds: (height) => this.options.resolveBounds(
+          height,
+          this.options.anchorTracker.getAnchorPaneIndex(),
+        ),
         focusQuickPromptView: (view) => view.webContents.focus(),
         focusSidebarIfAvailable: () => this.options.focusSidebarIfAvailable(),
         notifyQuickPromptOpened: (view) => this.notifyQuickPromptOpened(view),
         closeQuickPromptView: (view) => view.webContents.close(),
-        updateQuickPromptAnchorFromFocusedWebContents: () => this.updateQuickPromptAnchorFromFocusedWebContents(),
+        updateQuickPromptAnchorFromFocusedWebContents: () =>
+          this.options.anchorTracker.updateAnchorFromFocusedWebContents(),
       },
     );
   }
@@ -64,14 +67,11 @@ export class QuickPromptController {
   }
 
   getAnchorPaneIndex(): number {
-    return this.quickPromptAnchorPaneIndex;
+    return this.options.anchorTracker.getAnchorPaneIndex();
   }
 
   setAnchorPaneIndex(paneIndex: number): void {
-    if (!Number.isInteger(paneIndex) || paneIndex < 0) {
-      return;
-    }
-    this.quickPromptAnchorPaneIndex = paneIndex;
+    this.options.anchorTracker.setAnchorPaneIndex(paneIndex);
   }
 
   toggleQuickPrompt(sourceWebContents?: WebContents): boolean {
@@ -91,7 +91,7 @@ export class QuickPromptController {
     }
 
     if (sourceWebContents) {
-      this.updateQuickPromptAnchorFromSource(sourceWebContents);
+      this.options.anchorTracker.updateAnchorFromSource(sourceWebContents);
     }
 
     return this.quickPromptLifecycleService.toggle();
@@ -124,26 +124,6 @@ export class QuickPromptController {
 
   destroy(): void {
     this.quickPromptLifecycleService.destroy();
-  }
-
-  private updateQuickPromptAnchorFromFocusedWebContents(): void {
-    const focusedWebContents = webContents.getFocusedWebContents();
-    if (!focusedWebContents) {
-      return;
-    }
-    const paneIndex = this.options.resolvePaneIndexByWebContents(focusedWebContents);
-    if (paneIndex !== null) {
-      this.setAnchorPaneIndex(paneIndex);
-    }
-  }
-
-  private updateQuickPromptAnchorFromSource(sourceWebContents: WebContents): void {
-    const paneIndex = this.options.resolvePaneIndexByWebContents(sourceWebContents);
-    if (paneIndex !== null) {
-      this.setAnchorPaneIndex(paneIndex);
-      return;
-    }
-    this.updateQuickPromptAnchorFromFocusedWebContents();
   }
 
   private createQuickPromptView(): WebContentsView {

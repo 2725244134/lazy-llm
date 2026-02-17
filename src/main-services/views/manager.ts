@@ -33,6 +33,7 @@ import {
 import { PromptDispatchService } from './promptDispatchService.js';
 import {
   QuickPromptController,
+  QuickPromptAnchorTracker,
   buildQuickPromptDataUrl,
 } from './quick-prompt/index.js';
 import { PromptImageStageService } from './prompt-image/index.js';
@@ -160,6 +161,10 @@ export class ViewManager {
       sidebarZoomFactor: this.sidebarZoomFactor,
       attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
     });
+    const quickPromptAnchorTracker = new QuickPromptAnchorTracker({
+      resolvePaneIndexByWebContents: (webContents) =>
+        this.findPaneIndexByWebContents(webContents),
+    });
     this.quickPromptController = new QuickPromptController({
       hostWindow: this.window,
       quickPromptPreloadPath,
@@ -168,8 +173,7 @@ export class ViewManager {
       maxHeight: QUICK_PROMPT_MAX_HEIGHT,
       resolveBounds: (requestedHeight, anchorPaneIndex) =>
         this.getQuickPromptBounds(requestedHeight, anchorPaneIndex),
-      resolvePaneIndexByWebContents: (webContents) =>
-        this.findPaneIndexByWebContents(webContents),
+      anchorTracker: quickPromptAnchorTracker,
       focusSidebarIfAvailable: () => this.sidebarController.focusIfAvailable(),
       attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
       buildQuickPromptDataUrl: () => buildQuickPromptDataUrl(),
