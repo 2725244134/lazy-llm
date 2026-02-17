@@ -1,7 +1,7 @@
 #!/usr/bin/env bun
 /**
- * Mock Capture Process — pure DOM processing pipeline.
- * Accepts raw HTML (from file or stdin) and generates a mock simulation page.
+ * Mock Capture Process — strict DOM processing pipeline.
+ * Accepts raw HTML and generates a simulation page plus a capture report.
  *
  * Usage:
  *   bun scripts/lib/mockCaptureProcess.ts --provider chatgpt --input /tmp/chatgpt-raw.html
@@ -25,6 +25,16 @@ import type { ProviderInject } from '../../src/providers/types';
 // ---------------------------------------------------------------------------
 
 export type ProviderKey = 'chatgpt' | 'claude' | 'gemini' | 'grok' | 'perplexity' | 'aistudio';
+
+type SelectorField =
+  | 'inputSelectors'
+  | 'submitSelectors'
+  | 'responseSelectors'
+  | 'completeIndicatorSelectors';
+
+type SelectorGroup = 'input' | 'submit' | 'response' | 'complete';
+
+type GroupStatus = 'pass' | 'fail';
 
 interface ElementSpec {
   tag: string;
@@ -51,7 +61,6 @@ interface MessageTemplate {
   completionWrapper: ElementSpec;
   inputType: 'contenteditable' | 'textarea';
   useForm?: boolean;
-  inputWrapper?: 'fieldset';
   useResponseCounter?: boolean;
 }
 
@@ -61,6 +70,69 @@ export interface ProviderConfig {
   inject: ProviderInject;
   template: MessageTemplate;
 }
+
+interface SelectorProbe {
+  selector: string;
+  normalizedSelector: string;
+  matches: number;
+  error?: string;
+}
+
+interface SelectorGroupReport {
+  field: SelectorField;
+  configured: string[];
+  matched: string[];
+  unmatched: string[];
+  probes: SelectorProbe[];
+}
+
+interface SelectorAnalysis {
+  input: SelectorGroupReport;
+  submit: SelectorGroupReport;
+  response: SelectorGroupReport;
+  complete: SelectorGroupReport;
+}
+
+interface CaptureReport {
+  provider: ProviderKey;
+  timestamp: string;
+  strict: boolean;
+  rawFile: string;
+  simulationFile: string;
+  status: 'pass' | 'fail';
+  summary: Record<SelectorGroup, GroupStatus>;
+  selectors: SelectorAnalysis;
+  recommendations: string[];
+}
+
+interface ProcessOptions {
+  strict: boolean;
+  inputPath: string;
+  outputPath: string;
+  artifactsDir: string;
+  writeReport: boolean;
+}
+
+interface SelectorGroupConfig {
+  key: SelectorGroup;
+  field: SelectorField;
+  requiredInStrict: boolean;
+}
+
+interface HtmlRewriterLike {
+  on(
+    selector: string,
+    handlers: {
+      element?: (element: unknown) => void;
+      comments?: (comment: unknown) => void;
+      text?: (text: unknown) => void;
+      end?: (end: unknown) => void;
+    }
+  ): HtmlRewriterLike;
+  transform(response: Response): Response;
+}
+
+type HtmlRewriterCtor = new () => HtmlRewriterLike;
 
 // ---------------------------------------------------------------------------
 // Provider metadata map
@@ -103,7 +175,6 @@ export const PROVIDERS: Record<ProviderKey, ProviderConfig> = {
       ],
       completionWrapper: { tag: 'div', className: 'action-bar' },
       inputType: 'contenteditable',
-      inputWrapper: 'fieldset',
     },
   },
   gemini: {
@@ -151,7 +222,7 @@ export const PROVIDERS: Record<ProviderKey, ProviderConfig> = {
     inject: perplexityInject,
     template: {
       userWrapper: { tag: 'div', className: 'query-row' },
-      userContent: { tag: 'div', className: 'default font-sans text-base' },
+      userContent: { tag: 'div', className: 'query-text' },
       assistantWrapper: { tag: 'div', className: 'answer-row' },
       assistantContent: { tag: 'div', className: 'prose' },
       streamingButton: { attrs: { 'aria-label': 'Stop' }, text: 'Stop' },
@@ -171,7 +242,7 @@ export const PROVIDERS: Record<ProviderKey, ProviderConfig> = {
     inject: aistudioInject,
     template: {
       userWrapper: { tag: 'ms-chat-turn', className: 'user-turn' },
-      userContent: { tag: 'ms-text-chunk', className: '' },
+      userContent: { tag: 'div', className: 'user-chunk' },
       assistantWrapper: { tag: 'ms-chat-turn', className: 'model-turn' },
       assistantContent: { tag: 'ms-cmark-node', className: 'cmark-node' },
       contentWrap: { tag: 'div', className: 'turn-content', includeUser: true },
@@ -189,6 +260,13 @@ export const PROVIDERS: Record<ProviderKey, ProviderConfig> = {
 
 export const PROVIDER_KEYS = Object.keys(PROVIDERS) as ProviderKey[];
 
+const SELECTOR_GROUPS: SelectorGroupConfig[] = [
+  { key: 'input', field: 'inputSelectors', requiredInStrict: true },
+  { key: 'submit', field: 'submitSelectors', requiredInStrict: true },
+  { key: 'response', field: 'responseSelectors', requiredInStrict: false },
+  { key: 'complete', field: 'completeIndicatorSelectors', requiredInStrict: false },
+];
+
 // ---------------------------------------------------------------------------
 // Paths
 // ---------------------------------------------------------------------------
@@ -196,6 +274,7 @@ export const PROVIDER_KEYS = Object.keys(PROVIDERS) as ProviderKey[];
 const ROOT = resolve(dirname(new URL(import.meta.url).pathname), '../..');
 const MOCK_SITE_DIR = resolve(ROOT, 'tests/fixtures/mock-site');
 const MOCK_CONFIG_PATH = resolve(MOCK_SITE_DIR, 'mock-provider-config.json');
+const DEFAULT_ARTIFACTS_DIR = resolve(MOCK_SITE_DIR, 'artifacts');
 
 // ---------------------------------------------------------------------------
 // Codegen helpers — generate JS source fragments for the runtime script
@@ -220,6 +299,181 @@ function wrapDeclCode(wrap: ContentWrapSpec, varName: string, indent = '      ')
   return line;
 }
 
+function escapeRegExp(source: string): string {
+  return source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeSelectorForProbe(selector: string): string {
+  return selector
+    .replace(/:last-of-type/g, '')
+    .replace(/:first-of-type/g, '')
+    .replace(/:nth-of-type\([^)]*\)/g, '')
+    .replace(/:nth-child\([^)]*\)/g, '')
+    .replace(/:has\([^)]*\)/g, '')
+    .replace(/:is\(([^)]*)\)/g, '$1')
+    .replace(/:where\(([^)]*)\)/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractProbeToken(selector: string): string | null {
+  const idMatch = selector.match(/#([A-Za-z0-9_-]+)/);
+  if (idMatch) {
+    return `id=\"${idMatch[1]}\"`;
+  }
+
+  const dataTestIdContains = selector.match(/\[data-testid\*=['\"]([^'\"]+)['\"]\]/);
+  if (dataTestIdContains) {
+    return dataTestIdContains[1];
+  }
+
+  const attrExact = selector.match(/\[([A-Za-z0-9_-]+)=['\"]([^'\"]+)['\"]\]/);
+  if (attrExact) {
+    return `${attrExact[1]}=\"${attrExact[2]}\"`;
+  }
+
+  const attrContains = selector.match(/\[([A-Za-z0-9_-]+)\*=['\"]([^'\"]+)['\"]\]/);
+  if (attrContains) {
+    return attrContains[2];
+  }
+
+  const classMatch = selector.match(/\.([A-Za-z0-9_-]+)/);
+  if (classMatch) {
+    return classMatch[1];
+  }
+
+  const tagMatch = selector.match(/^([A-Za-z][A-Za-z0-9-]*)/);
+  if (tagMatch) {
+    return `<${tagMatch[1]}`;
+  }
+
+  return null;
+}
+
+function countMatchesWithFallback(html: string, selector: string): number {
+  const token = extractProbeToken(selector);
+  if (!token) {
+    return 0;
+  }
+
+  const regexp = new RegExp(escapeRegExp(token), 'g');
+  return html.match(regexp)?.length ?? 0;
+}
+
+function getHtmlRewriterCtor(): HtmlRewriterCtor | null {
+  const maybeCtor = (globalThis as unknown as { HTMLRewriter?: HtmlRewriterCtor }).HTMLRewriter;
+  if (!maybeCtor) {
+    return null;
+  }
+  return maybeCtor;
+}
+
+async function countSelectorMatches(rawHtml: string, selector: string): Promise<{ matches: number; error?: string }> {
+  const ctor = getHtmlRewriterCtor();
+  if (!ctor) {
+    return { matches: countMatchesWithFallback(rawHtml, selector) };
+  }
+
+  let matches = 0;
+  try {
+    const rewriter = new ctor().on(selector, {
+      element() {
+        matches += 1;
+      },
+    });
+    await rewriter.transform(new Response(rawHtml)).text();
+    return { matches };
+  } catch (error) {
+    return {
+      matches: 0,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+async function analyzeSelectorGroup(rawHtml: string, selectors: string[], field: SelectorField): Promise<SelectorGroupReport> {
+  const probes: SelectorProbe[] = [];
+
+  for (const selector of selectors) {
+    const normalizedSelector = normalizeSelectorForProbe(selector);
+    const result = await countSelectorMatches(rawHtml, normalizedSelector);
+
+    probes.push({
+      selector,
+      normalizedSelector,
+      matches: result.matches,
+      error: result.error,
+    });
+  }
+
+  const matched = probes.filter((probe) => probe.matches > 0).map((probe) => probe.selector);
+  const unmatched = probes.filter((probe) => probe.matches === 0).map((probe) => probe.selector);
+
+  return {
+    field,
+    configured: selectors,
+    matched,
+    unmatched,
+    probes,
+  };
+}
+
+export async function analyzeSelectors(rawHtml: string, config: ProviderConfig): Promise<SelectorAnalysis> {
+  const input = await analyzeSelectorGroup(rawHtml, config.inject.inputSelectors ?? [], 'inputSelectors');
+  const submit = await analyzeSelectorGroup(rawHtml, config.inject.submitSelectors ?? [], 'submitSelectors');
+  const response = await analyzeSelectorGroup(rawHtml, config.inject.responseSelectors ?? [], 'responseSelectors');
+  const complete = await analyzeSelectorGroup(rawHtml, config.inject.completeIndicatorSelectors ?? [], 'completeIndicatorSelectors');
+
+  return { input, submit, response, complete };
+}
+
+function groupStatusFromReport(report: SelectorGroupReport): GroupStatus {
+  return report.matched.length > 0 ? 'pass' : 'fail';
+}
+
+function buildRecommendations(key: ProviderKey, analysis: SelectorAnalysis): string[] {
+  const providerFile = `src/providers/${key}/inject.ts`;
+  const recommendations: string[] = [];
+
+  for (const group of SELECTOR_GROUPS) {
+    const groupReport = analysis[group.key];
+
+    if (group.requiredInStrict && groupReport.matched.length === 0) {
+      recommendations.push(
+        `${providerFile}: update ${group.field}; none of the configured selectors match current raw HTML.`
+      );
+      continue;
+    }
+
+    const firstProbe = groupReport.probes[0];
+    if (!firstProbe) {
+      continue;
+    }
+
+    if (firstProbe.matches === 0 && groupReport.matched.length > 0) {
+      recommendations.push(
+        `${providerFile}: consider promoting a matched selector to ${group.field}[0] because current primary selector is stale.`
+      );
+    }
+  }
+
+  return recommendations;
+}
+
+function isStrictFailure(summary: Record<SelectorGroup, GroupStatus>, strict: boolean): boolean {
+  if (!strict) {
+    return false;
+  }
+  return summary.input === 'fail' || summary.submit === 'fail';
+}
+
+export function writeCaptureReport(report: CaptureReport, artifactsDir: string): string {
+  mkdirSync(artifactsDir, { recursive: true });
+  const reportPath = resolve(artifactsDir, `${report.provider}-capture-report.json`);
+  writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n', 'utf-8');
+  return reportPath;
+}
+
 // ---------------------------------------------------------------------------
 // DOM cleanup — applied to captured HTML
 // ---------------------------------------------------------------------------
@@ -229,6 +483,8 @@ export function cleanDom(html: string): string {
   html = html.replace(/<noscript[\s\S]*?<\/noscript>/gi, '');
   html = html.replace(/<meta\s+[^>]*http-equiv\s*=\s*["']Content-Security-Policy["'][^>]*>/gi, '');
   html = html.replace(/<link\s+[^>]*rel\s*=\s*["'](preload|prefetch|preconnect|modulepreload|dns-prefetch)["'][^>]*\/?>/gi, '');
+  // Prevent form elements from triggering page navigation on submit.
+  html = html.replace(/<form\b/gi, '<form onsubmit="return false"');
   return html;
 }
 
@@ -238,11 +494,14 @@ export function cleanDom(html: string): string {
 
 export function injectSentinels(html: string, config: ProviderConfig): string {
   const { streamingButton } = config.template;
-  const ariaLabel = streamingButton.attrs['aria-label'];
-  if (ariaLabel && html.includes(`aria-label="${ariaLabel}"`)) {
+  if (html.includes('id="mock-streaming-btn"')) {
     return html;
   }
-  const sentinel = `<button ${attrsToString(streamingButton.attrs)} class="hidden" style="display:none!important">${streamingButton.text}</button>`;
+  const sentinelAttrs = {
+    ...streamingButton.attrs,
+    id: 'mock-streaming-btn',
+  };
+  const sentinel = `<button ${attrsToString(sentinelAttrs)} class="hidden" hidden>${streamingButton.text}</button>`;
   return html.replace(/<\/body>/i, `${sentinel}\n</body>`);
 }
 
@@ -250,7 +509,7 @@ export function injectSentinels(html: string, config: ProviderConfig): string {
 // Runtime script generation
 // ---------------------------------------------------------------------------
 
-export function generateRuntime(key: ProviderKey, config: ProviderConfig): string {
+export function generateRuntime(config: ProviderConfig): string {
   const { template: t, displayName } = config;
   const mockResponse = `This is a streamed response from mock ${displayName}. It simulates token-by-token generation to verify the inject bridge contract.\\n\\nSecond paragraph for multiline extraction.`;
 
@@ -260,15 +519,12 @@ export function generateRuntime(key: ProviderKey, config: ProviderConfig): strin
     : `function getInputText() { return (inputEl.innerText || inputEl.textContent || '').trim(); }`;
   const clearInput = isTextarea
     ? `function clearInput() { inputEl.value = ''; }`
-    : `function clearInput() { inputEl.innerHTML = '<p><br></p>'; }`;
+    : `function clearInput() { inputEl.textContent = ''; }`;
 
   const wrap = t.contentWrap;
   const wrapUserContent = wrap?.includeUser === true;
   const appendCompletionTo = wrap ? 'wrapperEl' : 'contentEl.parentElement';
 
-  // Wrap variable name: 'tc' for div-based wraps, 'mc' for custom element wraps.
-  // Split into two template lines to preserve the blank-line structure of the original
-  // (which had separate conditionals for needsMessageContent and needsTurnContent).
   const isMcWrap = wrap && wrap.tag !== 'div';
   const isTcWrap = wrap && wrap.tag === 'div';
 
@@ -297,10 +553,71 @@ export function generateRuntime(key: ProviderKey, config: ProviderConfig): strin
     return lines.join('\n');
   }).join('\n');
 
-  const script = `
+  const responseSelectors = JSON.stringify(config.inject.responseSelectors || []);
+  const completeSelectors = JSON.stringify(config.inject.completeIndicatorSelectors || []);
+  const streamingSelectors = JSON.stringify(config.inject.streamingIndicatorSelectors || []);
+  const streamingAttrs = JSON.stringify(t.streamingButton.attrs);
+
+  return `
   <script>
-    const chatHistory = document.getElementById('chat-history');
-    const streamingBtn = document.querySelector('[aria-label="${t.streamingButton.attrs['aria-label']}"]') || document.getElementById('streaming-btn');
+    const RESPONSE_SELECTORS = ${responseSelectors};
+    const COMPLETE_SELECTORS = ${completeSelectors};
+    const STREAMING_SELECTORS = ${streamingSelectors};
+    const STREAMING_BUTTON_ATTRS = ${streamingAttrs};
+
+    function removeMatchedNodes(selectors, keepId = null) {
+      for (const selector of selectors) {
+        try {
+          const nodes = document.querySelectorAll(selector);
+          for (const node of nodes) {
+            if (keepId && node instanceof HTMLElement && node.id === keepId) {
+              continue;
+            }
+            node.remove();
+          }
+        } catch {
+          // Ignore selector parsing/runtime issues in captured pages.
+        }
+      }
+    }
+
+    function ensureChatHistory() {
+      let history = document.getElementById('chat-history');
+      if (!history) {
+        history = document.createElement('div');
+        history.id = 'chat-history';
+        history.style.padding = '16px';
+        history.style.display = 'flex';
+        history.style.flexDirection = 'column';
+        history.style.gap = '12px';
+        document.body.appendChild(history);
+      }
+      history.innerHTML = '';
+      return history;
+    }
+
+    function ensureStreamingButton() {
+      let button = document.getElementById('mock-streaming-btn');
+      if (!button) {
+        button = document.createElement('button');
+        button.id = 'mock-streaming-btn';
+        for (const [key, value] of Object.entries(STREAMING_BUTTON_ATTRS)) {
+          button.setAttribute(key, value);
+        }
+        button.className = 'hidden';
+        button.setAttribute('hidden', '');
+        button.textContent = '${t.streamingButton.text}';
+        document.body.appendChild(button);
+      }
+      return button;
+    }
+
+    removeMatchedNodes(RESPONSE_SELECTORS);
+    removeMatchedNodes(COMPLETE_SELECTORS);
+    removeMatchedNodes(STREAMING_SELECTORS, 'mock-streaming-btn');
+
+    const chatHistory = ensureChatHistory();
+    const streamingBtn = ensureStreamingButton();
     const MOCK_RESPONSE = "${mockResponse}";
 ${counterDecl}
 
@@ -337,14 +654,16 @@ ${assistantAppend}
 
     async function streamResponse(contentEl, wrapperEl) {
       streamingBtn.classList.remove('hidden');
+      streamingBtn.removeAttribute('hidden');
       const tokens = MOCK_RESPONSE.split(/(?=\\s)/);
       contentEl.textContent = '';
       for (const token of tokens) {
         contentEl.textContent += token;
         chatHistory.scrollTop = chatHistory.scrollHeight;
-        await new Promise(r => setTimeout(r, 40));
+        await new Promise((resolve) => setTimeout(resolve, 40));
       }
       streamingBtn.classList.add('hidden');
+      streamingBtn.setAttribute('hidden', '');
       const w = document.createElement('${t.completionWrapper.tag}');
 ${setClassCode('w', t.completionWrapper.className)}
 ${compButtons}
@@ -353,7 +672,8 @@ ${compButtons}
     }
 
     function handleSubmit() {
-      const text = getInputText(); if (!text) return;
+      const text = getInputText();
+      if (!text) return;
       window.__mockLastInput = text;
       chatHistory.appendChild(createUserMessage(text));
       clearInput();
@@ -363,37 +683,98 @@ ${compButtons}
       setTimeout(() => streamResponse(content, wrapper), 300);
     }
   </script>`;
-
-  return script;
 }
 
 // ---------------------------------------------------------------------------
 // Input area HTML generation
 // ---------------------------------------------------------------------------
 
-export function generateInputBindings(_key: ProviderKey, config: ProviderConfig): string {
+export function generateInputBindings(config: ProviderConfig): string {
   const t = config.template;
+  const inputSelectors = JSON.stringify(config.inject.inputSelectors || []);
+  const submitSelectors = JSON.stringify(config.inject.submitSelectors || []);
 
-  const inputSelector = config.inject.inputSelectors[0];
-  const sendBtnSelector = config.inject.submitSelectors[0];
-
-  const formHandling = t.useForm
-    ? `
-    const chatForm = inputEl.closest('form');
+  const formHandling = `
+    const chatForm = inputEl?.closest('form') || sendBtn?.closest('form');
     if (chatForm) {
-      chatForm.addEventListener('submit', (e) => { e.preventDefault(); handleSubmit(); });
-    }`
-    : '';
+      chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        handleSubmit();
+      });
+    }`;
 
   return `
   <script>
-    const inputEl = document.querySelector('${inputSelector}');
-    const sendBtn = document.querySelector('${sendBtnSelector}');
-    if (sendBtn) sendBtn.addEventListener('click', (e) => { ${t.useForm ? 'e.preventDefault(); ' : ''}handleSubmit(); });
+    const INPUT_SELECTORS = ${inputSelectors};
+    const SUBMIT_SELECTORS = ${submitSelectors};
+
+    function findAllVisibleElements(selectors) {
+      const results = [];
+      for (const selector of selectors) {
+        try {
+          const elements = document.querySelectorAll(selector);
+          for (const element of elements) {
+            if (
+              element instanceof HTMLElement &&
+              (element.offsetParent !== null || window.getComputedStyle(element).display !== 'none') &&
+              !results.includes(element)
+            ) {
+              results.push(element);
+            }
+          }
+        } catch {
+          // Ignore invalid selectors from stale captures.
+        }
+      }
+      return results;
+    }
+
+    const inputCandidates = findAllVisibleElements(INPUT_SELECTORS);
+    const submitCandidates = findAllVisibleElements(SUBMIT_SELECTORS);
+    let inputEl = inputCandidates[0] || null;
+    let sendBtn = submitCandidates[0] || null;
+
+    if (!inputEl || submitCandidates.length === 0) {
+      const missing = [
+        !inputEl ? 'input' : null,
+        submitCandidates.length === 0 ? 'submit' : null,
+      ].filter(Boolean).join(', ');
+      const error = 'Mock binding failed: missing ' + missing + ' element(s) in captured DOM';
+      window.__mock_binding_error = error;
+      throw new Error(error);
+    }
+
+    function normalizeSubmitCandidate(buttonEl) {
+      const ariaLabel = (buttonEl.getAttribute('aria-label') || '').toLowerCase();
+      if (ariaLabel.includes('voice')) {
+        // Captured static pages are often in pre-send state; normalize to send state for offline playback.
+        buttonEl.setAttribute('aria-label', 'Send');
+      }
+      // Captured raw pages are usually in pre-input state, where submit controls may be marked disabled.
+      // Normalize to a sendable mock state because no provider runtime is present in simulation files.
+      buttonEl.removeAttribute('aria-disabled');
+      buttonEl.removeAttribute('disabled');
+      if (buttonEl instanceof HTMLButtonElement) {
+        buttonEl.disabled = false;
+      }
+    }
+
+    for (const candidate of submitCandidates) {
+      normalizeSubmitCandidate(candidate);
+      candidate.addEventListener('click', (e) => {
+        ${t.useForm ? 'e.preventDefault(); ' : ''}
+        handleSubmit();
+      });
+    }
 ${formHandling}
-    if (inputEl) inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
-    });
+    if (inputEl) {
+      inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSubmit();
+        }
+      });
+    }
   </script>`;
 }
 
@@ -411,21 +792,7 @@ export function updateMockConfig(key: ProviderKey): void {
     urlPattern: `${key}-simulation.html`,
   };
   writeFileSync(MOCK_CONFIG_PATH, JSON.stringify(config, null, 2) + '\n', 'utf-8');
-  console.log(`   Updated mock-provider-config.json`);
-}
-
-// ---------------------------------------------------------------------------
-// .gitignore maintenance
-// ---------------------------------------------------------------------------
-
-export function ensureGitignoreAuth(): void {
-  const gitignorePath = resolve(ROOT, '.gitignore');
-  if (!existsSync(gitignorePath)) return;
-  const content = readFileSync(gitignorePath, 'utf-8');
-  if (!content.includes('auth/')) {
-    writeFileSync(gitignorePath, content.trimEnd() + '\nauth/\n', 'utf-8');
-    console.log('Added auth/ to .gitignore');
-  }
+  console.log('   Updated mock-provider-config.json');
 }
 
 // ---------------------------------------------------------------------------
@@ -437,10 +804,38 @@ export function processCapture(key: ProviderKey, rawHtml: string): string {
   let html = cleanDom(rawHtml);
   html = injectSentinels(html, config);
 
-  const runtime = generateRuntime(key, config);
-  const bindings = generateInputBindings(key, config);
+  const runtime = generateRuntime(config);
+  const bindings = generateInputBindings(config);
   html = html.replace(/<\/body>/i, `${runtime}\n${bindings}\n</body>`);
   return html;
+}
+
+async function buildCaptureReport(
+  key: ProviderKey,
+  rawHtml: string,
+  options: ProcessOptions,
+): Promise<CaptureReport> {
+  const analysis = await analyzeSelectors(rawHtml, PROVIDERS[key]);
+  const summary: Record<SelectorGroup, GroupStatus> = {
+    input: groupStatusFromReport(analysis.input),
+    submit: groupStatusFromReport(analysis.submit),
+    response: groupStatusFromReport(analysis.response),
+    complete: groupStatusFromReport(analysis.complete),
+  };
+
+  const status = isStrictFailure(summary, options.strict) ? 'fail' : 'pass';
+
+  return {
+    provider: key,
+    timestamp: new Date().toISOString(),
+    strict: options.strict,
+    rawFile: options.inputPath,
+    simulationFile: options.outputPath,
+    status,
+    summary,
+    selectors: analysis,
+    recommendations: buildRecommendations(key, analysis),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -454,8 +849,12 @@ async function main() {
       provider: { type: 'string' },
       input: { type: 'string' },
       output: { type: 'string' },
+      strict: { type: 'boolean', default: true },
+      'artifacts-dir': { type: 'string' },
+      'write-report': { type: 'boolean', default: true },
       help: { type: 'boolean', default: false },
     },
+    allowNegative: true,
     strict: true,
   });
 
@@ -464,10 +863,15 @@ async function main() {
 Usage: bun scripts/lib/mockCaptureProcess.ts [options]
 
 Options:
-  --provider <key>   Provider to process (chatgpt|claude|gemini|grok|perplexity|aistudio)
-  --input <path>     Path to raw HTML file (reads from stdin if omitted)
-  --output <path>    Output path (defaults to tests/fixtures/mock-site/<key>-simulation.html)
-  --help             Show this help
+  --provider <key>       Provider to process (chatgpt|claude|gemini|grok|perplexity|aistudio)
+  --input <path>         Path to raw HTML file (reads from stdin if omitted)
+  --output <path>        Output path (defaults to tests/fixtures/mock-site/<key>-simulation.html)
+  --strict               Fail generation when required selector groups do not match (default: true)
+  --no-strict            Disable strict fail-fast
+  --artifacts-dir <path> Directory for capture reports (default: tests/fixtures/mock-site/artifacts)
+  --write-report         Write capture report JSON (default: true)
+  --no-write-report      Disable report output
+  --help                 Show this help
 `);
     process.exit(0);
   }
@@ -483,8 +887,9 @@ Options:
     process.exit(1);
   }
 
-  // Read raw HTML from file or stdin
-  let rawHtml: string;
+  let rawHtml = '';
+  let inputPath = args.input ?? '<stdin>';
+
   if (args.input) {
     if (!existsSync(args.input)) {
       console.error(`Input file not found: ${args.input}`);
@@ -503,23 +908,47 @@ Options:
     }
   }
 
+  const outputPath = args.output ?? resolve(MOCK_SITE_DIR, `${key}-simulation.html`);
+  const options: ProcessOptions = {
+    strict: args.strict ?? true,
+    inputPath,
+    outputPath,
+    artifactsDir: args['artifacts-dir'] ?? DEFAULT_ARTIFACTS_DIR,
+    writeReport: args['write-report'] ?? true,
+  };
+
   console.log(`Processing ${PROVIDERS[key].displayName} (${key})...`);
   console.log(`   Input: ${(rawHtml.length / 1024).toFixed(1)} KB`);
+  console.log(`   Strict mode: ${options.strict ? 'enabled' : 'disabled'}`);
 
-  ensureGitignoreAuth();
+  const report = await buildCaptureReport(key, rawHtml, options);
+
+  if (options.writeReport) {
+    const reportPath = writeCaptureReport(report, options.artifactsDir);
+    console.log(`   Report: ${reportPath}`);
+  }
+
+  if (report.status === 'fail') {
+    console.error('   Selector check failed (required groups: input, submit).');
+    for (const recommendation of report.recommendations) {
+      console.error(`   - ${recommendation}`);
+    }
+    process.exit(1);
+  }
 
   const html = processCapture(key, rawHtml);
 
-  const outPath = args.output ?? resolve(MOCK_SITE_DIR, `${key}-simulation.html`);
-  mkdirSync(dirname(outPath), { recursive: true });
-  writeFileSync(outPath, html, 'utf-8');
-  console.log(`   Written: ${outPath} (${(html.length / 1024).toFixed(1)} KB)`);
+  mkdirSync(dirname(outputPath), { recursive: true });
+  writeFileSync(outputPath, html, 'utf-8');
+  console.log(`   Written: ${outputPath} (${(html.length / 1024).toFixed(1)} KB)`);
 
   updateMockConfig(key);
   console.log('Done.');
 }
 
-main().catch((err) => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+if (import.meta.main) {
+  main().catch((err) => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
+}
