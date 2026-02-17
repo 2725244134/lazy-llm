@@ -1,4 +1,9 @@
-import type { PromptImagePayload, PromptRequest } from '@shared-contracts/ipc/contracts';
+import type {
+  PromptImagePayload,
+  PromptRequest,
+  QuickPromptQueueEntry,
+  QuickPromptQueueSnapshot,
+} from '@shared-contracts/ipc/contracts';
 import { normalizePromptImagePayload, validatePromptImagePayload } from '@shared-contracts/ipc/promptImage';
 import {
   buildPromptDraftSyncEvalScript,
@@ -37,6 +42,7 @@ export interface PromptDispatchServiceOptions {
   clearTimer?: (timer: ReturnType<typeof setTimeout>) => void;
   onQueuedDispatchFailure?: (paneIndex: number, promptText: string, failures: string[]) => void;
   onQueueTimeout?: (paneIndex: number, promptText: string, waitedMs: number) => void;
+  onQueueStateChanged?: (snapshot: QuickPromptQueueSnapshot) => void;
   imageReadyWaitTimeoutMs?: number;
   imageReadyPollIntervalMs?: number;
 }
@@ -66,9 +72,13 @@ interface NormalizedPromptRequest {
   image: PromptImagePayload | null;
 }
 
+interface QueuedPromptItem {
+  request: NormalizedPromptRequest;
+  queuedAtMs: number;
+}
+
 interface PaneQueueState {
-  queuedPromptRequest: NormalizedPromptRequest | null;
-  queueStartedAtMs: number | null;
+  queuedPromptRequests: QueuedPromptItem[];
   idleStreak: number;
   timer: ReturnType<typeof setTimeout> | null;
   drainInProgress: boolean;
@@ -130,6 +140,7 @@ export class PromptDispatchService {
   private readonly clearTimer: (timer: ReturnType<typeof setTimeout>) => void;
   private readonly onQueuedDispatchFailure: (paneIndex: number, promptText: string, failures: string[]) => void;
   private readonly onQueueTimeout: (paneIndex: number, promptText: string, waitedMs: number) => void;
+  private readonly onQueueStateChanged: (snapshot: QuickPromptQueueSnapshot) => void;
   private readonly imageReadyWaitTimeoutMs: number;
   private readonly imageReadyPollIntervalMs: number;
 
@@ -181,6 +192,7 @@ export class PromptDispatchService {
         }
       );
     });
+    this.onQueueStateChanged = options.onQueueStateChanged ?? (() => {});
     this.imageReadyWaitTimeoutMs = Math.max(
       1,
       Math.floor(options.imageReadyWaitTimeoutMs ?? DEFAULT_IMAGE_READY_WAIT_TIMEOUT_MS)
@@ -456,7 +468,7 @@ export class PromptDispatchService {
     });
 
     if (busyState !== 'idle') {
-      this.queueLatestPromptForPane(pane.paneIndex, request);
+      this.enqueuePromptForPane(pane.paneIndex, request);
       logQuickPromptDispatchDebug('pane queued prompt because pane is not idle', {
         paneIndex: pane.paneIndex,
         busyState,
@@ -744,8 +756,7 @@ export class PromptDispatchService {
     }
 
     const initialState: PaneQueueState = {
-      queuedPromptRequest: null,
-      queueStartedAtMs: null,
+      queuedPromptRequests: [],
       idleStreak: 0,
       timer: null,
       drainInProgress: false,
@@ -790,13 +801,36 @@ export class PromptDispatchService {
     return false;
   }
 
-  private queueLatestPromptForPane(paneIndex: number, request: NormalizedPromptRequest): void {
-    const state = this.getPaneQueueState(paneIndex);
-    state.queuedPromptRequest = request;
-    if (state.queueStartedAtMs === null) {
-      state.queueStartedAtMs = this.now();
+  private buildQueueSnapshot(): QuickPromptQueueSnapshot {
+    const entries: QuickPromptQueueEntry[] = [];
+    const paneQueueEntries = Array.from(this.paneQueueStates.entries())
+      .sort(([leftPaneIndex], [rightPaneIndex]) => leftPaneIndex - rightPaneIndex);
+
+    for (const [paneIndex, state] of paneQueueEntries) {
+      for (const queued of state.queuedPromptRequests) {
+        entries.push({
+          paneIndex,
+          text: queued.request.text,
+          queuedAtMs: queued.queuedAtMs,
+        });
+      }
     }
+
+    return { entries };
+  }
+
+  private notifyQueueStateChanged(): void {
+    this.onQueueStateChanged(this.buildQueueSnapshot());
+  }
+
+  private enqueuePromptForPane(paneIndex: number, request: NormalizedPromptRequest): void {
+    const state = this.getPaneQueueState(paneIndex);
+    state.queuedPromptRequests.push({
+      request,
+      queuedAtMs: this.now(),
+    });
     state.idleStreak = 0;
+    this.notifyQueueStateChanged();
     this.schedulePaneQueueDrain(paneIndex, state);
   }
 
@@ -805,7 +839,7 @@ export class PromptDispatchService {
     state: PaneQueueState,
     delayMs = this.queuePollIntervalMs
   ): void {
-    if (state.timer !== null || state.queuedPromptRequest === null || state.drainInProgress) {
+    if (state.timer !== null || state.queuedPromptRequests.length === 0 || state.drainInProgress) {
       return;
     }
 
@@ -825,10 +859,13 @@ export class PromptDispatchService {
   }
 
   private clearPaneQueueState(paneIndex: number, state: PaneQueueState): void {
+    const hadQueuedPrompts = state.queuedPromptRequests.length > 0;
     this.clearPaneQueueTimer(state);
-    state.queuedPromptRequest = null;
-    state.queueStartedAtMs = null;
+    state.queuedPromptRequests = [];
     state.idleStreak = 0;
+    if (hadQueuedPrompts) {
+      this.notifyQueueStateChanged();
+    }
     this.maybeCleanupPaneQueueState(paneIndex, state);
   }
 
@@ -837,16 +874,40 @@ export class PromptDispatchService {
       return;
     }
 
-    if (state.queuedPromptRequest !== null || state.timer !== null) {
+    if (state.queuedPromptRequests.length > 0 || state.timer !== null) {
       return;
     }
 
     this.paneQueueStates.delete(paneIndex);
   }
 
+  private dropExpiredQueuedPrompts(paneIndex: number, state: PaneQueueState): void {
+    let droppedAny = false;
+
+    while (state.queuedPromptRequests.length > 0) {
+      const nextQueuedPrompt = state.queuedPromptRequests[0];
+      if (!nextQueuedPrompt) {
+        break;
+      }
+
+      const waitedMs = this.now() - nextQueuedPrompt.queuedAtMs;
+      if (waitedMs <= this.queueMaxWaitMs) {
+        break;
+      }
+
+      state.queuedPromptRequests.shift();
+      droppedAny = true;
+      this.onQueueTimeout(paneIndex, nextQueuedPrompt.request.text, waitedMs);
+    }
+
+    if (droppedAny) {
+      this.notifyQueueStateChanged();
+    }
+  }
+
   private async drainPaneQueue(paneIndex: number): Promise<void> {
     const state = this.getPaneQueueState(paneIndex);
-    if (state.drainInProgress || state.queuedPromptRequest === null) {
+    if (state.drainInProgress || state.queuedPromptRequests.length === 0) {
       this.maybeCleanupPaneQueueState(paneIndex, state);
       return;
     }
@@ -861,9 +922,9 @@ export class PromptDispatchService {
 
       const injectRuntimeScript = this.getInjectRuntimeScript();
       if (!injectRuntimeScript) {
-        const queuedPrompt = state.queuedPromptRequest;
+        const queuedPrompts = state.queuedPromptRequests.map((queued) => queued.request);
         this.clearPaneQueueState(paneIndex, state);
-        if (queuedPrompt !== null) {
+        for (const queuedPrompt of queuedPrompts) {
           this.onQueuedDispatchFailure(
             paneIndex,
             queuedPrompt.text,
@@ -873,13 +934,9 @@ export class PromptDispatchService {
         return;
       }
 
-      const waitedMs = state.queueStartedAtMs === null ? 0 : this.now() - state.queueStartedAtMs;
-      if (waitedMs > this.queueMaxWaitMs) {
-        const queuedPrompt = state.queuedPromptRequest;
-        this.clearPaneQueueState(paneIndex, state);
-        if (queuedPrompt !== null) {
-          this.onQueueTimeout(paneIndex, queuedPrompt.text, waitedMs);
-        }
+      this.dropExpiredQueuedPrompts(paneIndex, state);
+      if (state.queuedPromptRequests.length === 0) {
+        this.maybeCleanupPaneQueueState(paneIndex, state);
         return;
       }
 
@@ -901,10 +958,11 @@ export class PromptDispatchService {
         return;
       }
 
-      const queuedPrompt = state.queuedPromptRequest;
-      state.queuedPromptRequest = null;
-      state.queueStartedAtMs = null;
+      const queuedPrompt = state.queuedPromptRequests.shift() ?? null;
       state.idleStreak = 0;
+      if (queuedPrompt !== null) {
+        this.notifyQueueStateChanged();
+      }
 
       if (queuedPrompt === null) {
         return;
@@ -912,9 +970,9 @@ export class PromptDispatchService {
 
       let promptScripts: PanePromptDispatchScripts;
       try {
-        promptScripts = this.buildPromptDispatchScripts(queuedPrompt);
+        promptScripts = this.buildPromptDispatchScripts(queuedPrompt.request);
       } catch (error) {
-        this.onQueuedDispatchFailure(paneIndex, queuedPrompt.text, [
+        this.onQueuedDispatchFailure(paneIndex, queuedPrompt.request.text, [
           `invalid-queued-prompt: ${toFailureReason(error)}`,
         ]);
         return;
@@ -929,14 +987,14 @@ export class PromptDispatchService {
       if (!executionResult.success) {
         this.onQueuedDispatchFailure(
           paneIndex,
-          queuedPrompt.text,
+          queuedPrompt.request.text,
           [`pane-${paneIndex}: ${executionResult.reason ?? 'prompt injection failed'}`]
         );
       } else {
         if (executionResult.nonBlockingFailures.length > 0) {
           this.onQueuedDispatchFailure(
             paneIndex,
-            queuedPrompt.text,
+            queuedPrompt.request.text,
             executionResult.nonBlockingFailures
           );
         }
@@ -949,10 +1007,7 @@ export class PromptDispatchService {
       });
     } finally {
       state.drainInProgress = false;
-      if (state.queuedPromptRequest !== null) {
-        if (state.queueStartedAtMs === null) {
-          state.queueStartedAtMs = this.now();
-        }
+      if (state.queuedPromptRequests.length > 0) {
         this.schedulePaneQueueDrain(paneIndex, state);
       } else {
         this.maybeCleanupPaneQueueState(paneIndex, state);

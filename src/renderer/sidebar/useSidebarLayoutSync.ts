@@ -18,7 +18,6 @@ interface UseSidebarLayoutSyncArgs {
 interface SidebarLayoutSyncController {
   enqueueLayoutSync: () => Promise<void>;
   invalidateLayoutSignature: () => void;
-  focusPromptComposer: () => Promise<void>;
   scheduleResizeLayoutSync: () => void;
   cancelPendingFrames: () => void;
 }
@@ -39,7 +38,6 @@ export function useSidebarLayoutSync(args: UseSidebarLayoutSyncArgs): SidebarLay
   const layoutSyncQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastLayoutSignatureRef = useRef<string | null>(null);
   const resizeRafRef = useRef(0);
-  const focusRafRef = useRef(0);
 
   const invalidateLayoutSignature = useCallback(() => {
     lastLayoutSignatureRef.current = null;
@@ -87,41 +85,10 @@ export function useSidebarLayoutSync(args: UseSidebarLayoutSyncArgs): SidebarLay
     });
   }, [enqueueLayoutSync]);
 
-  const focusPromptComposer = useCallback(async () => {
-    if (collapsedRef.current) {
-      return;
-    }
-
-    if (focusRafRef.current !== 0) {
-      window.cancelAnimationFrame(focusRafRef.current);
-      focusRafRef.current = 0;
-    }
-
-    await new Promise<void>((resolve) => {
-      focusRafRef.current = window.requestAnimationFrame(() => {
-        focusRafRef.current = 0;
-
-        const textarea = document.querySelector<HTMLTextAreaElement>('textarea.composer-textarea');
-        if (textarea && !textarea.disabled) {
-          textarea.focus();
-          const cursorPosition = textarea.value.length;
-          textarea.setSelectionRange(cursorPosition, cursorPosition);
-        }
-
-        resolve();
-      });
-    });
-  }, [collapsedRef]);
-
   const cancelPendingFrames = useCallback(() => {
     if (resizeRafRef.current !== 0) {
       window.cancelAnimationFrame(resizeRafRef.current);
       resizeRafRef.current = 0;
-    }
-
-    if (focusRafRef.current !== 0) {
-      window.cancelAnimationFrame(focusRafRef.current);
-      focusRafRef.current = 0;
     }
   }, []);
 
@@ -129,14 +96,12 @@ export function useSidebarLayoutSync(args: UseSidebarLayoutSyncArgs): SidebarLay
     return {
       enqueueLayoutSync,
       invalidateLayoutSignature,
-      focusPromptComposer,
       scheduleResizeLayoutSync,
       cancelPendingFrames,
     };
   }, [
     cancelPendingFrames,
     enqueueLayoutSync,
-    focusPromptComposer,
     invalidateLayoutSignature,
     scheduleResizeLayoutSync,
   ]);

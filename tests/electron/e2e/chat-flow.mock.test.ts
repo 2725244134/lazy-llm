@@ -1,6 +1,5 @@
 import type { ElectronApplication, Page } from '@playwright/test';
 import { test, expect } from '../fixtures/electronApp';
-import { selectors } from '../helpers/selectors';
 import { getConfig, setPaneCount, updateProvider } from '../helpers/lazyllm';
 
 type BridgeCompletionResult = {
@@ -112,11 +111,10 @@ async function waitForCompletion(page: Page): Promise<BridgeCompletionResult> {
 }
 
 async function sendPrompt(appWindow: Page, prompt: string): Promise<void> {
-  const textarea = appWindow.locator(selectors.promptTextarea);
-  const sendButton = appWindow.locator(selectors.promptSendButton);
-  await textarea.fill(prompt);
-  await expect(sendButton).toBeEnabled({ timeout: POLL_TIMEOUT });
-  await sendButton.click();
+  const result = await appWindow.evaluate((text) => {
+    return window.lazyllm.sendPrompt({ text });
+  }, prompt);
+  expect(result.success).toBe(true);
 }
 
 async function prepareSinglePane(appWindow: Page, providerKey: string): Promise<void> {

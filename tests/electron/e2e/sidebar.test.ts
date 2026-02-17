@@ -67,11 +67,6 @@ test.describe('E2E / Sidebar', () => {
       window.dispatchEvent(new Event('lazyllm:shortcut-toggle-sidebar'));
     });
     await expect(sidebar).not.toHaveClass(/collapsed/);
-    await expect.poll(async () => {
-      return appWindow.evaluate(() => {
-        return document.activeElement?.classList.contains('composer-textarea') ?? false;
-      });
-    }).toBe(true);
   });
 
   test('sidebar width transition includes intermediate frames', async ({ appWindow }) => {

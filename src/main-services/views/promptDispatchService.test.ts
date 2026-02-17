@@ -479,7 +479,7 @@ describe('PromptDispatchService', () => {
     expect(pane.executeJavaScript).not.toHaveBeenCalled();
   });
 
-  it('queues latest prompt while busy and dispatches only the newest prompt after idle', async () => {
+  it('queues multiple prompts while busy and dispatches them in FIFO order after idle', async () => {
     vi.useFakeTimers();
     try {
       const injectRuntimeScript = 'inject-runtime-script';
@@ -512,6 +512,7 @@ describe('PromptDispatchService', () => {
       const service = new PromptDispatchService({
         getPaneTargets: () => [pane.target],
         getInjectRuntimeScript: () => injectRuntimeScript,
+        postSubmitGuardMs: 0,
         queuePollIntervalMs: 10,
         queueIdleConfirmations: 2,
       });
@@ -524,11 +525,11 @@ describe('PromptDispatchService', () => {
       expect(promptScripts).toHaveLength(0);
 
       isStreaming = false;
-      await vi.advanceTimersByTimeAsync(60);
+      await vi.advanceTimersByTimeAsync(120);
 
-      expect(promptScripts).toHaveLength(1);
-      expect(promptScripts[0]).toContain(JSON.stringify('second'));
-      expect(promptScripts[0]).not.toContain(JSON.stringify('first'));
+      expect(promptScripts).toHaveLength(2);
+      expect(promptScripts[0]).toContain(JSON.stringify('first'));
+      expect(promptScripts[1]).toContain(JSON.stringify('second'));
     } finally {
       vi.useRealTimers();
     }
@@ -644,7 +645,7 @@ describe('PromptDispatchService', () => {
     }
   });
 
-  it('dispatches idle pane immediately while busy pane keeps latest-only queue', async () => {
+  it('dispatches idle pane immediately while busy pane drains FIFO queue after idle', async () => {
     vi.useFakeTimers();
     try {
       const injectRuntimeScript = 'inject-runtime-script';
@@ -717,11 +718,74 @@ describe('PromptDispatchService', () => {
       expect(pane1PromptScripts).toHaveLength(0);
 
       pane1Streaming = false;
-      await vi.advanceTimersByTimeAsync(60);
+      await vi.advanceTimersByTimeAsync(120);
 
-      expect(pane1PromptScripts).toHaveLength(1);
-      expect(pane1PromptScripts[0]).toContain(JSON.stringify('second'));
-      expect(pane1PromptScripts[0]).not.toContain(JSON.stringify('first'));
+      expect(pane1PromptScripts).toHaveLength(2);
+      expect(pane1PromptScripts[0]).toContain(JSON.stringify('first'));
+      expect(pane1PromptScripts[1]).toContain(JSON.stringify('second'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('emits queue snapshots when pending queue changes', async () => {
+    vi.useFakeTimers();
+    try {
+      const injectRuntimeScript = 'inject-runtime-script';
+      const onQueueStateChanged = vi.fn<(snapshot: { entries: Array<{ paneIndex: number; text: string }> }) => void>();
+      let isStreaming = true;
+
+      const pane = createPaneTarget(0, async (script) => {
+        if (script === injectRuntimeScript) {
+          return undefined;
+        }
+
+        if (script.includes('bridge.getStatus')) {
+          return {
+            success: true,
+            provider: 'chatgpt',
+            isStreaming,
+            isComplete: !isStreaming,
+            hasResponse: isStreaming,
+          };
+        }
+
+        if (script.includes('bridge.injectPrompt')) {
+          return { success: true };
+        }
+
+        return undefined;
+      });
+
+      const service = new PromptDispatchService({
+        getPaneTargets: () => [pane.target],
+        getInjectRuntimeScript: () => injectRuntimeScript,
+        postSubmitGuardMs: 0,
+        queuePollIntervalMs: 10,
+        queueIdleConfirmations: 2,
+        onQueueStateChanged,
+      });
+
+      await service.sendPromptToAll('first');
+      await service.sendPromptToAll('second');
+
+      expect(onQueueStateChanged).toHaveBeenCalledTimes(2);
+      expect(onQueueStateChanged.mock.calls[0]?.[0]).toMatchObject({
+        entries: [{ paneIndex: 0, text: 'first' }],
+      });
+      expect(onQueueStateChanged.mock.calls[1]?.[0]).toMatchObject({
+        entries: [
+          { paneIndex: 0, text: 'first' },
+          { paneIndex: 0, text: 'second' },
+        ],
+      });
+
+      isStreaming = false;
+      await vi.advanceTimersByTimeAsync(120);
+
+      const snapshots = onQueueStateChanged.mock.calls.map(([snapshot]) => snapshot);
+      const finalSnapshot = snapshots[snapshots.length - 1];
+      expect(finalSnapshot).toEqual({ entries: [] });
     } finally {
       vi.useRealTimers();
     }

@@ -1,18 +1,16 @@
 import { test, expect } from '../fixtures/electronApp';
 import { selectors } from '../helpers/selectors';
 
-test.describe('E2E / Prompt Composer', () => {
-  test('prompt composer is visible and functional', async ({ appWindow }) => {
-    const textarea = appWindow.locator(selectors.promptTextarea);
-    const sendButton = appWindow.locator(selectors.promptSendButton);
+test.describe('E2E / Sidebar Queue', () => {
+  test('queue panel replaces sidebar prompt composer', async ({ appWindow }) => {
+    const queueList = appWindow.locator(selectors.queueList);
+    const queueEmpty = appWindow.locator(selectors.queueEmpty);
 
-    await expect(textarea).toBeVisible();
-    await expect(textarea).toBeFocused();
+    await expect(queueList).toBeVisible();
+    await expect(queueEmpty).toBeVisible();
+    await expect(queueEmpty).toContainText('No pending quick prompt');
 
-    await expect(sendButton).toBeVisible();
-    await expect(sendButton).toBeDisabled();
-
-    await textarea.fill('Hello, world!');
-    await expect(sendButton).toBeEnabled();
+    await expect(appWindow.locator('textarea.composer-textarea')).toHaveCount(0);
+    await expect(appWindow.locator('button.composer-send-btn')).toHaveCount(0);
   });
 });

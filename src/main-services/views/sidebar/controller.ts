@@ -78,6 +78,10 @@ export class SidebarController {
     this.sidebarEventBridge.dispatchEvent(eventName);
   }
 
+  dispatchCustomEvent(eventName: string, detail: unknown): void {
+    this.sidebarEventBridge.dispatchCustomEvent(eventName, detail);
+  }
+
   clearProviderLoadingTracking(paneIndex: number): void {
     this.sidebarEventBridge.clearProviderLoadingTracking(paneIndex);
   }

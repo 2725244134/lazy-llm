@@ -13,7 +13,7 @@ import { ACTIVE_THEME_PRESET, getSidebarThemeVars } from '@/theme/palette';
 import { normalizePaneProviderSequence } from '@/features/providers/paneProviders';
 import { PaneSelector } from './PaneSelector';
 import { ProviderList } from './ProviderList';
-import { PromptComposer } from './PromptComposer';
+import { QuickPromptQueue } from './QuickPromptQueue';
 import { type PaneCount, SidebarContextProvider } from './context';
 import { resolveStartupState, saveUiSettings } from '../state/uiSettings';
 import { useSidebarLayoutSync } from './useSidebarLayoutSync';
@@ -94,7 +94,6 @@ export function Sidebar() {
   const {
     enqueueLayoutSync,
     invalidateLayoutSignature,
-    focusPromptComposer,
     scheduleResizeLayoutSync,
     cancelPendingFrames,
   } = useSidebarLayoutSync({
@@ -137,11 +136,7 @@ export function Sidebar() {
     setCollapsed(nextCollapsed);
 
     await enqueueLayoutSync();
-
-    if (!nextCollapsed) {
-      await focusPromptComposer();
-    }
-  }, [enqueueLayoutSync, focusPromptComposer]);
+  }, [enqueueLayoutSync]);
 
   const setPaneCount = useCallback(
     async (count: number) => {
@@ -312,7 +307,6 @@ export function Sidebar() {
       }
 
       await enqueueLayoutSync();
-      await focusPromptComposer();
     };
 
     window.addEventListener('resize', handleWindowResize);
@@ -331,7 +325,6 @@ export function Sidebar() {
   }, [
     cancelPendingFrames,
     enqueueLayoutSync,
-    focusPromptComposer,
     persistUiSettings,
     runtime,
     scheduleResizeLayoutSync,
@@ -395,7 +388,7 @@ export function Sidebar() {
           <div className="sidebar-scroll">
             <PaneSelector />
             <ProviderList />
-            <PromptComposer />
+            <QuickPromptQueue />
           </div>
         </div>
       </aside>

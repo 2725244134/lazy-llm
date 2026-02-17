@@ -46,6 +46,7 @@ import type {
   AppConfig,
   PaneCount,
   PromptImagePayload,
+  QuickPromptQueueSnapshot,
   PromptRequest,
   ProviderMeta,
 } from '@shared-contracts/ipc/contracts';
@@ -104,6 +105,7 @@ const QUICK_PROMPT_LAYOUT_CONFIG = {
 } as const;
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
+const QUICK_PROMPT_QUEUE_EVENT = APP_CONFIG.interaction.shortcuts.quickPromptQueueEvent;
 const SIDEBAR_TRANSITION_DURATION_MS = APP_CONFIG.layout.sidebar.transitionDurationMs;
 const SIDEBAR_ANIMATION_TICK_MS = 16;
 const PANE_LOAD_MAX_RETRIES = 2;
@@ -203,6 +205,9 @@ export class ViewManager {
       getInjectRuntimeScript: () => this.getInjectRuntimeScript(),
       onPaneExecutionError: (paneIndex, error) => {
         console.error(`[ViewManager] Failed to send prompt to pane ${paneIndex}:`, error);
+      },
+      onQueueStateChanged: (snapshot: QuickPromptQueueSnapshot) => {
+        this.sidebarController.dispatchCustomEvent(QUICK_PROMPT_QUEUE_EVENT, snapshot);
       },
     });
     const paneLoadMonitor = new PaneLoadMonitor({

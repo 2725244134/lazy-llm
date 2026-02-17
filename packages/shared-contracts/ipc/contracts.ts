@@ -105,6 +105,16 @@ export interface PromptSyncResponse {
   failures?: string[];
 }
 
+export interface QuickPromptQueueEntry {
+  paneIndex: number;
+  text: string;
+  queuedAtMs: number;
+}
+
+export interface QuickPromptQueueSnapshot {
+  entries: QuickPromptQueueEntry[];
+}
+
 export interface PromptImagePayload {
   mimeType: string;
   base64Data: string;
