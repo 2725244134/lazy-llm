@@ -170,9 +170,17 @@ describe('resolveStatus', () => {
 
       expect(status.provider).toBe(provider);
       expect(status.isStreaming).toBe(false);
-      expect(status.isComplete).toBe(false);
       expect(status.hasResponse).toBe(true);
-      expect(resolveBusyState(status)).toBe('unknown');
+
+      const completeSelectors = config.completeIndicatorSelectors ?? [];
+      const completeMatchesResponse = completeSelectors.includes(responseSelector!);
+      if (completeMatchesResponse) {
+        expect(status.isComplete).toBe(true);
+        expect(resolveBusyState(status)).toBe('idle');
+      } else {
+        expect(status.isComplete).toBe(false);
+        expect(resolveBusyState(status)).toBe('unknown');
+      }
     }
   );
 });

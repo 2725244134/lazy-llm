@@ -30,5 +30,8 @@ export const inject: ProviderInject = {
     "button[aria-label='Regenerate']",
     "button[aria-label='Copy']",
     "button[aria-label='Read Aloud']",
+    'div.response-content-markdown.markdown',
+    '.message-bubble .markdown',
+    "div[data-testid='message-text']",
   ],
 }
