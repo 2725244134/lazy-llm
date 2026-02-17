@@ -465,8 +465,10 @@ export class ViewManager {
 
   /**
    * Reload all panes to each pane's active provider home page.
+   * Clear queued quick prompts first so reload starts from a clean queue state.
    */
   resetAllPanesToProviderHome(): boolean {
+    this.promptDispatchService.clearQueuedPrompts();
     const success = resetAllPanesToProviderHomeWithLifecycle({
       paneViews: this.paneViews,
       defaultProviders: this.defaultProviders,
