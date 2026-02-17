@@ -345,6 +345,22 @@ export class ViewManager {
     return this.quickPromptController.toggleQuickPrompt();
   }
 
+  /**
+   * Restore a child WebContentsView focus when host window regains OS focus.
+   * This keeps before-input-event shortcuts responsive after alt-tab or overlays.
+   */
+  restoreFocus(): void {
+    if (this.quickPromptController.isVisible()) {
+      const quickPromptView = this.quickPromptController.getView();
+      if (quickPromptView && !quickPromptView.webContents.isDestroyed()) {
+        quickPromptView.webContents.focus();
+        return;
+      }
+    }
+
+    this.sidebarController.focusIfAvailable();
+  }
+
   showQuickPrompt(): boolean {
     return this.quickPromptController.showQuickPrompt();
   }

@@ -60,6 +60,10 @@ function createWindow(): void {
     viewManager?.updateLayout();
   });
 
+  mainWindow.on('focus', () => {
+    viewManager?.restoreFocus();
+  });
+
   mainWindow.on('close', () => {
     viewManager?.destroy();
   });
