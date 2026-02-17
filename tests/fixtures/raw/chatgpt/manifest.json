@@ -1,0 +1,30 @@
+{
+  "provider": "chatgpt",
+  "generatedAt": "2026-02-17T11:04:29.883Z",
+  "records": [
+    {
+      "state": "idle",
+      "sourceFile": "tests/fixtures/raw/chatgpt/idle.html",
+      "capturedAt": "2026-02-17T10:49:04.683Z",
+      "bytes": 471659
+    },
+    {
+      "state": "send-ready",
+      "sourceFile": "tests/fixtures/raw/chatgpt/send-ready.html",
+      "capturedAt": "2026-02-17T10:49:17.231Z",
+      "bytes": 471362
+    },
+    {
+      "state": "streaming",
+      "sourceFile": "tests/fixtures/raw/chatgpt/streaming.html",
+      "capturedAt": "2026-02-17T10:49:30.484Z",
+      "bytes": 482313
+    },
+    {
+      "state": "complete",
+      "sourceFile": "tests/fixtures/raw/chatgpt/complete.html",
+      "capturedAt": "2026-02-17T10:49:47.781Z",
+      "bytes": 482268
+    }
+  ]
+}

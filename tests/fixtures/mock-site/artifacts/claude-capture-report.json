@@ -1,0 +1,236 @@
+{
+  "provider": "claude",
+  "timestamp": "2026-02-17T11:20:33.685Z",
+  "strict": true,
+  "rawFile": "tests/fixtures/raw/claude/send-ready.html",
+  "simulationFile": "/home/cctop/Github/lazy-llm-monorepo/worktrees/lazy-llm-mock-capture-e2e-claude/tests/fixtures/mock-site/claude-simulation.html",
+  "status": "pass",
+  "summary": {
+    "input": "pass",
+    "submit": "pass",
+    "response": "pass",
+    "complete": "pass"
+  },
+  "selectors": {
+    "input": {
+      "field": "inputSelectors",
+      "configured": [
+        "div.ProseMirror[contenteditable='true']",
+        "div[role='textbox'][aria-label='Write your prompt to Claude']",
+        "textarea[aria-label='Write your prompt to Claude']",
+        "div[contenteditable='true'][data-placeholder]",
+        "textarea[placeholder*='Reply']",
+        "fieldset div[contenteditable='true']",
+        "div[contenteditable='true']",
+        "textarea"
+      ],
+      "matched": [
+        "div.ProseMirror[contenteditable='true']",
+        "div[role='textbox'][aria-label='Write your prompt to Claude']",
+        "textarea[aria-label='Write your prompt to Claude']",
+        "textarea[placeholder*='Reply']",
+        "fieldset div[contenteditable='true']",
+        "div[contenteditable='true']",
+        "textarea"
+      ],
+      "unmatched": [
+        "div[contenteditable='true'][data-placeholder]"
+      ],
+      "probes": [
+        {
+          "selector": "div.ProseMirror[contenteditable='true']",
+          "normalizedSelector": "div.ProseMirror[contenteditable='true']",
+          "matches": 1
+        },
+        {
+          "selector": "div[role='textbox'][aria-label='Write your prompt to Claude']",
+          "normalizedSelector": "div[role='textbox'][aria-label='Write your prompt to Claude']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea[aria-label='Write your prompt to Claude']",
+          "normalizedSelector": "textarea[aria-label='Write your prompt to Claude']",
+          "matches": 1
+        },
+        {
+          "selector": "div[contenteditable='true'][data-placeholder]",
+          "normalizedSelector": "div[contenteditable='true'][data-placeholder]",
+          "matches": 0
+        },
+        {
+          "selector": "textarea[placeholder*='Reply']",
+          "normalizedSelector": "textarea[placeholder*='Reply']",
+          "matches": 1
+        },
+        {
+          "selector": "fieldset div[contenteditable='true']",
+          "normalizedSelector": "fieldset div[contenteditable='true']",
+          "matches": 1
+        },
+        {
+          "selector": "div[contenteditable='true']",
+          "normalizedSelector": "div[contenteditable='true']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea",
+          "normalizedSelector": "textarea",
+          "matches": 1
+        }
+      ]
+    },
+    "submit": {
+      "field": "submitSelectors",
+      "configured": [
+        "button[aria-label='Send message']",
+        "button[aria-label='Send']",
+        "button[aria-label*='Send']",
+        "button[aria-label*='send']",
+        "fieldset button[type='submit']",
+        "form button"
+      ],
+      "matched": [
+        "button[aria-label='Send message']",
+        "button[aria-label*='Send']"
+      ],
+      "unmatched": [
+        "button[aria-label='Send']",
+        "button[aria-label*='send']",
+        "fieldset button[type='submit']",
+        "form button"
+      ],
+      "probes": [
+        {
+          "selector": "button[aria-label='Send message']",
+          "normalizedSelector": "button[aria-label='Send message']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label='Send']",
+          "normalizedSelector": "button[aria-label='Send']",
+          "matches": 0
+        },
+        {
+          "selector": "button[aria-label*='Send']",
+          "normalizedSelector": "button[aria-label*='Send']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label*='send']",
+          "normalizedSelector": "button[aria-label*='send']",
+          "matches": 0
+        },
+        {
+          "selector": "fieldset button[type='submit']",
+          "normalizedSelector": "fieldset button[type='submit']",
+          "matches": 0
+        },
+        {
+          "selector": "form button",
+          "normalizedSelector": "form button",
+          "matches": 0
+        }
+      ]
+    },
+    "response": {
+      "field": "responseSelectors",
+      "configured": [
+        ".font-claude-response .standard-markdown",
+        ".font-claude-response-body",
+        "div[data-is-streaming='false'] .standard-markdown",
+        ".font-claude-message",
+        "div[data-testid=\"message-container\"] .prose",
+        ".prose",
+        "div[data-turn-role=\"assistant\"]"
+      ],
+      "matched": [
+        ".font-claude-response .standard-markdown",
+        ".font-claude-response-body",
+        "div[data-is-streaming='false'] .standard-markdown"
+      ],
+      "unmatched": [
+        ".font-claude-message",
+        "div[data-testid=\"message-container\"] .prose",
+        ".prose",
+        "div[data-turn-role=\"assistant\"]"
+      ],
+      "probes": [
+        {
+          "selector": ".font-claude-response .standard-markdown",
+          "normalizedSelector": ".font-claude-response .standard-markdown",
+          "matches": 1
+        },
+        {
+          "selector": ".font-claude-response-body",
+          "normalizedSelector": ".font-claude-response-body",
+          "matches": 1
+        },
+        {
+          "selector": "div[data-is-streaming='false'] .standard-markdown",
+          "normalizedSelector": "div[data-is-streaming='false'] .standard-markdown",
+          "matches": 1
+        },
+        {
+          "selector": ".font-claude-message",
+          "normalizedSelector": ".font-claude-message",
+          "matches": 0
+        },
+        {
+          "selector": "div[data-testid=\"message-container\"] .prose",
+          "normalizedSelector": "div[data-testid=\"message-container\"] .prose",
+          "matches": 0
+        },
+        {
+          "selector": ".prose",
+          "normalizedSelector": ".prose",
+          "matches": 0
+        },
+        {
+          "selector": "div[data-turn-role=\"assistant\"]",
+          "normalizedSelector": "div[data-turn-role=\"assistant\"]",
+          "matches": 0
+        }
+      ]
+    },
+    "complete": {
+      "field": "completeIndicatorSelectors",
+      "configured": [
+        "button[data-testid='action-bar-copy']",
+        "button[aria-label*='Copy']",
+        "button[aria-label*='Retry']",
+        "button[aria-label*='Good response']"
+      ],
+      "matched": [
+        "button[data-testid='action-bar-copy']",
+        "button[aria-label*='Copy']",
+        "button[aria-label*='Retry']"
+      ],
+      "unmatched": [
+        "button[aria-label*='Good response']"
+      ],
+      "probes": [
+        {
+          "selector": "button[data-testid='action-bar-copy']",
+          "normalizedSelector": "button[data-testid='action-bar-copy']",
+          "matches": 2
+        },
+        {
+          "selector": "button[aria-label*='Copy']",
+          "normalizedSelector": "button[aria-label*='Copy']",
+          "matches": 2
+        },
+        {
+          "selector": "button[aria-label*='Retry']",
+          "normalizedSelector": "button[aria-label*='Retry']",
+          "matches": 2
+        },
+        {
+          "selector": "button[aria-label*='Good response']",
+          "normalizedSelector": "button[aria-label*='Good response']",
+          "matches": 0
+        }
+      ]
+    }
+  },
+  "recommendations": []
+}

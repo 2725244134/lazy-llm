@@ -1,0 +1,242 @@
+{
+  "provider": "perplexity",
+  "timestamp": "2026-02-17T11:20:45.057Z",
+  "strict": true,
+  "rawFile": "tests/fixtures/raw/perplexity/complete.html",
+  "simulationFile": "/home/cctop/Github/lazy-llm-monorepo/worktrees/lazy-llm-mock-capture-e2e-claude/tests/fixtures/mock-site/perplexity-simulation.html",
+  "status": "pass",
+  "summary": {
+    "input": "pass",
+    "submit": "pass",
+    "response": "pass",
+    "complete": "pass"
+  },
+  "selectors": {
+    "input": {
+      "field": "inputSelectors",
+      "configured": [
+        "#ask-input[data-lexical-editor=\"true\"]",
+        "div#ask-input[contenteditable='true']",
+        "#ask-input",
+        "div[data-lexical-editor='true'][contenteditable='true']",
+        "div[data-lexical-editor='true']",
+        "textarea[placeholder*='Ask']",
+        "textarea[placeholder*='Anything']",
+        "textarea[aria-label*='Ask']",
+        "textarea",
+        "div[contenteditable='true']"
+      ],
+      "matched": [
+        "#ask-input[data-lexical-editor=\"true\"]",
+        "div#ask-input[contenteditable='true']",
+        "#ask-input",
+        "div[data-lexical-editor='true'][contenteditable='true']",
+        "div[data-lexical-editor='true']",
+        "div[contenteditable='true']"
+      ],
+      "unmatched": [
+        "textarea[placeholder*='Ask']",
+        "textarea[placeholder*='Anything']",
+        "textarea[aria-label*='Ask']",
+        "textarea"
+      ],
+      "probes": [
+        {
+          "selector": "#ask-input[data-lexical-editor=\"true\"]",
+          "normalizedSelector": "#ask-input[data-lexical-editor=\"true\"]",
+          "matches": 1
+        },
+        {
+          "selector": "div#ask-input[contenteditable='true']",
+          "normalizedSelector": "div#ask-input[contenteditable='true']",
+          "matches": 1
+        },
+        {
+          "selector": "#ask-input",
+          "normalizedSelector": "#ask-input",
+          "matches": 1
+        },
+        {
+          "selector": "div[data-lexical-editor='true'][contenteditable='true']",
+          "normalizedSelector": "div[data-lexical-editor='true'][contenteditable='true']",
+          "matches": 1
+        },
+        {
+          "selector": "div[data-lexical-editor='true']",
+          "normalizedSelector": "div[data-lexical-editor='true']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea[placeholder*='Ask']",
+          "normalizedSelector": "textarea[placeholder*='Ask']",
+          "matches": 0
+        },
+        {
+          "selector": "textarea[placeholder*='Anything']",
+          "normalizedSelector": "textarea[placeholder*='Anything']",
+          "matches": 0
+        },
+        {
+          "selector": "textarea[aria-label*='Ask']",
+          "normalizedSelector": "textarea[aria-label*='Ask']",
+          "matches": 0
+        },
+        {
+          "selector": "textarea",
+          "normalizedSelector": "textarea",
+          "matches": 0
+        },
+        {
+          "selector": "div[contenteditable='true']",
+          "normalizedSelector": "div[contenteditable='true']",
+          "matches": 1
+        }
+      ]
+    },
+    "submit": {
+      "field": "submitSelectors",
+      "configured": [
+        "button[aria-label='Submit']",
+        "button[aria-label*='Submit']",
+        "button[aria-label*='Send']",
+        "button[aria-label*='send']",
+        "button[data-testid*='send']",
+        "button[data-testid*='submit']",
+        "button[type='submit']",
+        "form button",
+        "button[aria-label='Voice mode']"
+      ],
+      "matched": [
+        "button[aria-label='Submit']",
+        "button[aria-label*='Submit']"
+      ],
+      "unmatched": [
+        "button[aria-label*='Send']",
+        "button[aria-label*='send']",
+        "button[data-testid*='send']",
+        "button[data-testid*='submit']",
+        "button[type='submit']",
+        "form button",
+        "button[aria-label='Voice mode']"
+      ],
+      "probes": [
+        {
+          "selector": "button[aria-label='Submit']",
+          "normalizedSelector": "button[aria-label='Submit']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label*='Submit']",
+          "normalizedSelector": "button[aria-label*='Submit']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label*='Send']",
+          "normalizedSelector": "button[aria-label*='Send']",
+          "matches": 0
+        },
+        {
+          "selector": "button[aria-label*='send']",
+          "normalizedSelector": "button[aria-label*='send']",
+          "matches": 0
+        },
+        {
+          "selector": "button[data-testid*='send']",
+          "normalizedSelector": "button[data-testid*='send']",
+          "matches": 0
+        },
+        {
+          "selector": "button[data-testid*='submit']",
+          "normalizedSelector": "button[data-testid*='submit']",
+          "matches": 0
+        },
+        {
+          "selector": "button[type='submit']",
+          "normalizedSelector": "button[type='submit']",
+          "matches": 0
+        },
+        {
+          "selector": "form button",
+          "normalizedSelector": "form button",
+          "matches": 0
+        },
+        {
+          "selector": "button[aria-label='Voice mode']",
+          "normalizedSelector": "button[aria-label='Voice mode']",
+          "matches": 0
+        }
+      ]
+    },
+    "response": {
+      "field": "responseSelectors",
+      "configured": [
+        ".prose.dark\\:prose-invert",
+        "[id^=\"markdown-content-\"]",
+        ".default.font-sans.text-base",
+        ".min-w-0.break-words"
+      ],
+      "matched": [
+        ".prose.dark\\:prose-invert",
+        "[id^=\"markdown-content-\"]",
+        ".min-w-0.break-words"
+      ],
+      "unmatched": [
+        ".default.font-sans.text-base"
+      ],
+      "probes": [
+        {
+          "selector": ".prose.dark\\:prose-invert",
+          "normalizedSelector": ".prose.dark\\:prose-invert",
+          "matches": 1
+        },
+        {
+          "selector": "[id^=\"markdown-content-\"]",
+          "normalizedSelector": "[id^=\"markdown-content-\"]",
+          "matches": 1
+        },
+        {
+          "selector": ".default.font-sans.text-base",
+          "normalizedSelector": ".default.font-sans.text-base",
+          "matches": 0
+        },
+        {
+          "selector": ".min-w-0.break-words",
+          "normalizedSelector": ".min-w-0.break-words",
+          "matches": 2
+        }
+      ]
+    },
+    "complete": {
+      "field": "completeIndicatorSelectors",
+      "configured": [
+        "button[aria-label='Copy']",
+        "button[aria-label='Share']",
+        "button[aria-label='Rewrite']"
+      ],
+      "matched": [
+        "button[aria-label='Copy']",
+        "button[aria-label='Share']",
+        "button[aria-label='Rewrite']"
+      ],
+      "unmatched": [],
+      "probes": [
+        {
+          "selector": "button[aria-label='Copy']",
+          "normalizedSelector": "button[aria-label='Copy']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label='Share']",
+          "normalizedSelector": "button[aria-label='Share']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label='Rewrite']",
+          "normalizedSelector": "button[aria-label='Rewrite']",
+          "matches": 1
+        }
+      ]
+    }
+  },
+  "recommendations": []
+}

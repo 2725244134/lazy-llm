@@ -1,0 +1,235 @@
+{
+  "provider": "aistudio",
+  "timestamp": "2026-02-17T11:20:45.041Z",
+  "strict": true,
+  "rawFile": "tests/fixtures/raw/aistudio/complete.html",
+  "simulationFile": "/home/cctop/Github/lazy-llm-monorepo/worktrees/lazy-llm-mock-capture-e2e-claude/tests/fixtures/mock-site/aistudio-simulation.html",
+  "status": "pass",
+  "summary": {
+    "input": "pass",
+    "submit": "pass",
+    "response": "pass",
+    "complete": "pass"
+  },
+  "selectors": {
+    "input": {
+      "field": "inputSelectors",
+      "configured": [
+        "textarea[aria-label='Enter a prompt']",
+        "textarea[formcontrolname='promptText']",
+        "textarea[placeholder*='Start typing']",
+        "textarea[placeholder*='prompt']",
+        "textarea[aria-label*='prompt']",
+        "textarea[aria-label*='Prompt']",
+        "ms-prompt-box textarea",
+        ".prompt-box-container textarea",
+        "textarea.cdk-textarea-autosize",
+        "textarea",
+        "div[contenteditable='true']"
+      ],
+      "matched": [
+        "textarea[aria-label='Enter a prompt']",
+        "textarea[formcontrolname='promptText']",
+        "textarea[placeholder*='Start typing']",
+        "textarea[placeholder*='prompt']",
+        "textarea[aria-label*='prompt']",
+        "ms-prompt-box textarea",
+        ".prompt-box-container textarea",
+        "textarea.cdk-textarea-autosize",
+        "textarea"
+      ],
+      "unmatched": [
+        "textarea[aria-label*='Prompt']",
+        "div[contenteditable='true']"
+      ],
+      "probes": [
+        {
+          "selector": "textarea[aria-label='Enter a prompt']",
+          "normalizedSelector": "textarea[aria-label='Enter a prompt']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea[formcontrolname='promptText']",
+          "normalizedSelector": "textarea[formcontrolname='promptText']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea[placeholder*='Start typing']",
+          "normalizedSelector": "textarea[placeholder*='Start typing']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea[placeholder*='prompt']",
+          "normalizedSelector": "textarea[placeholder*='prompt']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea[aria-label*='prompt']",
+          "normalizedSelector": "textarea[aria-label*='prompt']",
+          "matches": 1
+        },
+        {
+          "selector": "textarea[aria-label*='Prompt']",
+          "normalizedSelector": "textarea[aria-label*='Prompt']",
+          "matches": 0
+        },
+        {
+          "selector": "ms-prompt-box textarea",
+          "normalizedSelector": "ms-prompt-box textarea",
+          "matches": 1
+        },
+        {
+          "selector": ".prompt-box-container textarea",
+          "normalizedSelector": ".prompt-box-container textarea",
+          "matches": 1
+        },
+        {
+          "selector": "textarea.cdk-textarea-autosize",
+          "normalizedSelector": "textarea.cdk-textarea-autosize",
+          "matches": 1
+        },
+        {
+          "selector": "textarea",
+          "normalizedSelector": "textarea",
+          "matches": 1
+        },
+        {
+          "selector": "div[contenteditable='true']",
+          "normalizedSelector": "div[contenteditable='true']",
+          "matches": 0
+        }
+      ]
+    },
+    "submit": {
+      "field": "submitSelectors",
+      "configured": [
+        "ms-run-button button",
+        "button[type='submit']",
+        "button.ms-button-primary[type='submit']",
+        "button[aria-label*='Run']",
+        "button[aria-label*='Send']",
+        "form button"
+      ],
+      "matched": [
+        "ms-run-button button",
+        "button[type='submit']",
+        "button.ms-button-primary[type='submit']"
+      ],
+      "unmatched": [
+        "button[aria-label*='Run']",
+        "button[aria-label*='Send']",
+        "form button"
+      ],
+      "probes": [
+        {
+          "selector": "ms-run-button button",
+          "normalizedSelector": "ms-run-button button",
+          "matches": 1
+        },
+        {
+          "selector": "button[type='submit']",
+          "normalizedSelector": "button[type='submit']",
+          "matches": 1
+        },
+        {
+          "selector": "button.ms-button-primary[type='submit']",
+          "normalizedSelector": "button.ms-button-primary[type='submit']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label*='Run']",
+          "normalizedSelector": "button[aria-label*='Run']",
+          "matches": 0
+        },
+        {
+          "selector": "button[aria-label*='Send']",
+          "normalizedSelector": "button[aria-label*='Send']",
+          "matches": 0
+        },
+        {
+          "selector": "form button",
+          "normalizedSelector": "form button",
+          "matches": 0
+        }
+      ]
+    },
+    "response": {
+      "field": "responseSelectors",
+      "configured": [
+        "ms-cmark-node.cmark-node",
+        ".turn-content ms-text-chunk",
+        ".model-prompt-container .turn-content",
+        ".text-chunk"
+      ],
+      "matched": [
+        "ms-cmark-node.cmark-node",
+        ".turn-content ms-text-chunk",
+        ".model-prompt-container .turn-content",
+        ".text-chunk"
+      ],
+      "unmatched": [],
+      "probes": [
+        {
+          "selector": "ms-cmark-node.cmark-node",
+          "normalizedSelector": "ms-cmark-node.cmark-node",
+          "matches": 2
+        },
+        {
+          "selector": ".turn-content ms-text-chunk",
+          "normalizedSelector": ".turn-content ms-text-chunk",
+          "matches": 2
+        },
+        {
+          "selector": ".model-prompt-container .turn-content",
+          "normalizedSelector": ".model-prompt-container .turn-content",
+          "matches": 1
+        },
+        {
+          "selector": ".text-chunk",
+          "normalizedSelector": ".text-chunk",
+          "matches": 2
+        }
+      ]
+    },
+    "complete": {
+      "field": "completeIndicatorSelectors",
+      "configured": [
+        "ms-chat-turn-options",
+        "button[aria-label='Good response']",
+        "button[aria-label='Bad response']",
+        "button[aria-label='Copy']"
+      ],
+      "matched": [
+        "ms-chat-turn-options",
+        "button[aria-label='Good response']",
+        "button[aria-label='Bad response']"
+      ],
+      "unmatched": [
+        "button[aria-label='Copy']"
+      ],
+      "probes": [
+        {
+          "selector": "ms-chat-turn-options",
+          "normalizedSelector": "ms-chat-turn-options",
+          "matches": 2
+        },
+        {
+          "selector": "button[aria-label='Good response']",
+          "normalizedSelector": "button[aria-label='Good response']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label='Bad response']",
+          "normalizedSelector": "button[aria-label='Bad response']",
+          "matches": 1
+        },
+        {
+          "selector": "button[aria-label='Copy']",
+          "normalizedSelector": "button[aria-label='Copy']",
+          "matches": 0
+        }
+      ]
+    }
+  },
+  "recommendations": []
+}
