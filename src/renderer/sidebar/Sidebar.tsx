@@ -24,6 +24,7 @@ import {
   createNextSidebarTab,
   createSidebarTabState,
   findSidebarTab,
+  getAdjacentTabId,
   removeSidebarTab,
   updateSidebarTabSnapshot,
   type SidebarTabState,
@@ -52,6 +53,19 @@ function resolveProviderForPane(providerKey: string | undefined): string {
     return providerKey;
   }
   return DEFAULT_PROVIDER_KEY;
+}
+
+function isEditableElement(node: EventTarget | null): boolean {
+  if (!(node instanceof HTMLElement)) {
+    return false;
+  }
+
+  if (node.isContentEditable) {
+    return true;
+  }
+
+  const tagName = node.tagName.toLowerCase();
+  return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
 }
 
 export function Sidebar() {
@@ -547,6 +561,44 @@ export function Sidebar() {
       setProviderLoadingState(detail.paneIndex, detail.loading);
     };
 
+    const handleTabShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.altKey || event.shiftKey) {
+        return;
+      }
+      if (!event.ctrlKey && !event.metaKey) {
+        return;
+      }
+      if (isEditableElement(event.target)) {
+        return;
+      }
+
+      const keyLower = event.key.toLowerCase();
+      if (keyLower === 'w') {
+        event.preventDefault();
+        void closeTab(activeTabIdRef.current);
+        return;
+      }
+
+      if (keyLower === 't') {
+        event.preventDefault();
+        void createTab();
+        return;
+      }
+
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+        return;
+      }
+
+      const direction = event.key === 'ArrowLeft' ? 'prev' : 'next';
+      const nextTabId = getAdjacentTabId(tabsRef.current, activeTabIdRef.current, direction);
+      if (!nextTabId || nextTabId === activeTabIdRef.current) {
+        return;
+      }
+
+      event.preventDefault();
+      void switchTab(nextTabId);
+    };
+
     let active = true;
 
     const initialize = async () => {
@@ -598,6 +650,7 @@ export function Sidebar() {
     window.addEventListener('resize', handleWindowResize);
     window.addEventListener(SIDEBAR_TOGGLE_SHORTCUT_EVENT, handleSidebarToggleShortcut);
     window.addEventListener(PROVIDER_LOADING_EVENT, handleProviderLoadingEvent as EventListener);
+    window.addEventListener('keydown', handleTabShortcut);
 
     void initialize();
 
@@ -606,9 +659,12 @@ export function Sidebar() {
       window.removeEventListener('resize', handleWindowResize);
       window.removeEventListener(SIDEBAR_TOGGLE_SHORTCUT_EVENT, handleSidebarToggleShortcut);
       window.removeEventListener(PROVIDER_LOADING_EVENT, handleProviderLoadingEvent as EventListener);
+      window.removeEventListener('keydown', handleTabShortcut);
       cancelPendingFrames();
     };
   }, [
+    createTab,
+    closeTab,
     cancelPendingFrames,
     enqueueLayoutSync,
     persistUiSettings,
@@ -616,6 +672,7 @@ export function Sidebar() {
     scheduleResizeLayoutSync,
     setActiveTabState,
     setProviderLoadingState,
+    switchTab,
     toggleCollapse,
     trimProviderLoadingState,
     updateTabsState,

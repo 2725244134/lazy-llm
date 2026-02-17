@@ -32,4 +32,27 @@ test.describe('E2E / Panes', () => {
     await newAllButton.click();
     await expect(providerItems).toHaveCount(countBefore);
   });
+
+  test('tab shortcuts support close and left/right navigation', async ({ appWindow }) => {
+    const addTabButton = appWindow.locator('.tab-add-btn');
+    const tabs = appWindow.locator('.tab-chip');
+
+    await appWindow.keyboard.press('Control+T');
+    await expect(tabs).toHaveCount(2);
+    await expect(tabs.nth(1)).toHaveClass(/active/);
+
+    await addTabButton.click();
+    await expect(tabs).toHaveCount(3);
+    await expect(tabs.nth(2)).toHaveClass(/active/);
+
+    await appWindow.keyboard.press('Control+ArrowLeft');
+    await expect(tabs.nth(1)).toHaveClass(/active/);
+
+    await appWindow.keyboard.press('Control+ArrowRight');
+    await expect(tabs.nth(2)).toHaveClass(/active/);
+
+    await appWindow.keyboard.press('Control+W');
+    await expect(tabs).toHaveCount(2);
+    await expect(tabs.nth(1)).toHaveClass(/active/);
+  });
 });

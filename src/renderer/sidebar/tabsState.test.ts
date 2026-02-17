@@ -4,6 +4,7 @@ import {
   createNextSidebarTab,
   createSidebarTabState,
   findSidebarTab,
+  getAdjacentTabId,
   normalizeSidebarTabsState,
   removeSidebarTab,
   updateSidebarTabSnapshot,
@@ -108,5 +109,18 @@ describe('tabsState', () => {
 
     expect(result.tabs.map((tab) => tab.id)).toEqual(['tab-1', 'tab-3']);
     expect(result.activeTabId).toBe('tab-1');
+  });
+
+  it('resolves adjacent tabs with circular navigation', () => {
+    const tabs = [
+      createDefaultTab({ id: 'tab-1' }),
+      createDefaultTab({ id: 'tab-2' }),
+      createDefaultTab({ id: 'tab-3' }),
+    ];
+
+    expect(getAdjacentTabId(tabs, 'tab-1', 'next')).toBe('tab-2');
+    expect(getAdjacentTabId(tabs, 'tab-3', 'next')).toBe('tab-1');
+    expect(getAdjacentTabId(tabs, 'tab-1', 'prev')).toBe('tab-3');
+    expect(getAdjacentTabId(tabs, 'tab-2', 'prev')).toBe('tab-1');
   });
 });

@@ -13,6 +13,8 @@ export interface SidebarTabsState {
   activeTabId: string;
 }
 
+export type TabMoveDirection = 'prev' | 'next';
+
 export const MAX_SIDEBAR_TABS = 8;
 const TAB_ID_PREFIX = 'tab';
 
@@ -206,4 +208,21 @@ export function removeSidebarTab(
     tabs: nextTabs,
     activeTabId: nextActiveTabId,
   };
+}
+
+export function getAdjacentTabId(
+  tabs: readonly SidebarTabState[],
+  activeTabId: string,
+  direction: TabMoveDirection,
+): string | null {
+  if (tabs.length === 0) {
+    return null;
+  }
+
+  const activeTabIndex = tabs.findIndex((tab) => tab.id === activeTabId);
+  const baseIndex = activeTabIndex >= 0 ? activeTabIndex : 0;
+  const delta = direction === 'prev' ? -1 : 1;
+  const nextIndex = (baseIndex + delta + tabs.length) % tabs.length;
+
+  return tabs[nextIndex]?.id ?? null;
 }
