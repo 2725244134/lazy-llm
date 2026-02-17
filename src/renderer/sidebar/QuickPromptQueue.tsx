@@ -203,30 +203,15 @@ export function QuickPromptQueue() {
     });
   }, [roundGroups]);
 
-  const paneCount = useMemo(() => {
-    return new Set(entries.map((entry) => entry.paneIndex)).size;
-  }, [entries]);
   const isMutating = pendingMutationKey !== null;
   const nextQueueItemId = entries[0]?.queueItemId ?? null;
   const latestRoundId = roundGroups[roundGroups.length - 1]?.roundId ?? null;
-  const totalEntries = entries.length;
-  const pendingLabel = totalEntries === 1
-    ? '1 pending message'
-    : `${totalEntries} pending messages`;
-  const paneLabel = paneCount === 1
-    ? '1 pane'
-    : `${paneCount} panes`;
 
   return (
     <SidebarSection title="QUEUE">
       <div className="queue-list">
-        <div className="queue-summary" role="status" aria-live="polite">
-          <span className="queue-summary-count">{pendingLabel}</span>
-          <span className="queue-summary-separator">•</span>
-          <span className="queue-summary-panes">{paneLabel}</span>
-          <span className="queue-summary-separator">•</span>
-          <span className="queue-summary-mode">FIFO by round</span>
-          {entries.length > 0 ? (
+        {entries.length > 0 ? (
+          <div className="queue-actions">
             <button
               type="button"
               className="queue-summary-clear"
@@ -237,8 +222,8 @@ export function QuickPromptQueue() {
             >
               Clear all
             </button>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
         {mutationError ? (
           <p className="queue-error" role="status" aria-live="polite">
             {mutationError}
