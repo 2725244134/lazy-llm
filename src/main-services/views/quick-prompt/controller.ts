@@ -3,7 +3,6 @@ import {
   type Input,
   type WebContents,
   WebContentsView,
-  type BaseWindow,
 } from 'electron';
 import type { ViewRect } from '@shared-contracts/ipc/contracts';
 import { QuickPromptAnchorTracker } from './anchorTracker.js';
@@ -14,13 +13,15 @@ import {
 } from './lifecycleService.js';
 
 export interface QuickPromptControllerOptions {
-  hostWindow: BaseWindow;
   quickPromptPreloadPath: string;
   defaultHeight: number;
   minHeight: number;
   maxHeight: number;
   resolveBounds(requestedHeight: number, anchorPaneIndex: number): ViewRect;
   anchorTracker: QuickPromptAnchorTracker;
+  addQuickPromptViewToContent(view: WebContentsView): void;
+  removeQuickPromptViewFromContent(view: WebContentsView): void;
+  keepQuickPromptViewOnTop(view: WebContentsView): void;
   focusSidebarIfAvailable(): void;
   attachGlobalShortcutHooks(webContents: WebContents): void;
   buildQuickPromptDataUrl(): string;
@@ -38,8 +39,8 @@ export class QuickPromptController {
       },
       {
         createQuickPromptView: () => this.createQuickPromptView(),
-        addQuickPromptViewToContent: (view) => this.options.hostWindow.contentView.addChildView(view),
-        removeQuickPromptViewFromContent: (view) => this.options.hostWindow.contentView.removeChildView(view),
+        addQuickPromptViewToContent: (view) => this.options.addQuickPromptViewToContent(view),
+        removeQuickPromptViewFromContent: (view) => this.options.removeQuickPromptViewFromContent(view),
         getQuickPromptBounds: (height) => this.options.resolveBounds(
           height,
           this.options.anchorTracker.getAnchorPaneIndex(),
@@ -118,8 +119,7 @@ export class QuickPromptController {
     if (!quickPromptView || !this.quickPromptLifecycleService.isVisible()) {
       return;
     }
-    this.options.hostWindow.contentView.removeChildView(quickPromptView);
-    this.options.hostWindow.contentView.addChildView(quickPromptView);
+    this.options.keepQuickPromptViewOnTop(quickPromptView);
   }
 
   destroy(): void {

@@ -166,7 +166,6 @@ export class ViewManager {
         this.findPaneIndexByWebContents(webContents),
     });
     this.quickPromptController = new QuickPromptController({
-      hostWindow: this.window,
       quickPromptPreloadPath,
       defaultHeight: options.config.quick_prompt.default_height,
       minHeight: QUICK_PROMPT_MIN_HEIGHT,
@@ -174,6 +173,12 @@ export class ViewManager {
       resolveBounds: (requestedHeight, anchorPaneIndex) =>
         this.getQuickPromptBounds(requestedHeight, anchorPaneIndex),
       anchorTracker: quickPromptAnchorTracker,
+      addQuickPromptViewToContent: (view) => this.window.contentView.addChildView(view),
+      removeQuickPromptViewFromContent: (view) => this.window.contentView.removeChildView(view),
+      keepQuickPromptViewOnTop: (view) => {
+        this.window.contentView.removeChildView(view);
+        this.window.contentView.addChildView(view);
+      },
       focusSidebarIfAvailable: () => this.sidebarController.focusIfAvailable(),
       attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
       buildQuickPromptDataUrl: () => buildQuickPromptDataUrl(),
