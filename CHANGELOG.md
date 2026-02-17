@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-02-17
+
+### Added
+
+- Add image-paste prompt flow with staged clipboard payload and readiness wait.
+- Add realistic provider mock fixtures plus cross-provider chat-flow E2E coverage.
+- Add quick-prompt queue timeline with round grouping and per-round controls.
+
+### Fixed
+
+- Fix Grok completion handling and avoid early empty completion in inject bridge polling.
+- Fix quick-prompt visibility/toggle behavior and stabilize related E2E assertions.
+- Fix CI headless Electron test invocation to use existing E2E recipe.
+
+### Changed
+
+- Refactor main-process view lifecycle into sidebar/quick-prompt/prompt-image services.
+- Reorganize provider/runtime architecture and tighten import-boundary checks.
+- Replace mock capture workflow with actionbook-based capture/transform tooling.
+
 ## [0.1.2] - 2026-02-15
 
 ### Added
