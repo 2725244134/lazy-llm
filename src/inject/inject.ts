@@ -8,6 +8,7 @@ import {
   extractAllResponses,
 } from './core';
 import { resolveStatus, type StatusResult } from './status';
+import { findSendableSubmitButton } from './submit-button';
 
 interface InjectResult {
   success: boolean;
@@ -83,9 +84,9 @@ function clickSubmit(config: ProviderInjectConfig | undefined): SubmitResult {
     return { success: false, reason: 'No config' };
   }
 
-  const button = findElement(config.submitSelectors) as HTMLButtonElement | null;
+  const button = findSendableSubmitButton(config.submitSelectors);
   if (!button) {
-    return { success: false, reason: 'Submit button not found' };
+    return { success: false, reason: 'No sendable submit button found' };
   }
 
   if (button.disabled) {
