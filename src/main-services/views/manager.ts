@@ -7,11 +7,9 @@ import {
   type Event,
   type Input,
   ipcMain,
-  type IpcMainEvent,
   type WebContents,
   WebContentsView,
 } from 'electron';
-import { randomUUID } from 'node:crypto';
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { fileURLToPath } from 'url';
@@ -37,6 +35,7 @@ import {
   QuickPromptController,
   buildQuickPromptDataUrl,
 } from './quick-prompt/index.js';
+import { PromptImageStageService } from './prompt-image/index.js';
 import { resolveShortcutAction, type ShortcutAction } from './shortcutDispatcher.js';
 import { PANE_ACCEPT_LANGUAGES } from './paneRuntimePreferences.js';
 import type { RuntimePreferences } from '../ipc-handlers/store.js';
@@ -44,13 +43,10 @@ import { padProviderSequence } from '../ipc-handlers/providerConfig.js';
 import type {
   AppConfig,
   PaneCount,
-  PaneStagePromptImageAckPayload,
-  PaneStagePromptImagePayload,
   PromptImagePayload,
   PromptRequest,
   ProviderMeta,
 } from '@shared-contracts/ipc/contracts';
-import { IPC_CHANNELS } from '@shared-contracts/ipc/contracts';
 
 const runtimeDir = fileURLToPath(new URL('.', import.meta.url));
 
@@ -137,18 +133,11 @@ export class ViewManager {
   private sidebarController: SidebarController;
   private quickPromptController: QuickPromptController;
   private promptDispatchService: PromptDispatchService;
+  private promptImageStageService: PromptImageStageService;
   private sidebarWidthAnimationTimer: ReturnType<typeof setTimeout> | null = null;
   private sidebarWidthAnimationToken = 0;
   private sidebarWidthAnimationTarget: number | null = null;
   private rendererDevServerUrl: string | null;
-  private promptImageStageRequestSeq = 0;
-  private readonly pendingPromptImageStageRequests = new Map<string, {
-    paneIndex: number;
-    consumeToken: string;
-    timer: ReturnType<typeof setTimeout>;
-    resolve: (consumeToken: string) => void;
-    reject: (error: Error) => void;
-  }>();
 
   constructor(window: BaseWindow, options: ViewManagerOptions) {
     this.window = window;
@@ -185,6 +174,10 @@ export class ViewManager {
       attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
       buildQuickPromptDataUrl: () => buildQuickPromptDataUrl(),
     });
+    this.promptImageStageService = new PromptImageStageService({
+      ackBus: ipcMain,
+      timeoutMs: PANE_STAGE_PROMPT_IMAGE_TIMEOUT_MS,
+    });
     this.promptDispatchService = new PromptDispatchService({
       getPaneTargets: () => this.paneViews.map((pane) => ({
         paneIndex: pane.paneIndex,
@@ -192,10 +185,10 @@ export class ViewManager {
           return pane.view.webContents.executeJavaScript(script, userGesture);
         },
         stagePromptImagePayload: (image) => {
-          return this.stagePromptImagePayload(
+          return this.promptImageStageService.stagePromptImagePayload(
             pane.view.webContents,
             pane.paneIndex,
-            image
+            image,
           );
         },
       })),
@@ -204,7 +197,6 @@ export class ViewManager {
         console.error(`[ViewManager] Failed to send prompt to pane ${paneIndex}:`, error);
       },
     });
-    ipcMain.on(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE_ACK, this.handlePaneStagePromptImageAck);
     const paneLoadMonitor = new PaneLoadMonitor({
       maxRetries: PANE_LOAD_MAX_RETRIES,
       retryBaseDelayMs: PANE_LOAD_RETRY_BASE_DELAY_MS,
@@ -332,100 +324,6 @@ export class ViewManager {
 
   resizeQuickPrompt(nextHeight: number): { visible: boolean; height: number } {
     return this.quickPromptController.resizeQuickPrompt(nextHeight);
-  }
-
-  private readonly handlePaneStagePromptImageAck = (
-    _event: IpcMainEvent,
-    payload: PaneStagePromptImageAckPayload
-  ): void => {
-    const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
-    if (!requestId) {
-      return;
-    }
-
-    const pending = this.pendingPromptImageStageRequests.get(requestId);
-    if (!pending) {
-      return;
-    }
-
-    this.pendingPromptImageStageRequests.delete(requestId);
-    clearTimeout(pending.timer);
-
-    const responsePaneIndex = typeof payload?.paneIndex === 'number'
-      ? payload.paneIndex
-      : pending.paneIndex;
-    if (responsePaneIndex !== pending.paneIndex) {
-      pending.reject(new Error(
-        `prompt image stage ack pane mismatch: expected ${pending.paneIndex}, got ${responsePaneIndex}`
-      ));
-      return;
-    }
-
-    if (payload.success === true) {
-      pending.resolve(pending.consumeToken);
-      return;
-    }
-
-    pending.reject(new Error(
-      typeof payload.reason === 'string' && payload.reason
-        ? payload.reason
-        : 'failed to stage prompt image payload'
-    ));
-  };
-
-  private stagePromptImagePayload(
-    paneWebContents: WebContents,
-    paneIndex: number,
-    image: PromptImagePayload
-  ): Promise<string> {
-    if (paneWebContents.isDestroyed()) {
-      return Promise.reject(new Error('pane webContents is destroyed'));
-    }
-
-    const requestId = `${paneIndex}:${Date.now()}:${this.promptImageStageRequestSeq++}`;
-    const consumeToken = randomUUID();
-    const stagePayload: PaneStagePromptImagePayload = {
-      requestId,
-      consumeToken,
-      image,
-    };
-
-    return new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingPromptImageStageRequests.delete(requestId);
-        reject(new Error('timed out while staging prompt image payload'));
-      }, PANE_STAGE_PROMPT_IMAGE_TIMEOUT_MS);
-
-      const rejectWithError = (error: unknown): void => {
-        clearTimeout(timer);
-        this.pendingPromptImageStageRequests.delete(requestId);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      };
-
-      this.pendingPromptImageStageRequests.set(requestId, {
-        paneIndex,
-        consumeToken,
-        timer,
-        resolve,
-        reject: (error) => {
-          rejectWithError(error);
-        },
-      });
-
-      try {
-        paneWebContents.send(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE, stagePayload);
-      } catch (error) {
-        rejectWithError(error);
-      }
-    });
-  }
-
-  private rejectPendingPromptImageStageRequests(reason: string): void {
-    for (const [requestId, pending] of this.pendingPromptImageStageRequests) {
-      clearTimeout(pending.timer);
-      pending.reject(new Error(reason));
-      this.pendingPromptImageStageRequests.delete(requestId);
-    }
   }
 
   private clearProviderLoadingTracking(paneIndex: number): void {
@@ -682,8 +580,7 @@ export class ViewManager {
    */
   destroy(): void {
     this.stopSidebarWidthAnimation();
-    ipcMain.off(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE_ACK, this.handlePaneStagePromptImageAck);
-    this.rejectPendingPromptImageStageRequests(
+    this.promptImageStageService.destroy(
       'view manager destroyed before prompt image staging completed'
     );
 
