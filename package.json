@@ -18,12 +18,8 @@
     "test:unit": "vitest run",
     "test:electron:smoke": "bun run build:inject && bun run build:app && playwright test tests/electron/",
     "test:electron:e2e": "bun run build:inject && bun run build:app && playwright test tests/electron/",
-    "mock:generate": "bun scripts/lib/mockGenerateAll.ts",
-    "mock:capture": "bun scripts/lib/mockCaptureCli.ts",
-    "mock:crawl": "bun scripts/lib/mockCrawlCli.ts",
-    "mock:transform": "bun scripts/lib/mockTransformCli.ts",
-    "mock:diff": "bun scripts/lib/mockDiffCli.ts",
-    "mock:parity": "bun scripts/lib/mockParityCli.ts --manifest tests/fixtures/mock-site/parity-manifest.json --mock-dir tests/fixtures/mock-site",
+    "mock:capture": "bun scripts/lib/mockCaptureProcess.ts",
+    "mock:capture:process": "bun scripts/lib/mockCaptureProcess.ts",
     "prepare": "echo 'Hooks ready'"
   },
   "dependencies": {

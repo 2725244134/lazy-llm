@@ -1,49 +1,22 @@
 import { reportFrontendError, toErrorMessage } from './error';
 
-function hasHiddenClass(element: Element): boolean {
-  const maybeClassList = element as Element & {
-    classList?: { contains?: (token: string) => boolean };
-  };
-  return maybeClassList.classList?.contains?.('hidden') === true;
-}
-
-function hasHiddenAttribute(element: Element): boolean {
-  const maybeElement = element as Element & {
-    hasAttribute?: (qualifiedName: string) => boolean;
-    getAttribute?: (qualifiedName: string) => string | null;
-  };
-
-  if (maybeElement.hasAttribute?.('hidden') === true) {
-    return true;
+function isIndicatorVisible(element: Element): boolean {
+  if (element.classList?.contains?.('hidden')) {
+    return false;
+  }
+  if (element.hasAttribute?.('hidden') || element.getAttribute?.('aria-hidden') === 'true') {
+    return false;
   }
 
-  return maybeElement.getAttribute?.('aria-hidden') === 'true';
-}
-
-function isStyleVisible(element: Element): boolean {
   if (typeof window === 'undefined' || typeof window.getComputedStyle !== 'function') {
     return true;
   }
 
   const computed = window.getComputedStyle(element);
-  if (computed.display === 'none') {
-    return false;
-  }
-  if (computed.visibility === 'hidden' || computed.visibility === 'collapse') {
-    return false;
-  }
-  if (computed.opacity === '0') {
-    return false;
-  }
-
-  return true;
-}
-
-function isIndicatorVisible(element: Element): boolean {
-  if (hasHiddenAttribute(element) || hasHiddenClass(element)) {
-    return false;
-  }
-  return isStyleVisible(element);
+  return computed.display !== 'none'
+    && computed.visibility !== 'hidden'
+    && computed.visibility !== 'collapse'
+    && computed.opacity !== '0';
 }
 
 export function isStreaming(indicatorSelectors: string[]): boolean {

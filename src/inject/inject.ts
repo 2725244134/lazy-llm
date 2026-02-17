@@ -178,31 +178,18 @@ async function waitForComplete(
   timeoutMs: number,
   pollIntervalMs: number
 ): Promise<ExtractResult> {
-  const startTime = Date.now();
+  const deadline = Date.now() + timeoutMs;
 
-  return new Promise((resolve) => {
-    const poll = () => {
-      const result = handleExtractResponse(config, provider);
-
-      if (result.isComplete) {
-        resolve(result);
-        return;
-      }
-
-      if (Date.now() - startTime > timeoutMs) {
-        resolve({
-          ...result,
-          success: false,
-          reason: 'Timeout waiting for response completion',
-        });
-        return;
-      }
-
-      setTimeout(poll, pollIntervalMs);
-    };
-
-    poll();
-  });
+  while (true) {
+    const result = handleExtractResponse(config, provider);
+    if (result.isComplete) {
+      return result;
+    }
+    if (Date.now() > deadline) {
+      return { ...result, success: false, reason: 'Timeout waiting for response completion' };
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
 }
 
 (() => {

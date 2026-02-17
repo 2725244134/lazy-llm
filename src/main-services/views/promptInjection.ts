@@ -20,69 +20,49 @@ function normalizePromptText(text: string): string {
   return prompt;
 }
 
-export function buildPromptInjectionEvalScript(text: string): string {
-  const prompt = normalizePromptText(text);
-  const serializedPrompt = JSON.stringify(prompt);
-
+function wrapBridgeEval(bridgeMethod: string, body: string): string {
   return `
 (() => {
   const bridge = window.__llmBridge;
-  if (!bridge || typeof bridge.injectPrompt !== "function") {
-    return { success: false, reason: "window.__llmBridge.injectPrompt is unavailable" };
+  if (!bridge || typeof bridge.${bridgeMethod} !== "function") {
+    return { success: false, reason: "window.__llmBridge.${bridgeMethod} is unavailable" };
   }
+${body}
+})();
+`;
+}
 
-  const result = bridge.injectPrompt(${serializedPrompt}, true);
+export function buildPromptInjectionEvalScript(text: string): string {
+  const serialized = JSON.stringify(normalizePromptText(text));
+  return wrapBridgeEval('injectPrompt', `
+  const result = bridge.injectPrompt(${serialized}, true);
   if (!result || result.success !== true) {
     const reason = result && typeof result.reason === "string"
       ? result.reason
       : "injectPrompt returned an unsuccessful result";
     return { success: false, reason };
   }
-
-  return { success: true };
-})();
-`;
-}
-
-function normalizeDraftText(text: string): string {
-  if (typeof text !== 'string') {
-    throw new Error('prompt draft text must be a string');
-  }
-  return text;
+  return { success: true };`);
 }
 
 export function buildPromptDraftSyncEvalScript(text: string): string {
-  const promptDraft = normalizeDraftText(text);
-  const serializedPromptDraft = JSON.stringify(promptDraft);
-
-  return `
-(() => {
-  const bridge = window.__llmBridge;
-  if (!bridge || typeof bridge.injectPrompt !== "function") {
-    return { success: false, reason: "window.__llmBridge.injectPrompt is unavailable" };
+  if (typeof text !== 'string') {
+    throw new Error('prompt draft text must be a string');
   }
-
-  const result = bridge.injectPrompt(${serializedPromptDraft}, false);
+  const serialized = JSON.stringify(text);
+  return wrapBridgeEval('injectPrompt', `
+  const result = bridge.injectPrompt(${serialized}, false);
   if (!result || result.success !== true) {
     const reason = result && typeof result.reason === "string"
       ? result.reason
       : "injectPrompt returned an unsuccessful result";
     return { success: false, reason };
   }
-
-  return { success: true };
-})();
-`;
+  return { success: true };`);
 }
 
 export function buildPromptStatusEvalScript(): string {
-  return `
-(() => {
-  const bridge = window.__llmBridge;
-  if (!bridge || typeof bridge.getStatus !== "function") {
-    return { success: false, reason: "window.__llmBridge.getStatus is unavailable" };
-  }
-
+  return wrapBridgeEval('getStatus', `
   try {
     const status = bridge.getStatus();
     const isStreaming = status && typeof status.isStreaming === "boolean"
@@ -113,7 +93,5 @@ export function buildPromptStatusEvalScript(): string {
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
     return { success: false, reason };
-  }
-})();
-`;
+  }`);
 }
