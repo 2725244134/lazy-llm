@@ -20,3 +20,5 @@ export {
   DEFAULT_PANE_PROVIDER_KEYS,
 } from './providers';
 export type { ProviderCatalogEntry, ProviderKey } from './providers';
+export { normalizeProviderSequence, padProviderSequence } from './providerSequence';
+export type { NormalizeProviderSequenceOptions, ProviderFallbackStrategy } from './providerSequence';

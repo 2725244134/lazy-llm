@@ -2,6 +2,10 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve } from 'path';
 import type { AppConfig } from '@shared-contracts/ipc/contracts';
 import { APP_CONFIG } from '@shared-config/src/app.js';
+import {
+  normalizeProviderSequence as normalizeProviderSequenceByRule,
+  padProviderSequence as padProviderSequenceByRule,
+} from '@shared-config/src/providerSequence.js';
 
 export const CANONICAL_PROVIDERS: AppConfig['provider']['catalog'] = [
   ...APP_CONFIG.providers.catalog.map((provider) => ({ ...provider })),
@@ -45,27 +49,20 @@ if (mockProvidersFile && mockProvidersFile.trim().length > 0) {
 const FALLBACK_PROVIDER_KEY =
   CANONICAL_PROVIDERS[0]?.key ?? APP_CONFIG.providers.catalog[0]?.key ?? 'chatgpt';
 
-const VALID_PROVIDER_KEYS = new Set(CANONICAL_PROVIDERS.map((provider) => provider.key));
+const VALID_PROVIDER_KEYS = CANONICAL_PROVIDERS.map((provider) => provider.key);
 
 export function padProviderSequence(providers: readonly string[], paneCount: number): string[] {
-  const fallbackProvider = providers[0] ?? FALLBACK_PROVIDER_KEY;
-  return Array.from({ length: paneCount }, (_, paneIndex) => {
-    return providers[paneIndex] ?? fallbackProvider;
-  });
+  return padProviderSequenceByRule(providers, paneCount, FALLBACK_PROVIDER_KEY);
 }
 
 export function buildDefaultPaneProviders(paneCount: number): string[] {
-  return padProviderSequence(APP_CONFIG.providers.defaultPaneKeys, paneCount);
+  return padProviderSequenceByRule(APP_CONFIG.providers.defaultPaneKeys, paneCount, FALLBACK_PROVIDER_KEY);
 }
 
 export function normalizeProviderSequence(providers: unknown, paneCount: number): string[] {
-  const source = Array.isArray(providers) ? providers : [];
-
-  return Array.from({ length: paneCount }, (_, paneIndex) => {
-    const candidate = source[paneIndex];
-    if (typeof candidate === 'string' && VALID_PROVIDER_KEYS.has(candidate)) {
-      return candidate;
-    }
-    return FALLBACK_PROVIDER_KEY;
+  return normalizeProviderSequenceByRule(providers, paneCount, {
+    validProviderKeys: VALID_PROVIDER_KEYS,
+    fallbackProviderKey: FALLBACK_PROVIDER_KEY,
+    fallbackStrategy: 'global',
   });
 }

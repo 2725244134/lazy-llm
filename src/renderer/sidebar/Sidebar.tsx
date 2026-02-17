@@ -10,6 +10,7 @@ import { APP_CONFIG } from '@/config';
 import { resolveSidebarUiDensity } from '@/config/layout';
 import { getSidebarRuntime } from '@/runtime/sidebar';
 import { ACTIVE_THEME_PRESET, getSidebarThemeVars } from '@/theme/palette';
+import { normalizePaneProviderSequence } from '@/features/providers/paneProviders';
 import { PaneSelector } from './PaneSelector';
 import { ProviderList } from './ProviderList';
 import { PromptComposer } from './PromptComposer';
@@ -20,31 +21,12 @@ import { useSidebarLayoutSync } from './useSidebarLayoutSync';
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
 
-function normalizePaneCount(count: number): PaneCount {
+function clampPaneCount(count: number): PaneCount {
   const normalized = Math.min(
     APP_CONFIG.layout.pane.maxCount,
     Math.max(APP_CONFIG.layout.pane.minCount, Math.floor(count)),
   );
   return normalized as PaneCount;
-}
-
-const providerKeySet: Set<string> = new Set(
-  APP_CONFIG.providers.catalog.map((provider) => provider.key),
-);
-const fallbackProvider = APP_CONFIG.providers.defaultPaneKeys[0] ?? 'chatgpt';
-
-function normalizeProviderSequence(providers: readonly string[], paneCount: PaneCount): string[] {
-  const firstProvider = providers[0] && providerKeySet.has(providers[0])
-    ? providers[0]
-    : fallbackProvider;
-
-  return Array.from({ length: paneCount }, (_, paneIndex) => {
-    const candidate = providers[paneIndex];
-    if (typeof candidate === 'string' && providerKeySet.has(candidate)) {
-      return candidate;
-    }
-    return firstProvider;
-  });
 }
 
 export function Sidebar() {
@@ -164,14 +146,14 @@ export function Sidebar() {
   const setPaneCount = useCallback(
     async (count: number) => {
       const oldCount = paneCountRef.current;
-      const oldProviders = normalizeProviderSequence(activeProvidersRef.current, oldCount);
+      const oldProviders = normalizePaneProviderSequence(activeProvidersRef.current, oldCount);
 
-      const newCount = normalizePaneCount(count);
+      const newCount = clampPaneCount(count);
       if (newCount === oldCount) {
         return;
       }
 
-      const nextProviders = normalizeProviderSequence(activeProvidersRef.current, newCount);
+      const nextProviders = normalizePaneProviderSequence(activeProvidersRef.current, newCount);
 
       paneCountRef.current = newCount;
       setPaneCountState(newCount);
@@ -217,7 +199,10 @@ export function Sidebar() {
       try {
         await runtime.updateProvider(paneIndex, providerKey);
 
-        const nextProviders = normalizeProviderSequence(activeProvidersRef.current, paneCountRef.current);
+        const nextProviders = normalizePaneProviderSequence(
+          activeProvidersRef.current,
+          paneCountRef.current,
+        );
         nextProviders[paneIndex] = providerKey;
         activeProvidersRef.current = nextProviders;
         setActiveProviders(nextProviders);

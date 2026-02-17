@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { APP_CONFIG } from '@/config';
+import { normalizePaneProviderSequence } from '@/features/providers/paneProviders';
 import type { AppConfig } from '@/runtime/sidebar';
 import type { PaneCount } from '../sidebar/context';
 
@@ -10,10 +11,6 @@ const paneMin = APP_CONFIG.layout.pane.minCount;
 const paneMax = APP_CONFIG.layout.pane.maxCount;
 const sidebarMin = APP_CONFIG.layout.sidebar.minExpandedWidth;
 const sidebarMax = APP_CONFIG.layout.sidebar.maxExpandedWidth;
-
-const providerKeys = APP_CONFIG.providers.catalog.map((provider) => provider.key);
-const providerKeySet: Set<string> = new Set(providerKeys);
-const fallbackProvider = APP_CONFIG.providers.defaultPaneKeys[0] ?? providerKeys[0] ?? 'chatgpt';
 
 const uiSettingsSchema = z.object({
   version: z.literal(SETTINGS_VERSION).default(SETTINGS_VERSION),
@@ -45,20 +42,6 @@ function normalizePaneCount(count: number): PaneCount {
 
 function normalizeSidebarWidth(width: number): number {
   return Math.max(sidebarMin, Math.min(sidebarMax, Math.floor(width)));
-}
-
-function normalizePaneProviders(providers: readonly string[], paneCount: PaneCount): string[] {
-  const firstProvider = providers[0] && providerKeySet.has(providers[0])
-    ? providers[0]
-    : fallbackProvider;
-
-  return Array.from({ length: paneCount }, (_, paneIndex) => {
-    const candidate = providers[paneIndex];
-    if (typeof candidate === 'string' && providerKeySet.has(candidate)) {
-      return candidate;
-    }
-    return firstProvider;
-  });
 }
 
 export function loadUiSettings(): UiSettings {
@@ -101,7 +84,7 @@ export function resolveStartupState(config: AppConfig): ResolvedUiState {
   );
 
   const paneProvidersSource = localSettings.providers.paneKeys ?? config.provider.panes;
-  const paneProviders = normalizePaneProviders(paneProvidersSource, paneCount);
+  const paneProviders = normalizePaneProviderSequence(paneProvidersSource, paneCount);
 
   return {
     paneCount,
