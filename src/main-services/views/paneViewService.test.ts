@@ -74,6 +74,7 @@ function createFakePaneView(webContentsId: number): WebContentsView {
   return {
     webContents: createFakePaneWebContents(webContentsId),
     setBounds: vi.fn(),
+    getBounds: vi.fn(() => ({ x: 160, y: 24, width: 1024, height: 768 })),
   } as unknown as WebContentsView;
 }
 
@@ -178,7 +179,7 @@ describe('PaneViewService', () => {
     expect(onPaneShortcutAction).toHaveBeenCalledWith('toggleQuickPrompt', paneContents);
   });
 
-  it('builds and pops pane context menu with rounded coordinates', () => {
+  it('builds and pops pane context menu using host-window coordinates', () => {
     const { service, createPaneContextMenu, contextMenuPopup, hostWindow } = createHarness();
     const view = service.createPaneWebContentsView(0);
     const paneContents = view.webContents as FakePaneWebContents;
@@ -195,8 +196,8 @@ describe('PaneViewService', () => {
     expect(contextMenuPopup).toHaveBeenCalledWith({
       window: hostWindow,
       frame: undefined,
-      x: 12,
-      y: 44,
+      x: 172,
+      y: 68,
       sourceType: 'mouse',
     });
   });

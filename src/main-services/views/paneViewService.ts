@@ -54,7 +54,7 @@ export class PaneViewService {
         });
 
     this.attachPaneShortcutHooks(view.webContents);
-    this.attachPaneContextMenuHooks(view.webContents);
+    this.attachPaneContextMenuHooks(view);
     this.attachPaneRuntimePreferenceHooks(view.webContents);
     this.attachPaneDebugConsoleHooks(paneIndex, view.webContents);
     this.options.paneLoadMonitor.attachPane(paneIndex, view.webContents);
@@ -165,19 +165,23 @@ export class PaneViewService {
     });
   }
 
-  private attachPaneContextMenuHooks(webContents: WebContents): void {
+  private attachPaneContextMenuHooks(view: WebContentsView): void {
+    const { webContents } = view;
     webContents.on('context-menu', (_event: Event, params: ContextMenuParams) => {
       if (webContents.isDestroyed()) {
         return;
       }
+      const paneBounds = view.getBounds();
+      const popupX = Math.floor(paneBounds.x + params.x);
+      const popupY = Math.floor(paneBounds.y + params.y);
       const menu = this.options.createPaneContextMenu
         ? this.options.createPaneContextMenu(webContents, params)
         : this.buildPaneContextMenu(webContents, params);
       menu.popup({
         window: this.options.hostWindow,
         frame: params.frame ?? undefined,
-        x: Math.floor(params.x),
-        y: Math.floor(params.y),
+        x: popupX,
+        y: popupY,
         sourceType: params.menuSourceType,
       });
     });
