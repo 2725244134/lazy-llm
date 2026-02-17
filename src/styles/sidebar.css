@@ -584,6 +584,29 @@
   box-shadow: 0 4px 12px rgba(235, 188, 186, 0.12);
 }
 
+.queue-round-prompt {
+  margin: 0;
+  padding: 7px 8px;
+  border: 1.5px solid rgba(229, 231, 235, 0.9);
+  border-radius: 8px;
+  background: rgba(243, 244, 246, 0.52);
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.queue-round-prompt.is-mixed {
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
 .queue-round-header {
   display: flex;
   flex-wrap: wrap;
@@ -976,6 +999,7 @@
 .sidebar.is-compact .queue-round-count,
 .sidebar.is-compact .queue-round-panes,
 .sidebar.is-compact .queue-round-wait,
+.sidebar.is-compact .queue-round-prompt,
 .sidebar.is-compact .queue-item-wait,
 .sidebar.is-compact .queue-item-text,
 .sidebar.is-compact .queue-empty {
@@ -985,6 +1009,7 @@
 .sidebar.is-tight .queue-round-count,
 .sidebar.is-tight .queue-round-panes,
 .sidebar.is-tight .queue-round-wait,
+.sidebar.is-tight .queue-round-prompt,
 .sidebar.is-tight .queue-item-wait,
 .sidebar.is-tight .queue-item-text,
 .sidebar.is-tight .queue-empty {

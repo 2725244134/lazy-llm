@@ -59,4 +59,37 @@ test.describe('E2E / Sidebar Queue', () => {
     await expect(appWindow.locator(selectors.queueRoundRemove).first()).toBeVisible();
     await expect(appWindow.locator(selectors.queueItemRemove)).toBeVisible();
   });
+
+  test('queue round shows shared prompt once when all pane targets have same message', async ({ appWindow }) => {
+    await appWindow.evaluate(() => {
+      window.dispatchEvent(
+        new CustomEvent('lazyllm:quick-prompt-queue', {
+          detail: {
+            entries: [
+              {
+                queueItemId: 'q-21',
+                roundId: 1,
+                paneIndex: 0,
+                text: 'same prompt for all panes',
+                queuedAtMs: Date.now() - 2_000,
+              },
+              {
+                queueItemId: 'q-22',
+                roundId: 1,
+                paneIndex: 1,
+                text: 'same prompt for all panes',
+                queuedAtMs: Date.now() - 1_800,
+              },
+            ],
+          },
+        }),
+      );
+    });
+
+    await expect(appWindow.locator(selectors.queueRound)).toHaveCount(1);
+    await expect(appWindow.locator(selectors.queueRoundPrompt)).toHaveCount(1);
+    await expect(appWindow.locator(selectors.queueRoundPrompt)).toContainText('same prompt for all panes');
+    await expect(appWindow.locator(selectors.queueItem)).toHaveCount(2);
+    await expect(appWindow.locator(selectors.queueItemText)).toHaveCount(0);
+  });
 });

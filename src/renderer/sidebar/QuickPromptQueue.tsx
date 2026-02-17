@@ -237,12 +237,20 @@ export function QuickPromptQueue() {
               const groupRoundLabel = `Round ${roundIndex + 1}`;
               const paneCountInRound = new Set(group.entries.map((entry) => entry.paneIndex)).size;
               const paneLabelInRound = paneCountInRound === 1 ? '1 pane' : `${paneCountInRound} panes`;
+              const targetLabel = group.entries.length === 1 ? '1 target' : `${group.entries.length} targets`;
               const oldestQueuedAtMs = Math.min(...group.entries.map((entry) => entry.queuedAtMs));
               const roundWaitLabel = formatQueueAgeLabel(oldestQueuedAtMs, nowMs);
               const isExpanded = expandedRoundIds.has(group.roundId);
               const isLatestRound = latestRoundId !== null && latestRoundId === group.roundId;
               const hasNextEntry = nextQueueItemId !== null
                 && group.entries.some((entry) => entry.queueItemId === nextQueueItemId);
+              const uniqueRoundTexts = Array.from(
+                new Set(group.entries.map((entry) => entry.text.trim())),
+              );
+              const hasMixedRoundText = uniqueRoundTexts.length > 1;
+              const sharedRoundText = hasMixedRoundText
+                ? `${uniqueRoundTexts.length} prompt variants`
+                : uniqueRoundTexts[0] ?? '';
               const roundClassName = `queue-round${isExpanded ? ' is-expanded' : ''}${isLatestRound ? ' is-latest' : ''}`;
               return (
                 <li key={group.roundId} className={roundClassName}>
@@ -267,7 +275,7 @@ export function QuickPromptQueue() {
                         {groupRoundLabel}
                       </button>
                       <div className="queue-round-meta">
-                        <span className="queue-round-count">{group.entries.length} items</span>
+                        <span className="queue-round-count">{targetLabel}</span>
                         <span className="queue-round-separator">•</span>
                         <span className="queue-round-panes">{paneLabelInRound}</span>
                         <span className="queue-round-separator">•</span>
@@ -299,6 +307,12 @@ export function QuickPromptQueue() {
                         Remove round
                       </button>
                     </div>
+                    <p
+                      className={hasMixedRoundText ? 'queue-round-prompt is-mixed' : 'queue-round-prompt'}
+                      title={hasMixedRoundText ? undefined : sharedRoundText}
+                    >
+                      {sharedRoundText}
+                    </p>
                     {isExpanded ? (
                       <ol className="queue-items">
                         {group.entries.map((entry) => {
@@ -330,9 +344,11 @@ export function QuickPromptQueue() {
                                   </button>
                                 </div>
                               </div>
-                              <p className="queue-item-text" title={entry.text}>
-                                {entry.text}
-                              </p>
+                              {hasMixedRoundText ? (
+                                <p className="queue-item-text" title={entry.text}>
+                                  {entry.text}
+                                </p>
+                              ) : null}
                             </li>
                           );
                         })}
