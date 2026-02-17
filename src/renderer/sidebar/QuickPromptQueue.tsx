@@ -6,11 +6,6 @@ import type {
 } from '@shared-contracts/ipc/contracts';
 import { SidebarSection } from './SidebarSection';
 
-interface PaneQueueGroup {
-  paneIndex: number;
-  entries: QuickPromptQueueEntry[];
-}
-
 function normalizeQuickPromptQueueSnapshot(detail: unknown): QuickPromptQueueSnapshot {
   if (!detail || typeof detail !== 'object') {
     return { entries: [] };
@@ -50,33 +45,13 @@ function normalizeQuickPromptQueueSnapshot(detail: unknown): QuickPromptQueueSna
   }
 
   entries.sort((left, right) => {
-    if (left.paneIndex !== right.paneIndex) {
-      return left.paneIndex - right.paneIndex;
+    if (left.queuedAtMs !== right.queuedAtMs) {
+      return left.queuedAtMs - right.queuedAtMs;
     }
-    return left.queuedAtMs - right.queuedAtMs;
+    return left.paneIndex - right.paneIndex;
   });
 
   return { entries };
-}
-
-function groupEntriesByPane(entries: QuickPromptQueueEntry[]): PaneQueueGroup[] {
-  const grouped = new Map<number, QuickPromptQueueEntry[]>();
-
-  for (const entry of entries) {
-    const paneEntries = grouped.get(entry.paneIndex);
-    if (!paneEntries) {
-      grouped.set(entry.paneIndex, [entry]);
-      continue;
-    }
-    paneEntries.push(entry);
-  }
-
-  return Array.from(grouped.entries())
-    .sort(([leftPaneIndex], [rightPaneIndex]) => leftPaneIndex - rightPaneIndex)
-    .map(([paneIndex, paneEntries]) => ({
-      paneIndex,
-      entries: paneEntries,
-    }));
 }
 
 function formatQueueAgeLabel(queuedAtMs: number, nowMs: number): string {
@@ -137,15 +112,16 @@ export function QuickPromptQueue() {
     };
   }, [entries.length]);
 
-  const paneGroups = useMemo(() => groupEntriesByPane(entries), [entries]);
+  const paneCount = useMemo(() => {
+    return new Set(entries.map((entry) => entry.paneIndex)).size;
+  }, [entries]);
   const totalEntries = entries.length;
-  const totalPanes = paneGroups.length;
   const pendingLabel = totalEntries === 1
     ? '1 pending message'
     : `${totalEntries} pending messages`;
-  const paneLabel = totalPanes === 1
+  const paneLabel = paneCount === 1
     ? '1 pane'
-    : `${totalPanes} panes`;
+    : `${paneCount} panes`;
 
   return (
     <SidebarSection title="QUEUE">
@@ -154,48 +130,38 @@ export function QuickPromptQueue() {
           <span className="queue-summary-count">{pendingLabel}</span>
           <span className="queue-summary-separator">•</span>
           <span className="queue-summary-panes">{paneLabel}</span>
+          <span className="queue-summary-separator">•</span>
+          <span className="queue-summary-mode">FIFO</span>
         </div>
         {entries.length === 0 ? (
           <p className="queue-empty">No pending quick prompt.</p>
         ) : (
-          <div className="queue-groups">
-            {paneGroups.map((group) => {
+          <ol className="queue-items">
+            {entries.map((entry, index) => {
+              const waitLabel = formatQueueAgeLabel(entry.queuedAtMs, nowMs);
+              const orderLabel = index === 0 ? 'Next' : `#${index + 1}`;
+              const itemClassName = index === 0
+                ? 'queue-item is-next'
+                : 'queue-item';
               return (
-                <section
-                  key={`pane-${group.paneIndex}`}
-                  className="queue-group"
+                <li
+                  key={`${entry.paneIndex}:${entry.queuedAtMs}:${index}`}
+                  className={itemClassName}
                 >
-                  <div className="queue-group-header">
-                    <span className="queue-group-title">Pane {group.paneIndex + 1}</span>
-                    <span className="queue-group-count">{group.entries.length}</span>
+                  <div className="queue-item-header">
+                    <div className="queue-item-leading">
+                      <span className="queue-item-order">{orderLabel}</span>
+                      <span className="queue-item-pane">Pane {entry.paneIndex + 1}</span>
+                    </div>
+                    <span className="queue-item-wait">{waitLabel}</span>
                   </div>
-                  <div className="queue-group-items">
-                    {group.entries.map((entry, index) => {
-                      const waitLabel = formatQueueAgeLabel(entry.queuedAtMs, nowMs);
-                      const orderLabel = index === 0 ? 'Next' : `#${index + 1}`;
-                      const itemClassName = index === 0
-                        ? 'queue-item is-next'
-                        : 'queue-item';
-                      return (
-                        <article
-                          key={`${entry.paneIndex}:${entry.queuedAtMs}:${index}`}
-                          className={itemClassName}
-                        >
-                          <div className="queue-item-header">
-                            <span className="queue-item-order">{orderLabel}</span>
-                            <span className="queue-item-wait">Waiting {waitLabel}</span>
-                          </div>
-                          <p className="queue-item-text" title={entry.text}>
-                            {entry.text}
-                          </p>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
+                  <p className="queue-item-text" title={entry.text}>
+                    {entry.text}
+                  </p>
+                </li>
               );
             })}
-          </div>
+          </ol>
         )}
       </div>
     </SidebarSection>

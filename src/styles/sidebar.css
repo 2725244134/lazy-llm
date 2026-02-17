@@ -508,6 +508,14 @@
   color: var(--text-muted);
 }
 
+.queue-summary-mode {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.35px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
 .queue-empty {
   margin: 0;
   padding: 10px;
@@ -519,52 +527,13 @@
   line-height: 1.5;
 }
 
-.queue-groups {
+.queue-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-
-.queue-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 9px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  background: rgba(243, 244, 246, 0.4);
-}
-
-.queue-group-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.queue-group-title {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.45px;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-.queue-group-count {
-  min-width: 22px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--accent);
-  text-align: center;
-  background: rgba(235, 188, 186, 0.2);
-}
-
-.queue-group-items {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .queue-item {
@@ -599,6 +568,13 @@
   gap: 10px;
 }
 
+.queue-item-leading {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
 .queue-item-order {
   display: inline-flex;
   align-items: center;
@@ -612,6 +588,15 @@
   text-transform: uppercase;
   background: rgba(235, 188, 186, 0.14);
   color: var(--accent);
+}
+
+.queue-item-pane {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.38px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .queue-item-wait {
@@ -786,14 +771,12 @@
 }
 
 .sidebar.is-compact .queue-empty,
-.sidebar.is-compact .queue-group,
 .sidebar.is-compact .queue-item {
   padding: 9px;
   border-radius: 9px;
 }
 
 .sidebar.is-tight .queue-empty,
-.sidebar.is-tight .queue-group,
 .sidebar.is-tight .queue-item {
   padding: 8px;
   border-radius: 8px;
@@ -801,6 +784,7 @@
 
 .sidebar.is-compact .queue-summary-count,
 .sidebar.is-compact .queue-summary-panes,
+.sidebar.is-compact .queue-summary-mode,
 .sidebar.is-compact .queue-item-wait,
 .sidebar.is-compact .queue-item-text,
 .sidebar.is-compact .queue-empty {
@@ -809,17 +793,15 @@
 
 .sidebar.is-tight .queue-summary-count,
 .sidebar.is-tight .queue-summary-panes,
+.sidebar.is-tight .queue-summary-mode,
 .sidebar.is-tight .queue-item-wait,
 .sidebar.is-tight .queue-item-text,
 .sidebar.is-tight .queue-empty {
   font-size: 11px;
 }
 
-.sidebar.is-compact .queue-group-title {
-  font-size: 10px;
-}
-
-.sidebar.is-tight .queue-group-title {
+.sidebar.is-compact .queue-item-pane,
+.sidebar.is-tight .queue-item-pane {
   font-size: 10px;
 }
 
