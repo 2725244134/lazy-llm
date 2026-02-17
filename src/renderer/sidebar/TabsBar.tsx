@@ -25,6 +25,7 @@ export function TabsBar() {
                 role="tab"
                 aria-selected={isActive}
                 className="tab-chip-main"
+                title={tabLabels[tab.id] ?? tab.id}
                 onClick={() => {
                   void sidebar.switchTab(tab.id);
                 }}

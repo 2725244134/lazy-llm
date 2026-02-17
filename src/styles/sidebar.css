@@ -218,7 +218,8 @@
 }
 
 .tabs-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   margin-bottom: 14px;
@@ -231,7 +232,9 @@
   flex: 1;
   min-width: 0;
   overflow-x: auto;
+  overflow-y: hidden;
   padding-bottom: 2px;
+  overscroll-behavior-x: contain;
 }
 
 .tabs-strip::-webkit-scrollbar {
@@ -246,7 +249,9 @@
 .tab-chip {
   display: inline-flex;
   align-items: center;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: 76px;
+  max-width: 112px;
   border: 1.5px solid var(--border);
   background: var(--bg);
   border-radius: 999px;
@@ -262,6 +267,7 @@
 }
 
 .tab-chip-main {
+  display: block;
   border: none;
   background: transparent;
   color: var(--text-muted);
@@ -270,8 +276,11 @@
   letter-spacing: 0.2px;
   padding: 6px 9px;
   cursor: pointer;
-  min-width: 0;
+  min-width: 44px;
+  max-width: 72px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tab-chip.active .tab-chip-main {
@@ -279,6 +288,7 @@
 }
 
 .tab-chip-close {
+  flex: 0 0 auto;
   border: none;
   border-left: 1px solid var(--border);
   background: transparent;
@@ -294,6 +304,7 @@
 }
 
 .tab-add-btn {
+  flex: 0 0 auto;
   width: 28px;
   height: 28px;
   border-radius: 999px;
@@ -994,14 +1005,28 @@
   gap: 4px;
 }
 
+.sidebar.is-compact .tab-chip {
+  min-width: 68px;
+  max-width: 100px;
+}
+
 .sidebar.is-compact .tab-chip-main {
   font-size: 11px;
   padding: 5px 8px;
+  min-width: 40px;
+  max-width: 62px;
 }
 
 .sidebar.is-tight .tab-chip-main {
   font-size: 10px;
   padding: 4px 7px;
+  min-width: 34px;
+  max-width: 54px;
+}
+
+.sidebar.is-tight .tab-chip {
+  min-width: 60px;
+  max-width: 88px;
 }
 
 .sidebar.is-compact .tab-chip-close {
