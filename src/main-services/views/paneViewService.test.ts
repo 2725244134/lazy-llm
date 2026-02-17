@@ -7,7 +7,8 @@ type PaneHookEvent =
   | 'did-finish-load'
   | 'focus'
   | 'before-input-event'
-  | 'context-menu';
+  | 'context-menu'
+  | 'console-message';
 
 type PaneHookListeners = {
   [event in PaneHookEvent]: Array<(...args: unknown[]) => void>;
@@ -23,6 +24,7 @@ function createFakePaneWebContents(id: number): FakePaneWebContents {
     focus: [],
     'before-input-event': [],
     'context-menu': [],
+    'console-message': [],
   };
   const getUserAgent = vi.fn(() => 'fake-user-agent');
   const setUserAgent = vi.fn();

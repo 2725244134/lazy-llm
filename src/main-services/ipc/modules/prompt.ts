@@ -1,6 +1,11 @@
 import { ipcMain } from 'electron';
-import type { PromptRequest, PromptSyncRequest } from '@shared-contracts/ipc/contracts';
+import type {
+  PromptAttachImageRequest,
+  PromptRequest,
+  PromptSyncRequest,
+} from '@shared-contracts/ipc/contracts';
 import { IPC_CHANNELS } from '@shared-contracts/ipc/contracts';
+import { normalizePromptImagePayload, validatePromptImagePayload } from '@shared-contracts/ipc/promptImage';
 import type { IpcRuntimeContext } from '../context.js';
 
 export function registerPromptIpcHandlers(context: IpcRuntimeContext): void {
@@ -10,9 +15,51 @@ export function registerPromptIpcHandlers(context: IpcRuntimeContext): void {
       return { success: false, failures: ['no-view-manager'] };
     }
 
-    const text = typeof request?.text === 'string' ? request.text : '';
-    return viewManager.sendPromptToAll(text);
+    const normalizedRequest: PromptRequest = {
+      text: typeof request?.text === 'string' ? request.text : '',
+      image: normalizePromptImagePayload(request?.image) ?? undefined,
+    };
+    console.info('[QuickPromptDebug][IPC] PROMPT_SEND received', {
+      textLength: normalizedRequest.text.length,
+      hasImage: normalizedRequest.image !== null,
+      imageMimeType: normalizedRequest.image?.mimeType ?? null,
+      imageSizeBytes: normalizedRequest.image?.sizeBytes ?? null,
+      imageBase64Length: normalizedRequest.image?.base64Data.length ?? null,
+    });
+    return viewManager.sendPromptToAll(normalizedRequest);
   });
+
+  ipcMain.handle(
+    IPC_CHANNELS.PROMPT_ATTACH_IMAGE,
+    async (_event, request: PromptAttachImageRequest) => {
+      const viewManager = context.getViewManager();
+      if (!viewManager) {
+        return { success: false, failures: ['no-view-manager'] };
+      }
+
+      const normalizedImage = normalizePromptImagePayload(request?.image);
+      console.info('[QuickPromptDebug][IPC] PROMPT_ATTACH_IMAGE received', {
+        hasImage: normalizedImage !== null,
+        imageMimeType: normalizedImage?.mimeType ?? null,
+        imageSizeBytes: normalizedImage?.sizeBytes ?? null,
+        imageBase64Length: normalizedImage?.base64Data.length ?? null,
+      });
+
+      if (!normalizedImage) {
+        const validation = validatePromptImagePayload(request?.image);
+        return {
+          success: false,
+          failures: [
+            validation.ok
+              ? 'invalid-prompt-image: prompt image payload is invalid'
+              : `invalid-prompt-image: ${validation.reason}`,
+          ],
+        };
+      }
+
+      return viewManager.attachPromptImageToAll(normalizedImage);
+    }
+  );
 
   ipcMain.handle(IPC_CHANNELS.PROMPT_SYNC_DRAFT, async (_event, request: PromptSyncRequest) => {
     const viewManager = context.getViewManager();

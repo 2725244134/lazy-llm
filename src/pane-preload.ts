@@ -4,7 +4,13 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS } from '@shared-contracts/ipc/contracts';
+import {
+  IPC_CHANNELS,
+  type PaneStagePromptImageAckPayload,
+  type PaneStagePromptImagePayload,
+  type PromptImagePayload,
+} from '@shared-contracts/ipc/contracts';
+import { normalizePromptImagePayload } from '@shared-contracts/ipc/promptImage';
 
 // Get pane index from additionalArguments (injected by main process via webPreferences)
 function getPaneIndex(): number {
@@ -19,6 +25,64 @@ function getPaneIndex(): number {
 }
 
 const paneIndex = getPaneIndex();
+const stagedPromptImages = new Map<string, PromptImagePayload>();
+const MAX_STAGED_PROMPT_IMAGES = 32;
+
+function trimStagedPromptImages(): void {
+  while (stagedPromptImages.size > MAX_STAGED_PROMPT_IMAGES) {
+    const oldestToken = stagedPromptImages.keys().next().value;
+    if (typeof oldestToken !== 'string') {
+      break;
+    }
+    stagedPromptImages.delete(oldestToken);
+  }
+}
+
+function sendPromptImageStageAck(payload: PaneStagePromptImageAckPayload): void {
+  ipcRenderer.send(IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE_ACK, payload);
+}
+
+ipcRenderer.on(
+  IPC_CHANNELS.PANE_STAGE_PROMPT_IMAGE,
+  (_event, payload: PaneStagePromptImagePayload) => {
+    const requestId = typeof payload?.requestId === 'string' ? payload.requestId : '';
+    const consumeToken = typeof payload?.consumeToken === 'string'
+      ? payload.consumeToken
+      : '';
+    if (!requestId) {
+      return;
+    }
+
+    if (!consumeToken) {
+      sendPromptImageStageAck({
+        requestId,
+        paneIndex,
+        success: false,
+        reason: 'invalid prompt image consume token',
+      });
+      return;
+    }
+
+    const normalizedImage = normalizePromptImagePayload(payload?.image);
+    if (!normalizedImage) {
+      sendPromptImageStageAck({
+        requestId,
+        paneIndex,
+        success: false,
+        reason: 'invalid prompt image payload',
+      });
+      return;
+    }
+
+    stagedPromptImages.set(consumeToken, normalizedImage);
+    trimStagedPromptImages();
+    sendPromptImageStageAck({
+      requestId,
+      paneIndex,
+      success: true,
+    });
+  }
+);
 
 const paneAPI = {
   /**
@@ -43,6 +107,20 @@ const paneAPI = {
       paneIndex,
       response,
     });
+  },
+
+  consumeStagedPromptImage: (consumeToken: string): PromptImagePayload | null => {
+    if (typeof consumeToken !== 'string' || !consumeToken) {
+      return null;
+    }
+
+    const image = stagedPromptImages.get(consumeToken);
+    if (!image) {
+      return null;
+    }
+
+    stagedPromptImages.delete(consumeToken);
+    return image;
   },
 };
 
