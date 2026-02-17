@@ -13,12 +13,12 @@ export const inject: ProviderInject = {
     "div[contenteditable='true']",
   ],
   submitSelectors: [
+    'button.composer-submit-button-color',
     "button[data-testid='send-button']",
     "button[data-testid='fruitjuice-send-button']",
-    'button.composer-submit-button-color',
     "button[aria-label*='Send']",
-    "button[aria-label='Start Voice']",
     "form button[type='submit']",
+    "button[aria-label='Start Voice']",
   ],
   responseSelectors: [
     "div[data-message-author-role='assistant'] .markdown",

@@ -14,7 +14,7 @@ export const inject: ProviderInject = {
     "div[contenteditable='true']",
   ],
   submitSelectors: [
-    "button[aria-label='Voice mode']",
+    "button[aria-label='Submit']",
     "button[aria-label*='Submit']",
     "button[aria-label*='Send']",
     "button[aria-label*='send']",
@@ -22,6 +22,7 @@ export const inject: ProviderInject = {
     "button[data-testid*='submit']",
     "button[type='submit']",
     'form button',
+    "button[aria-label='Voice mode']",
   ],
   responseSelectors: [
     '.prose.dark\\:prose-invert',
