@@ -77,13 +77,16 @@ export function setPaneCountWithLifecycle(params: SetPaneCountParams): SetPaneCo
 
   while (paneViews.length < count) {
     const paneIndex = paneViews.length;
-    const providerKey = defaultProviders[paneIndex] ?? fallbackProviderKey;
-    const provider = providers.get(providerKey);
-    const url = provider?.url ?? 'about:blank';
     const stashedPane = callbacks.takeStashedPane?.(paneIndex);
     if (stashedPane) {
+      const fallbackProviderKeyForPane = defaultProviders[paneIndex] ?? fallbackProviderKey;
+      const preferredProviderKey = providers.has(stashedPane.providerKey)
+        ? stashedPane.providerKey
+        : fallbackProviderKeyForPane;
+      const preferredProvider = providers.get(preferredProviderKey);
+      const preferredUrl = preferredProvider?.url ?? 'about:blank';
       stashedPane.paneIndex = paneIndex;
-      const cachedEntry = stashedPane.cachedViews.get(providerKey);
+      const cachedEntry = stashedPane.cachedViews.get(preferredProviderKey);
 
       if (cachedEntry) {
         if (stashedPane.view !== cachedEntry.view) {
@@ -93,18 +96,19 @@ export function setPaneCountWithLifecycle(params: SetPaneCountParams): SetPaneCo
           callbacks.addPaneViewToContent(stashedPane.view);
         }
 
-        const shouldReload = cachedEntry.url !== url;
+        const shouldReload = cachedEntry.url !== preferredUrl;
         if (shouldReload) {
-          cachedEntry.url = url;
+          cachedEntry.url = preferredUrl;
           callbacks.applyPaneRuntimePreferences(cachedEntry.view.webContents);
-          callbacks.loadPaneUrl(paneIndex, cachedEntry.view, url, true);
+          callbacks.loadPaneUrl(paneIndex, cachedEntry.view, preferredUrl, true);
         } else {
           callbacks.clearProviderLoadingTracking(paneIndex);
         }
 
         stashedPane.view = cachedEntry.view;
-        stashedPane.providerKey = providerKey;
+        stashedPane.providerKey = preferredProviderKey;
         stashedPane.url = cachedEntry.url;
+        defaultProviders[paneIndex] = preferredProviderKey;
         callbacks.applyPaneRuntimePreferences(stashedPane.view.webContents);
         paneViews.push(stashedPane);
         continue;
@@ -112,15 +116,19 @@ export function setPaneCountWithLifecycle(params: SetPaneCountParams): SetPaneCo
 
       const nextView = callbacks.createPaneWebContentsView(paneIndex);
       callbacks.addPaneViewToContent(nextView);
-      callbacks.loadPaneUrl(paneIndex, nextView, url, true);
-      stashedPane.cachedViews.set(providerKey, { view: nextView, url });
+      callbacks.loadPaneUrl(paneIndex, nextView, preferredUrl, true);
+      stashedPane.cachedViews.set(preferredProviderKey, { view: nextView, url: preferredUrl });
       stashedPane.view = nextView;
-      stashedPane.providerKey = providerKey;
-      stashedPane.url = url;
+      stashedPane.providerKey = preferredProviderKey;
+      stashedPane.url = preferredUrl;
+      defaultProviders[paneIndex] = preferredProviderKey;
       paneViews.push(stashedPane);
       continue;
     }
 
+    const providerKey = defaultProviders[paneIndex] ?? fallbackProviderKey;
+    const provider = providers.get(providerKey);
+    const url = provider?.url ?? 'about:blank';
     const view = callbacks.createPaneWebContentsView(paneIndex);
     callbacks.addPaneViewToContent(view);
     callbacks.loadPaneUrl(paneIndex, view, url, false);

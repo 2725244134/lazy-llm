@@ -225,6 +225,7 @@ describe('setPaneCountWithLifecycle', () => {
     expect(closed).toEqual([]);
     expect(cleared).toEqual([1]);
     expect(removed).toEqual(['pane-1']);
+    defaultProviders[1] = 'chatgpt';
 
     setPaneCountWithLifecycle({
       count: 2 as PaneCount,
@@ -240,6 +241,8 @@ describe('setPaneCountWithLifecycle', () => {
     expect(loaded).toEqual([]);
     expect(created).toEqual([]);
     expect(added).toContain('pane-1');
+    expect(paneViews[1].providerKey).toBe('claude');
+    expect(defaultProviders[1]).toBe('claude');
   });
 });
 
