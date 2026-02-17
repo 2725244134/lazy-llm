@@ -217,6 +217,109 @@
   border-radius: 1px;
 }
 
+.tabs-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.tabs-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tabs-strip::-webkit-scrollbar {
+  height: 4px;
+}
+
+.tabs-strip::-webkit-scrollbar-thumb {
+  background: var(--sidebar-scrollbar-thumb);
+  border-radius: 999px;
+}
+
+.tab-chip {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  border: 1.5px solid var(--border);
+  background: var(--bg);
+  border-radius: 999px;
+  transition:
+    border-color 0.2s ease-out,
+    background-color 0.2s ease-out,
+    box-shadow 0.2s ease-out;
+}
+
+.tab-chip.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--select-open-ring);
+}
+
+.tab-chip-main {
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  padding: 6px 9px;
+  cursor: pointer;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.tab-chip.active .tab-chip-main {
+  color: var(--accent);
+}
+
+.tab-chip-close {
+  border: none;
+  border-left: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px 8px 6px 7px;
+  cursor: pointer;
+}
+
+.tab-chip-close:hover {
+  color: var(--accent);
+}
+
+.tab-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1.5px dashed var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 0.2s ease-out,
+    color 0.2s ease-out,
+    background-color 0.2s ease-out;
+}
+
+.tab-add-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--select-item-hover-bg);
+}
+
+.tab-add-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .pane-toggle {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -879,6 +982,48 @@
 
 .sidebar.is-tight .section-title::before {
   height: 10px;
+}
+
+.sidebar.is-compact .tabs-row {
+  margin-bottom: 11px;
+  gap: 6px;
+}
+
+.sidebar.is-tight .tabs-row {
+  margin-bottom: 9px;
+  gap: 4px;
+}
+
+.sidebar.is-compact .tab-chip-main {
+  font-size: 11px;
+  padding: 5px 8px;
+}
+
+.sidebar.is-tight .tab-chip-main {
+  font-size: 10px;
+  padding: 4px 7px;
+}
+
+.sidebar.is-compact .tab-chip-close {
+  font-size: 11px;
+  padding: 5px 7px 5px 6px;
+}
+
+.sidebar.is-tight .tab-chip-close {
+  font-size: 10px;
+  padding: 4px 6px 4px 5px;
+}
+
+.sidebar.is-compact .tab-add-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 16px;
+}
+
+.sidebar.is-tight .tab-add-btn {
+  width: 24px;
+  height: 24px;
+  font-size: 15px;
 }
 
 .sidebar.is-compact .pane-toggle {

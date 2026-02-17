@@ -1,13 +1,19 @@
 import { createContext, createElement, useContext } from 'react';
 import { APP_CONFIG } from '@/config';
+import type { SidebarTabState } from './tabsState';
 
 export const MAX_PANES = APP_CONFIG.layout.pane.maxCount;
 export type PaneCount = 1 | 2 | 3 | 4;
 
 export interface SidebarContextValue {
+  tabs: SidebarTabState[];
+  activeTabId: string;
   paneCount: PaneCount;
   activeProviders: string[];
   providerLoadingByPane: Record<number, boolean>;
+  createTab: () => Promise<void>;
+  switchTab: (tabId: string) => Promise<void>;
+  closeTab: (tabId: string) => Promise<void>;
   setPaneCount: (count: number) => Promise<void>;
   newAll: () => Promise<void>;
   setProvider: (paneIndex: number, providerKey: string) => Promise<void>;

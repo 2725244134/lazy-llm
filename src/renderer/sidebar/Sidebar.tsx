@@ -14,37 +14,62 @@ import { normalizePaneProviderSequence } from '@/features/providers/paneProvider
 import { PaneSelector } from './PaneSelector';
 import { ProviderList } from './ProviderList';
 import { QuickPromptQueue } from './QuickPromptQueue';
+import { TabsBar } from './TabsBar';
 import { type PaneCount, SidebarContextProvider } from './context';
 import { resolveStartupState, saveUiSettings } from '../state/uiSettings';
 import { useSidebarLayoutSync } from './useSidebarLayoutSync';
+import {
+  MAX_SIDEBAR_TABS,
+  clampPaneCount,
+  createNextSidebarTab,
+  createSidebarTabState,
+  findSidebarTab,
+  removeSidebarTab,
+  updateSidebarTabSnapshot,
+  type SidebarTabState,
+} from './tabsState';
 
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
 
-function clampPaneCount(count: number): PaneCount {
-  const normalized = Math.min(
-    APP_CONFIG.layout.pane.maxCount,
-    Math.max(APP_CONFIG.layout.pane.minCount, Math.floor(count)),
-  );
-  return normalized as PaneCount;
+const DEFAULT_PROVIDER_KEY = APP_CONFIG.providers.defaultPaneKeys[0]
+  ?? APP_CONFIG.providers.defaultActiveKeys[0]
+  ?? 'chatgpt';
+
+const DEFAULT_INITIAL_TAB = createSidebarTabState({
+  id: 'tab-1',
+  paneCount: APP_CONFIG.layout.pane.defaultCount,
+  paneProviders: APP_CONFIG.providers.defaultActiveKeys,
+});
+
+interface ActivePaneSnapshot {
+  paneCount: PaneCount;
+  paneProviders: string[];
+}
+
+function resolveProviderForPane(providerKey: string | undefined): string {
+  if (typeof providerKey === 'string' && providerKey.trim().length > 0) {
+    return providerKey;
+  }
+  return DEFAULT_PROVIDER_KEY;
 }
 
 export function Sidebar() {
   const runtime = useMemo(() => getSidebarRuntime(), []);
 
   const [collapsed, setCollapsed] = useState(false);
-  const [paneCount, setPaneCountState] = useState<PaneCount>(
-    APP_CONFIG.layout.pane.defaultCount as PaneCount,
-  );
-  const [activeProviders, setActiveProviders] = useState<string[]>([
-    ...APP_CONFIG.providers.defaultActiveKeys,
-  ]);
+  const [tabs, setTabs] = useState<SidebarTabState[]>([DEFAULT_INITIAL_TAB]);
+  const [activeTabId, setActiveTabId] = useState<string>(DEFAULT_INITIAL_TAB.id);
+  const [paneCount, setPaneCountState] = useState<PaneCount>(DEFAULT_INITIAL_TAB.paneCount);
+  const [activeProviders, setActiveProviders] = useState<string[]>(DEFAULT_INITIAL_TAB.paneProviders);
   const [providerLoadingByPane, setProviderLoadingByPane] = useState<Record<number, boolean>>({});
   const [expandedWidth, setExpandedWidth] = useState<number>(
     APP_CONFIG.layout.sidebar.defaultExpandedWidth,
   );
 
   const collapsedRef = useRef(collapsed);
+  const tabsRef = useRef(tabs);
+  const activeTabIdRef = useRef(activeTabId);
   const paneCountRef = useRef(paneCount);
   const activeProvidersRef = useRef(activeProviders);
   const expandedWidthRef = useRef(expandedWidth);
@@ -52,6 +77,14 @@ export function Sidebar() {
   useEffect(() => {
     collapsedRef.current = collapsed;
   }, [collapsed]);
+
+  useEffect(() => {
+    tabsRef.current = tabs;
+  }, [tabs]);
+
+  useEffect(() => {
+    activeTabIdRef.current = activeTabId;
+  }, [activeTabId]);
 
   useEffect(() => {
     paneCountRef.current = paneCount;
@@ -76,21 +109,31 @@ export function Sidebar() {
   const isTightSidebar = sidebarUiDensity === 'tight';
 
   const persistUiSettings = useCallback((overrides?: {
-    paneCount?: PaneCount;
-    paneProviders?: string[];
+    tabs?: SidebarTabState[];
+    activeTabId?: string;
     sidebarWidth?: number;
   }) => {
+    const nextTabs = overrides?.tabs ?? tabsRef.current;
+    const nextActiveTabId = overrides?.activeTabId ?? activeTabIdRef.current;
+
     saveUiSettings({
-      version: 1,
+      version: 2,
       layout: {
-        paneCount: overrides?.paneCount ?? paneCountRef.current,
         sidebarWidth: overrides?.sidebarWidth ?? expandedWidthRef.current,
       },
-      providers: {
-        paneKeys: overrides?.paneProviders ?? activeProvidersRef.current,
+      tabs: {
+        activeTabId: nextActiveTabId,
+        items: nextTabs.map((tab) => {
+          return {
+            id: tab.id,
+            paneCount: tab.paneCount,
+            paneKeys: tab.paneProviders,
+          };
+        }),
       },
     });
   }, []);
+
   const {
     enqueueLayoutSync,
     invalidateLayoutSignature,
@@ -130,6 +173,40 @@ export function Sidebar() {
     });
   }, []);
 
+  const setActiveTabState = useCallback((tab: SidebarTabState) => {
+    activeTabIdRef.current = tab.id;
+    setActiveTabId(tab.id);
+    paneCountRef.current = tab.paneCount;
+    setPaneCountState(tab.paneCount);
+    const normalizedProviders = normalizePaneProviderSequence(tab.paneProviders, tab.paneCount);
+    activeProvidersRef.current = normalizedProviders;
+    setActiveProviders(normalizedProviders);
+  }, []);
+
+  const updateTabsState = useCallback((nextTabs: SidebarTabState[]) => {
+    tabsRef.current = nextTabs;
+    setTabs(nextTabs);
+  }, []);
+
+  const applyTabToRuntime = useCallback(
+    async (tab: SidebarTabState, previousSnapshot?: ActivePaneSnapshot) => {
+      const shouldUpdatePaneCount = !previousSnapshot || previousSnapshot.paneCount !== tab.paneCount;
+      if (shouldUpdatePaneCount) {
+        await runtime.setPaneCount(tab.paneCount);
+      }
+
+      for (let paneIndex = 0; paneIndex < tab.paneCount; paneIndex += 1) {
+        const targetProvider = resolveProviderForPane(tab.paneProviders[paneIndex]);
+        const previousProvider = previousSnapshot?.paneProviders[paneIndex];
+        if (!shouldUpdatePaneCount && previousProvider === targetProvider) {
+          continue;
+        }
+        await runtime.updateProvider(paneIndex, targetProvider);
+      }
+    },
+    [runtime],
+  );
+
   const toggleCollapse = useCallback(async () => {
     const nextCollapsed = !collapsedRef.current;
     collapsedRef.current = nextCollapsed;
@@ -138,10 +215,156 @@ export function Sidebar() {
     await enqueueLayoutSync();
   }, [enqueueLayoutSync]);
 
+  const createTab = useCallback(async () => {
+    const currentTabs = tabsRef.current;
+    if (currentTabs.length >= MAX_SIDEBAR_TABS) {
+      return;
+    }
+
+    const activeTab = findSidebarTab(currentTabs, activeTabIdRef.current);
+    const nextTab = createNextSidebarTab(currentTabs, activeTab);
+    const nextTabs = [...currentTabs, nextTab];
+
+    updateTabsState(nextTabs);
+    setActiveTabState(nextTab);
+    trimProviderLoadingState(nextTab.paneCount);
+    persistUiSettings({
+      tabs: nextTabs,
+      activeTabId: nextTab.id,
+    });
+
+    await enqueueLayoutSync();
+  }, [
+    enqueueLayoutSync,
+    persistUiSettings,
+    setActiveTabState,
+    trimProviderLoadingState,
+    updateTabsState,
+  ]);
+
+  const switchTab = useCallback(
+    async (tabId: string) => {
+      const currentTabs = tabsRef.current;
+      const currentActiveTabId = activeTabIdRef.current;
+      if (tabId === currentActiveTabId) {
+        return;
+      }
+
+      const targetTab = currentTabs.find((tab) => tab.id === tabId);
+      if (!targetTab) {
+        return;
+      }
+
+      const previousTab = findSidebarTab(currentTabs, currentActiveTabId);
+      const previousSnapshot: ActivePaneSnapshot = {
+        paneCount: paneCountRef.current,
+        paneProviders: normalizePaneProviderSequence(
+          activeProvidersRef.current,
+          paneCountRef.current,
+        ),
+      };
+
+      setActiveTabState(targetTab);
+      trimProviderLoadingState(targetTab.paneCount);
+
+      try {
+        await applyTabToRuntime(targetTab, previousSnapshot);
+        persistUiSettings({
+          tabs: currentTabs,
+          activeTabId: targetTab.id,
+        });
+      } catch (error) {
+        console.error('[Sidebar] switchTab error:', error);
+        setActiveTabState(previousTab);
+        trimProviderLoadingState(previousTab.paneCount);
+
+        try {
+          await applyTabToRuntime(previousTab);
+        } catch (restoreError) {
+          console.error('[Sidebar] switchTab rollback error:', restoreError);
+        }
+      }
+
+      await enqueueLayoutSync();
+    },
+    [
+      applyTabToRuntime,
+      enqueueLayoutSync,
+      persistUiSettings,
+      setActiveTabState,
+      trimProviderLoadingState,
+    ],
+  );
+
+  const closeTab = useCallback(
+    async (tabId: string) => {
+      const currentTabs = tabsRef.current;
+      const currentActiveTabId = activeTabIdRef.current;
+      const removal = removeSidebarTab(currentTabs, currentActiveTabId, tabId);
+      if (removal.tabs.length === currentTabs.length) {
+        return;
+      }
+
+      const previousTab = findSidebarTab(currentTabs, currentActiveTabId);
+      const previousSnapshot: ActivePaneSnapshot = {
+        paneCount: paneCountRef.current,
+        paneProviders: normalizePaneProviderSequence(
+          activeProvidersRef.current,
+          paneCountRef.current,
+        ),
+      };
+
+      updateTabsState(removal.tabs);
+
+      if (removal.activeTabId === currentActiveTabId) {
+        persistUiSettings({
+          tabs: removal.tabs,
+          activeTabId: removal.activeTabId,
+        });
+        return;
+      }
+
+      const nextActiveTab = findSidebarTab(removal.tabs, removal.activeTabId);
+      setActiveTabState(nextActiveTab);
+      trimProviderLoadingState(nextActiveTab.paneCount);
+
+      try {
+        await applyTabToRuntime(nextActiveTab, previousSnapshot);
+        persistUiSettings({
+          tabs: removal.tabs,
+          activeTabId: removal.activeTabId,
+        });
+      } catch (error) {
+        console.error('[Sidebar] closeTab error:', error);
+        updateTabsState(currentTabs);
+        setActiveTabState(previousTab);
+        trimProviderLoadingState(previousTab.paneCount);
+
+        try {
+          await applyTabToRuntime(previousTab);
+        } catch (restoreError) {
+          console.error('[Sidebar] closeTab rollback error:', restoreError);
+        }
+      }
+
+      await enqueueLayoutSync();
+    },
+    [
+      applyTabToRuntime,
+      enqueueLayoutSync,
+      persistUiSettings,
+      setActiveTabState,
+      trimProviderLoadingState,
+      updateTabsState,
+    ],
+  );
+
   const setPaneCount = useCallback(
     async (count: number) => {
       const oldCount = paneCountRef.current;
       const oldProviders = normalizePaneProviderSequence(activeProvidersRef.current, oldCount);
+      const oldTabs = tabsRef.current;
+      const activeTab = activeTabIdRef.current;
 
       const newCount = clampPaneCount(count);
       if (newCount === oldCount) {
@@ -155,12 +378,17 @@ export function Sidebar() {
       activeProvidersRef.current = nextProviders;
       setActiveProviders(nextProviders);
 
+      const nextTabs = updateSidebarTabSnapshot(oldTabs, activeTab, {
+        paneCount: newCount,
+        paneProviders: nextProviders,
+      });
+      updateTabsState(nextTabs);
+
       try {
         await runtime.setPaneCount(newCount);
         trimProviderLoadingState(newCount);
         persistUiSettings({
-          paneCount: newCount,
-          paneProviders: nextProviders,
+          tabs: nextTabs,
         });
       } catch (error) {
         invalidateLayoutSignature();
@@ -168,13 +396,21 @@ export function Sidebar() {
         setPaneCountState(oldCount);
         activeProvidersRef.current = oldProviders;
         setActiveProviders(oldProviders);
+        updateTabsState(oldTabs);
         trimProviderLoadingState(oldCount);
         console.error('[Sidebar] setPaneCount error:', error);
       }
 
       await enqueueLayoutSync();
     },
-    [enqueueLayoutSync, invalidateLayoutSignature, persistUiSettings, runtime, trimProviderLoadingState],
+    [
+      enqueueLayoutSync,
+      invalidateLayoutSignature,
+      persistUiSettings,
+      runtime,
+      trimProviderLoadingState,
+      updateTabsState,
+    ],
   );
 
   const newAll = useCallback(async () => {
@@ -191,26 +427,41 @@ export function Sidebar() {
         return;
       }
 
+      const oldProviders = normalizePaneProviderSequence(
+        activeProvidersRef.current,
+        paneCountRef.current,
+      );
+      const oldTabs = tabsRef.current;
+      const activeTab = activeTabIdRef.current;
+
+      const nextProviders = normalizePaneProviderSequence(
+        activeProvidersRef.current,
+        paneCountRef.current,
+      );
+      nextProviders[paneIndex] = providerKey;
+      activeProvidersRef.current = nextProviders;
+      setActiveProviders(nextProviders);
+
+      const nextTabs = updateSidebarTabSnapshot(oldTabs, activeTab, {
+        paneCount: paneCountRef.current,
+        paneProviders: nextProviders,
+      });
+      updateTabsState(nextTabs);
+
       try {
         await runtime.updateProvider(paneIndex, providerKey);
-
-        const nextProviders = normalizePaneProviderSequence(
-          activeProvidersRef.current,
-          paneCountRef.current,
-        );
-        nextProviders[paneIndex] = providerKey;
-        activeProvidersRef.current = nextProviders;
-        setActiveProviders(nextProviders);
-
         persistUiSettings({
-          paneProviders: nextProviders,
+          tabs: nextTabs,
         });
       } catch (error) {
+        activeProvidersRef.current = oldProviders;
+        setActiveProviders(oldProviders);
+        updateTabsState(oldTabs);
         setProviderLoadingState(paneIndex, false);
         console.error('[Sidebar] setProvider error:', error);
       }
     },
-    [persistUiSettings, runtime, setProviderLoadingState],
+    [persistUiSettings, runtime, setProviderLoadingState, updateTabsState],
   );
 
   const sendPrompt = useCallback(
@@ -284,11 +535,11 @@ export function Sidebar() {
     const handleProviderLoadingEvent = (event: Event) => {
       const detail = (event as CustomEvent<{ paneIndex: number; loading: boolean }>).detail;
       if (
-        !detail ||
-        typeof detail.paneIndex !== 'number' ||
-        !Number.isInteger(detail.paneIndex) ||
-        detail.paneIndex < 0 ||
-        typeof detail.loading !== 'boolean'
+        !detail
+        || typeof detail.paneIndex !== 'number'
+        || !Number.isInteger(detail.paneIndex)
+        || detail.paneIndex < 0
+        || typeof detail.loading !== 'boolean'
       ) {
         return;
       }
@@ -302,6 +553,7 @@ export function Sidebar() {
       try {
         const config = await runtime.getConfig();
         const startupState = resolveStartupState(config);
+        const startupActiveTab = findSidebarTab(startupState.tabs, startupState.activeTabId);
 
         if (!active) {
           return;
@@ -310,28 +562,26 @@ export function Sidebar() {
         setExpandedWidth(startupState.sidebarWidth);
         expandedWidthRef.current = startupState.sidebarWidth;
 
-        setPaneCountState(startupState.paneCount);
-        paneCountRef.current = startupState.paneCount;
+        updateTabsState(startupState.tabs);
+        setActiveTabState(startupActiveTab);
+        trimProviderLoadingState(startupActiveTab.paneCount);
 
-        setActiveProviders(startupState.paneProviders);
-        activeProvidersRef.current = startupState.paneProviders;
-
-        if (startupState.paneCount !== config.provider.pane_count) {
-          await runtime.setPaneCount(startupState.paneCount);
+        const currentConfigPaneCount = clampPaneCount(config.provider.pane_count);
+        if (startupActiveTab.paneCount !== currentConfigPaneCount) {
+          await runtime.setPaneCount(startupActiveTab.paneCount);
         }
 
-        for (let paneIndex = 0; paneIndex < startupState.paneCount; paneIndex += 1) {
-          const targetProvider = startupState.paneProviders[paneIndex];
-          const currentProvider = config.provider.panes[paneIndex];
-
+        for (let paneIndex = 0; paneIndex < startupActiveTab.paneCount; paneIndex += 1) {
+          const targetProvider = resolveProviderForPane(startupActiveTab.paneProviders[paneIndex]);
+          const currentProvider = resolveProviderForPane(config.provider.panes[paneIndex]);
           if (targetProvider !== currentProvider) {
             await runtime.updateProvider(paneIndex, targetProvider);
           }
         }
 
         persistUiSettings({
-          paneCount: startupState.paneCount,
-          paneProviders: startupState.paneProviders,
+          tabs: startupState.tabs,
+          activeTabId: startupActiveTab.id,
           sidebarWidth: startupState.sidebarWidth,
         });
       } catch (error) {
@@ -364,8 +614,11 @@ export function Sidebar() {
     persistUiSettings,
     runtime,
     scheduleResizeLayoutSync,
+    setActiveTabState,
     setProviderLoadingState,
     toggleCollapse,
+    trimProviderLoadingState,
+    updateTabsState,
   ]);
 
   const sidebarStyle = useMemo(() => {
@@ -378,9 +631,14 @@ export function Sidebar() {
 
   const contextValue = useMemo(() => {
     return {
+      tabs,
+      activeTabId,
       paneCount,
       activeProviders,
       providerLoadingByPane,
+      createTab,
+      switchTab,
+      closeTab,
       setPaneCount,
       newAll,
       setProvider,
@@ -392,7 +650,10 @@ export function Sidebar() {
     };
   }, [
     activeProviders,
+    activeTabId,
     clearQueuedPrompts,
+    closeTab,
+    createTab,
     newAll,
     paneCount,
     providerLoadingByPane,
@@ -401,7 +662,9 @@ export function Sidebar() {
     sendPrompt,
     setPaneCount,
     setProvider,
+    switchTab,
     syncPromptDraft,
+    tabs,
   ]);
 
   return (
@@ -437,6 +700,7 @@ export function Sidebar() {
 
         <div className="sidebar-content">
           <div className="sidebar-scroll">
+            <TabsBar />
             <PaneSelector />
             <ProviderList />
             <QuickPromptQueue />
