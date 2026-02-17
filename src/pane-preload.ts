@@ -3,7 +3,7 @@
  * Exposes paneAPI for prompt injection and response reporting
  */
 
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 import {
   IPC_CHANNELS,
   type PaneStagePromptImageAckPayload,
@@ -27,6 +27,7 @@ function getPaneIndex(): number {
 const paneIndex = getPaneIndex();
 const stagedPromptImages = new Map<string, PromptImagePayload>();
 const MAX_STAGED_PROMPT_IMAGES = 32;
+let injectPromptListener: ((event: IpcRendererEvent, payload: { text: string }) => void) | null = null;
 
 function trimStagedPromptImages(): void {
   while (stagedPromptImages.size > MAX_STAGED_PROMPT_IMAGES) {
@@ -94,9 +95,15 @@ const paneAPI = {
    * Register callback for prompt injection from main process
    */
   onInjectPrompt: (callback: (text: string) => void): void => {
-    ipcRenderer.on(IPC_CHANNELS.PANE_INJECT_PROMPT, (_event, payload: { text: string }) => {
+    if (injectPromptListener) {
+      ipcRenderer.removeListener(IPC_CHANNELS.PANE_INJECT_PROMPT, injectPromptListener);
+    }
+
+    injectPromptListener = (_event, payload: { text: string }) => {
       callback(payload.text);
-    });
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.PANE_INJECT_PROMPT, injectPromptListener);
   },
 
   /**

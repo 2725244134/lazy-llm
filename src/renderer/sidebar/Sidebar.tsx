@@ -15,6 +15,7 @@ import { ProviderList } from './ProviderList';
 import { PromptComposer } from './PromptComposer';
 import { type PaneCount, SidebarContextProvider } from './context';
 import { resolveStartupState, saveUiSettings } from '../state/uiSettings';
+import { useSidebarLayoutSync } from './useSidebarLayoutSync';
 
 const SIDEBAR_TOGGLE_SHORTCUT_EVENT = APP_CONFIG.interaction.shortcuts.sidebarToggleEvent;
 const PROVIDER_LOADING_EVENT = APP_CONFIG.interaction.shortcuts.providerLoadingEvent;
@@ -92,11 +93,6 @@ export function Sidebar() {
   const isCompactSidebar = sidebarUiDensity !== 'regular';
   const isTightSidebar = sidebarUiDensity === 'tight';
 
-  const layoutSyncQueueRef = useRef<Promise<void>>(Promise.resolve());
-  const lastLayoutSignatureRef = useRef<string | null>(null);
-  const resizeRafRef = useRef(0);
-  const focusRafRef = useRef(0);
-
   const persistUiSettings = useCallback((overrides?: {
     paneCount?: PaneCount;
     paneProviders?: string[];
@@ -113,71 +109,19 @@ export function Sidebar() {
       },
     });
   }, []);
-
-  const buildLayoutSignature = useCallback((panes: PaneCount, sidebarWidth: number): string => {
-    return `${panes}:${sidebarWidth}`;
-  }, []);
-
-  const invalidateLayoutSignature = useCallback(() => {
-    lastLayoutSignatureRef.current = null;
-  }, []);
-
-  const syncLayout = useCallback(async () => {
-    const panes = paneCountRef.current;
-    const sidebarWidth = collapsedRef.current ? collapsedWidth : expandedWidthRef.current;
-    const viewportWidth = Math.max(1, Math.floor(window.innerWidth));
-    const viewportHeight = Math.max(1, Math.floor(window.innerHeight));
-
-    const signature = buildLayoutSignature(panes, sidebarWidth);
-    if (signature === lastLayoutSignatureRef.current) {
-      return;
-    }
-
-    await runtime.updateLayout({
-      viewportWidth,
-      viewportHeight,
-      paneCount: panes,
-      sidebarWidth,
-    });
-
-    lastLayoutSignatureRef.current = signature;
-  }, [buildLayoutSignature, collapsedWidth, runtime]);
-
-  const enqueueLayoutSync = useCallback(async () => {
-    layoutSyncQueueRef.current = layoutSyncQueueRef.current
-      .then(() => syncLayout())
-      .catch((error) => {
-        console.error('[Sidebar] syncLayout error:', error);
-      });
-
-    await layoutSyncQueueRef.current;
-  }, [syncLayout]);
-
-  const focusPromptComposer = useCallback(async () => {
-    if (collapsedRef.current) {
-      return;
-    }
-
-    if (focusRafRef.current !== 0) {
-      window.cancelAnimationFrame(focusRafRef.current);
-      focusRafRef.current = 0;
-    }
-
-    await new Promise<void>((resolve) => {
-      focusRafRef.current = window.requestAnimationFrame(() => {
-        focusRafRef.current = 0;
-
-        const textarea = document.querySelector<HTMLTextAreaElement>('textarea.composer-textarea');
-        if (textarea && !textarea.disabled) {
-          textarea.focus();
-          const cursorPosition = textarea.value.length;
-          textarea.setSelectionRange(cursorPosition, cursorPosition);
-        }
-
-        resolve();
-      });
-    });
-  }, []);
+  const {
+    enqueueLayoutSync,
+    invalidateLayoutSignature,
+    focusPromptComposer,
+    scheduleResizeLayoutSync,
+    cancelPendingFrames,
+  } = useSidebarLayoutSync({
+    runtime,
+    paneCountRef,
+    collapsedRef,
+    expandedWidthRef,
+    collapsedWidth,
+  });
 
   const trimProviderLoadingState = useCallback((count: PaneCount) => {
     setProviderLoadingByPane((current) => {
@@ -314,14 +258,7 @@ export function Sidebar() {
 
   useEffect(() => {
     const handleWindowResize = () => {
-      if (resizeRafRef.current !== 0) {
-        return;
-      }
-
-      resizeRafRef.current = window.requestAnimationFrame(() => {
-        resizeRafRef.current = 0;
-        void enqueueLayoutSync();
-      });
+      scheduleResizeLayoutSync();
     };
 
     const handleSidebarToggleShortcut = () => {
@@ -404,18 +341,18 @@ export function Sidebar() {
       window.removeEventListener('resize', handleWindowResize);
       window.removeEventListener(SIDEBAR_TOGGLE_SHORTCUT_EVENT, handleSidebarToggleShortcut);
       window.removeEventListener(PROVIDER_LOADING_EVENT, handleProviderLoadingEvent as EventListener);
-
-      if (resizeRafRef.current !== 0) {
-        window.cancelAnimationFrame(resizeRafRef.current);
-        resizeRafRef.current = 0;
-      }
-
-      if (focusRafRef.current !== 0) {
-        window.cancelAnimationFrame(focusRafRef.current);
-        focusRafRef.current = 0;
-      }
+      cancelPendingFrames();
     };
-  }, [enqueueLayoutSync, focusPromptComposer, persistUiSettings, runtime, setProviderLoadingState, toggleCollapse]);
+  }, [
+    cancelPendingFrames,
+    enqueueLayoutSync,
+    focusPromptComposer,
+    persistUiSettings,
+    runtime,
+    scheduleResizeLayoutSync,
+    setProviderLoadingState,
+    toggleCollapse,
+  ]);
 
   const sidebarStyle = useMemo(() => {
     return {

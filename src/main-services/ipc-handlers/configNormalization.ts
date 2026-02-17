@@ -5,23 +5,17 @@ import {
   buildDefaultPaneProviders,
   normalizeProviderSequence,
 } from './providerConfig.js';
+import { buildAppConfigPayload } from './appConfigPayload.js';
 
 export { CANONICAL_PROVIDERS } from './providerConfig.js';
 
-export const DEFAULT_CONFIG: AppConfig = {
-  provider: {
-    pane_count: APP_CONFIG.layout.pane.defaultCount,
-    panes: buildDefaultPaneProviders(APP_CONFIG.layout.pane.defaultCount),
-    catalog: CANONICAL_PROVIDERS,
-  },
-  sidebar: {
-    expanded_width: APP_CONFIG.layout.sidebar.defaultExpandedWidth,
-    collapsed_width: APP_CONFIG.layout.sidebar.defaultCollapsedWidth,
-  },
-  quick_prompt: {
-    default_height: APP_CONFIG.layout.quickPrompt.defaultHeight,
-  },
-};
+export const DEFAULT_CONFIG: AppConfig = buildAppConfigPayload({
+  paneCount: APP_CONFIG.layout.pane.defaultCount,
+  paneProviders: buildDefaultPaneProviders(APP_CONFIG.layout.pane.defaultCount),
+  providerCatalog: CANONICAL_PROVIDERS,
+  sidebarExpandedWidth: APP_CONFIG.layout.sidebar.defaultExpandedWidth,
+  quickPromptHeight: APP_CONFIG.layout.quickPrompt.defaultHeight,
+});
 
 export interface AppConfigDraft {
   provider?: {
@@ -65,19 +59,11 @@ export function normalizeConfig(config: AppConfigDraft | null | undefined): AppC
     ? Math.max(APP_CONFIG.layout.sidebar.minExpandedWidth, Math.floor(expandedWidthCandidate))
     : DEFAULT_CONFIG.sidebar.expanded_width;
 
-  return {
-    provider: {
-      pane_count: paneCount,
-      panes: normalizedPanes,
-      catalog: CANONICAL_PROVIDERS,
-    },
-    sidebar: {
-      expanded_width: expandedWidth,
-      // Collapsed width is fixed by product design. Only expanded_width is configurable.
-      collapsed_width: DEFAULT_CONFIG.sidebar.collapsed_width,
-    },
-    quick_prompt: {
-      default_height: normalizeQuickPromptHeight(config?.quick_prompt?.default_height),
-    },
-  };
+  return buildAppConfigPayload({
+    paneCount,
+    paneProviders: normalizedPanes,
+    providerCatalog: CANONICAL_PROVIDERS,
+    sidebarExpandedWidth: expandedWidth,
+    quickPromptHeight: normalizeQuickPromptHeight(config?.quick_prompt?.default_height),
+  });
 }
