@@ -16,7 +16,7 @@ interface QuickPromptLifecycleCallbacks {
   focusSidebarIfAvailable(): void;
   notifyQuickPromptOpened(view: WebContentsView): void;
   closeQuickPromptView(view: WebContentsView): void;
-  updateQuickPromptAnchorFromFocusedWebContents(): void;
+  syncQuickPromptAnchorBeforeShow(): void;
 }
 
 export interface QuickPromptResizeResult {
@@ -71,7 +71,7 @@ export class QuickPromptLifecycleService {
       return this.quickPromptVisible;
     }
 
-    this.callbacks.updateQuickPromptAnchorFromFocusedWebContents();
+    this.callbacks.syncQuickPromptAnchorBeforeShow();
     this.quickPromptHeight = this.config.defaultHeight;
     this.callbacks.addQuickPromptViewToContent(view);
     view.setBounds(this.callbacks.getQuickPromptBounds(this.quickPromptHeight));

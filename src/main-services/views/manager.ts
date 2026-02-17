@@ -7,6 +7,7 @@ import {
   type Event,
   type Input,
   ipcMain,
+  webContents as electronWebContents,
   type WebContents,
   WebContentsView,
 } from 'electron';
@@ -161,10 +162,7 @@ export class ViewManager {
       sidebarZoomFactor: this.sidebarZoomFactor,
       attachGlobalShortcutHooks: (webContents) => this.attachGlobalShortcutHooks(webContents),
     });
-    const quickPromptAnchorTracker = new QuickPromptAnchorTracker({
-      resolvePaneIndexByWebContents: (webContents) =>
-        this.findPaneIndexByWebContents(webContents),
-    });
+    const quickPromptAnchorTracker = new QuickPromptAnchorTracker();
     this.quickPromptController = new QuickPromptController({
       quickPromptPreloadPath,
       defaultHeight: options.config.quick_prompt.default_height,
@@ -173,6 +171,7 @@ export class ViewManager {
       resolveBounds: (requestedHeight, anchorPaneIndex) =>
         this.getQuickPromptBounds(requestedHeight, anchorPaneIndex),
       anchorTracker: quickPromptAnchorTracker,
+      syncQuickPromptAnchorBeforeShow: () => this.updateQuickPromptAnchorFromFocusedWebContents(),
       addQuickPromptViewToContent: (view) => this.window.contentView.addChildView(view),
       removeQuickPromptViewFromContent: (view) => this.window.contentView.removeChildView(view),
       keepQuickPromptViewOnTop: (view) => {
@@ -269,6 +268,27 @@ export class ViewManager {
     return null;
   }
 
+  private updateQuickPromptAnchorFromFocusedWebContents(): void {
+    const focusedWebContents = electronWebContents.getFocusedWebContents();
+    if (!focusedWebContents) {
+      return;
+    }
+    const paneIndex = this.findPaneIndexByWebContents(focusedWebContents);
+    if (paneIndex !== null) {
+      this.quickPromptController.setAnchorPaneIndex(paneIndex);
+    }
+  }
+
+  private updateQuickPromptAnchorFromSourceOrFocused(sourceWebContents?: WebContents): void {
+    if (sourceWebContents) {
+      const sourcePaneIndex = this.findPaneIndexByWebContents(sourceWebContents);
+      if (sourcePaneIndex !== null) {
+        this.quickPromptController.setAnchorPaneIndex(sourcePaneIndex);
+        return;
+      }
+    }
+    this.updateQuickPromptAnchorFromFocusedWebContents();
+  }
 
   private attachGlobalShortcutHooks(webContents: WebContents): void {
     webContents.on('before-input-event', (event: Event, input: Input) => {
@@ -293,7 +313,8 @@ export class ViewManager {
 
   private handleShortcutAction(action: ManagedShortcutAction, sourceWebContents: WebContents): void {
     if (action === 'toggleQuickPrompt') {
-      this.quickPromptController.toggleQuickPrompt(sourceWebContents);
+      this.updateQuickPromptAnchorFromSourceOrFocused(sourceWebContents);
+      this.quickPromptController.toggleQuickPrompt();
       return;
     }
     if (action === 'notifySidebarToggle') {
@@ -320,7 +341,8 @@ export class ViewManager {
   }
 
   toggleQuickPrompt(sourceWebContents?: WebContents): boolean {
-    return this.quickPromptController.toggleQuickPrompt(sourceWebContents);
+    this.updateQuickPromptAnchorFromSourceOrFocused(sourceWebContents);
+    return this.quickPromptController.toggleQuickPrompt();
   }
 
   showQuickPrompt(): boolean {
@@ -347,6 +369,16 @@ export class ViewManager {
     this.quickPromptController.keepOnTop();
   }
 
+  private clampQuickPromptAnchorPaneIndex(): void {
+    const paneCount = this.paneViews.length;
+    const currentAnchor = this.quickPromptController.getAnchorPaneIndex();
+    const maxAnchor = Math.max(0, paneCount - 1);
+    const clampedAnchor = Math.max(0, Math.min(currentAnchor, maxAnchor));
+    if (clampedAnchor !== currentAnchor) {
+      this.quickPromptController.setAnchorPaneIndex(clampedAnchor);
+    }
+  }
+
   private buildLifecycleCallbacks() {
     return {
       createPaneWebContentsView: (paneIndex: number) => this.paneViewService.createPaneWebContentsView(paneIndex),
@@ -357,10 +389,7 @@ export class ViewManager {
       applyPaneRuntimePreferences: (wc: WebContents) => this.paneViewService.applyPaneRuntimePreferences(wc),
       clearProviderLoadingTracking: (paneIndex: number) => this.clearProviderLoadingTracking(paneIndex),
       closePane: (pane: PaneViewState) => this.paneViewService.closePane(pane),
-      keepQuickPromptOnTop: () => this.keepQuickPromptOnTop(),
       updateLayout: () => this.updateLayout(),
-      setQuickPromptAnchorPaneIndex: (paneIndex: number) =>
-        this.quickPromptController.setAnchorPaneIndex(paneIndex),
     };
   }
 
@@ -374,18 +403,30 @@ export class ViewManager {
       paneViews: this.paneViews,
       defaultProviders: this.defaultProviders,
       providers: this.providers,
-      quickPromptAnchorPaneIndex: this.quickPromptController.getAnchorPaneIndex(),
       callbacks: this.buildLifecycleCallbacks(),
     });
     this.currentPaneCount = result.currentPaneCount;
-    this.quickPromptController.setAnchorPaneIndex(result.quickPromptAnchorPaneIndex);
+    this.clampQuickPromptAnchorPaneIndex();
+    this.keepQuickPromptOnTop();
   }
 
   /**
    * Update provider for a specific pane
    */
   updatePaneProvider(paneIndex: number, providerKey: string): boolean {
-    return updatePaneProviderWithLifecycle({
+    const pane = paneIndex >= 0 && paneIndex < this.paneViews.length
+      ? this.paneViews[paneIndex]
+      : null;
+    const shouldUpdateQuickPromptAnchor = Boolean(
+      pane
+      && pane.providerKey !== providerKey
+      && this.providers.has(providerKey),
+    );
+    if (shouldUpdateQuickPromptAnchor) {
+      this.quickPromptController.setAnchorPaneIndex(paneIndex);
+    }
+
+    const success = updatePaneProviderWithLifecycle({
       paneIndex,
       providerKey,
       paneViews: this.paneViews,
@@ -394,18 +435,24 @@ export class ViewManager {
       areUrlsEquivalent,
       callbacks: this.buildLifecycleCallbacks(),
     });
+    if (success) {
+      this.keepQuickPromptOnTop();
+    }
+    return success;
   }
 
   /**
    * Reload all panes to each pane's active provider home page.
    */
   resetAllPanesToProviderHome(): boolean {
-    return resetAllPanesToProviderHomeWithLifecycle({
+    const success = resetAllPanesToProviderHomeWithLifecycle({
       paneViews: this.paneViews,
       defaultProviders: this.defaultProviders,
       providers: this.providers,
       callbacks: this.buildLifecycleCallbacks(),
     });
+    this.keepQuickPromptOnTop();
+    return success;
   }
 
   /**

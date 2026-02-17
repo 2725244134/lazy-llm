@@ -20,9 +20,7 @@ interface PaneLifecycleCallbacks {
   applyPaneRuntimePreferences(webContents: WebContents): void;
   clearProviderLoadingTracking(paneIndex: number): void;
   closePane(pane: PaneViewState): void;
-  keepQuickPromptOnTop(): void;
   updateLayout(): void;
-  setQuickPromptAnchorPaneIndex(paneIndex: number): void;
 }
 
 interface BaseParams {
@@ -35,7 +33,6 @@ interface BaseParams {
 
 interface SetPaneCountParams extends BaseParams {
   count: PaneCount;
-  quickPromptAnchorPaneIndex: number;
   fallbackProviderKey?: string;
 }
 
@@ -49,7 +46,6 @@ interface ResetAllPanesParams extends BaseParams {}
 
 export interface SetPaneCountResult {
   currentPaneCount: PaneCount;
-  quickPromptAnchorPaneIndex: number;
 }
 
 function getLogger(logger?: Pick<Console, 'error'>): Pick<Console, 'error'> {
@@ -63,7 +59,6 @@ export function setPaneCountWithLifecycle(params: SetPaneCountParams): SetPaneCo
     defaultProviders,
     providers,
     callbacks,
-    quickPromptAnchorPaneIndex,
     fallbackProviderKey = 'chatgpt',
   } = params;
 
@@ -92,16 +87,10 @@ export function setPaneCountWithLifecycle(params: SetPaneCountParams): SetPaneCo
     });
   }
 
-  const nextQuickPromptAnchorPaneIndex = Math.max(
-    0,
-    Math.min(quickPromptAnchorPaneIndex, paneViews.length - 1)
-  );
-  callbacks.keepQuickPromptOnTop();
   callbacks.updateLayout();
 
   return {
     currentPaneCount: count,
-    quickPromptAnchorPaneIndex: nextQuickPromptAnchorPaneIndex,
   };
 }
 
@@ -124,7 +113,6 @@ export function updatePaneProviderWithLifecycle(params: UpdatePaneProviderParams
   if (pane.providerKey === providerKey) {
     return true;
   }
-  callbacks.setQuickPromptAnchorPaneIndex(paneIndex);
 
   const cachedViewEntry = pane.cachedViews.get(providerKey);
   if (cachedViewEntry) {
@@ -150,7 +138,6 @@ export function updatePaneProviderWithLifecycle(params: UpdatePaneProviderParams
     pane.url = cachedViewEntry.url;
     defaultProviders[paneIndex] = providerKey;
     callbacks.applyPaneRuntimePreferences(pane.view.webContents);
-    callbacks.keepQuickPromptOnTop();
     callbacks.updateLayout();
     return true;
   }
@@ -165,7 +152,6 @@ export function updatePaneProviderWithLifecycle(params: UpdatePaneProviderParams
   pane.providerKey = providerKey;
   pane.url = provider.url;
   defaultProviders[paneIndex] = providerKey;
-  callbacks.keepQuickPromptOnTop();
   callbacks.updateLayout();
 
   return true;
@@ -211,7 +197,6 @@ export function resetAllPanesToProviderHomeWithLifecycle(params: ResetAllPanesPa
     defaultProviders[pane.paneIndex] = pane.providerKey;
   }
 
-  callbacks.keepQuickPromptOnTop();
   callbacks.updateLayout();
   return success;
 }

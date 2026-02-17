@@ -28,7 +28,7 @@ function createHarness() {
   const focusSidebarIfAvailable = vi.fn<() => void>();
   const notifyQuickPromptOpened = vi.fn<(view: WebContentsView) => void>();
   const closeQuickPromptView = vi.fn<(view: WebContentsView) => void>();
-  const updateQuickPromptAnchorFromFocusedWebContents = vi.fn<() => void>();
+  const syncQuickPromptAnchorBeforeShow = vi.fn<() => void>();
   const createQuickPromptView = vi.fn<() => WebContentsView>(() => view);
 
   const service = new QuickPromptLifecycleService(
@@ -46,7 +46,7 @@ function createHarness() {
       focusSidebarIfAvailable,
       notifyQuickPromptOpened,
       closeQuickPromptView,
-      updateQuickPromptAnchorFromFocusedWebContents,
+      syncQuickPromptAnchorBeforeShow,
     }
   );
 
@@ -61,7 +61,7 @@ function createHarness() {
     focusSidebarIfAvailable,
     notifyQuickPromptOpened,
     closeQuickPromptView,
-    updateQuickPromptAnchorFromFocusedWebContents,
+    syncQuickPromptAnchorBeforeShow,
   };
 }
 
@@ -82,14 +82,14 @@ describe('QuickPromptLifecycleService', () => {
       addQuickPromptViewToContent,
       getQuickPromptBounds,
       focusQuickPromptView,
-      updateQuickPromptAnchorFromFocusedWebContents,
+      syncQuickPromptAnchorBeforeShow,
     } = createHarness();
 
     const visible = service.show();
 
     expect(visible).toBe(true);
     expect(service.isVisible()).toBe(true);
-    expect(updateQuickPromptAnchorFromFocusedWebContents).toHaveBeenCalledTimes(1);
+    expect(syncQuickPromptAnchorBeforeShow).toHaveBeenCalledTimes(1);
     expect(addQuickPromptViewToContent).toHaveBeenCalledWith(view);
     expect(getQuickPromptBounds).toHaveBeenCalledWith(72);
     expect(view.setBounds).toHaveBeenCalledWith({

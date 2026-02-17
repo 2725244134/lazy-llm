@@ -19,6 +19,7 @@ export interface QuickPromptControllerOptions {
   maxHeight: number;
   resolveBounds(requestedHeight: number, anchorPaneIndex: number): ViewRect;
   anchorTracker: QuickPromptAnchorTracker;
+  syncQuickPromptAnchorBeforeShow(): void;
   addQuickPromptViewToContent(view: WebContentsView): void;
   removeQuickPromptViewFromContent(view: WebContentsView): void;
   keepQuickPromptViewOnTop(view: WebContentsView): void;
@@ -49,8 +50,7 @@ export class QuickPromptController {
         focusSidebarIfAvailable: () => this.options.focusSidebarIfAvailable(),
         notifyQuickPromptOpened: (view) => this.notifyQuickPromptOpened(view),
         closeQuickPromptView: (view) => view.webContents.close(),
-        updateQuickPromptAnchorFromFocusedWebContents: () =>
-          this.options.anchorTracker.updateAnchorFromFocusedWebContents(),
+        syncQuickPromptAnchorBeforeShow: () => this.options.syncQuickPromptAnchorBeforeShow(),
       },
     );
   }
@@ -75,24 +75,17 @@ export class QuickPromptController {
     this.options.anchorTracker.setAnchorPaneIndex(paneIndex);
   }
 
-  toggleQuickPrompt(sourceWebContents?: WebContents): boolean {
+  toggleQuickPrompt(): boolean {
     const quickPromptView = this.quickPromptLifecycleService.getView();
     if (
       this.quickPromptLifecycleService.isVisible()
       && quickPromptView
       && !quickPromptView.webContents.isDestroyed()
     ) {
-      const sourceIsDifferentView = Boolean(
-        sourceWebContents && sourceWebContents.id !== quickPromptView.webContents.id,
-      );
-      const overlayLostFocusWithoutExplicitSource = !sourceWebContents && !quickPromptView.webContents.isFocused();
-      if (sourceIsDifferentView || overlayLostFocusWithoutExplicitSource) {
+      const overlayLostFocus = !quickPromptView.webContents.isFocused();
+      if (overlayLostFocus) {
         this.quickPromptLifecycleService.hide({ restoreFocus: false });
       }
-    }
-
-    if (sourceWebContents) {
-      this.options.anchorTracker.updateAnchorFromSource(sourceWebContents);
     }
 
     return this.quickPromptLifecycleService.toggle();

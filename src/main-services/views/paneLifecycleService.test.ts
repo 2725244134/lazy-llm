@@ -66,7 +66,6 @@ function createCallbacks() {
   const loaded: Array<{ paneIndex: number; viewId: string; targetUrl: string; trackLoading: boolean }> = [];
   const applied: string[] = [];
   const cleared: number[] = [];
-  const anchored: number[] = [];
   let sequence = 0;
 
   const callbacks = {
@@ -102,11 +101,7 @@ function createCallbacks() {
     closePane: (pane: PaneViewState) => {
       closed.push(pane.paneIndex);
     },
-    keepQuickPromptOnTop: vi.fn(),
     updateLayout: vi.fn(),
-    setQuickPromptAnchorPaneIndex: (paneIndex: number) => {
-      anchored.push(paneIndex);
-    },
   };
 
   return {
@@ -118,7 +113,6 @@ function createCallbacks() {
     loaded,
     applied,
     cleared,
-    anchored,
   };
 }
 
@@ -137,13 +131,11 @@ describe('setPaneCountWithLifecycle', () => {
       paneViews,
       defaultProviders,
       providers,
-      quickPromptAnchorPaneIndex: 99,
       callbacks,
     });
 
     expect(result).toEqual({
       currentPaneCount: 2,
-      quickPromptAnchorPaneIndex: 1,
     });
     expect(paneViews).toHaveLength(2);
     expect(paneViews[0].providerKey).toBe('chatgpt');
@@ -183,13 +175,11 @@ describe('setPaneCountWithLifecycle', () => {
       paneViews,
       defaultProviders,
       providers,
-      quickPromptAnchorPaneIndex: 2,
       callbacks,
     });
 
     expect(result).toEqual({
       currentPaneCount: 1,
-      quickPromptAnchorPaneIndex: 0,
     });
     expect(paneViews).toHaveLength(1);
     expect(closed).toEqual([2, 1]);
@@ -217,7 +207,7 @@ describe('updatePaneProviderWithLifecycle', () => {
     );
     const paneViews = [pane];
     const defaultProviders = ['chatgpt'];
-    const { callbacks, removed, added, loaded, cleared, anchored } = createCallbacks();
+    const { callbacks, removed, added, loaded, cleared } = createCallbacks();
 
     const success = updatePaneProviderWithLifecycle({
       paneIndex: 0,
@@ -230,7 +220,6 @@ describe('updatePaneProviderWithLifecycle', () => {
     });
 
     expect(success).toBe(true);
-    expect(anchored).toEqual([0]);
     expect(loaded).toHaveLength(0);
     expect(cleared).toEqual([0]);
     expect(removed).toEqual(['current']);
