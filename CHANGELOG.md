@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-20
+
+### Fixed
+
+- Fix idle-status detection in inject bridge by requiring submit button readiness.
+
 ## [0.2.0] - 2026-02-17
 
 ### Added
